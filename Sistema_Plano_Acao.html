@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plano de Ação — Mobilização | Brasil Pontes</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#f1f4f8; --card:#ffffff; --border:#e2e6ed; --border-strong:#cbd2de;
+  --text:#1d2733; --text-2:#5b6472; --text-3:#8a93a3;
+  --accent:#1f4e78; --accent-2:#2f6fa8; --accent-light:#e7f0f8;
+  --green:#1a7f4b; --green-bg:#e5f6ec;
+  --amber:#a5670a; --amber-bg:#fdf1de;
+  --red:#b3261e; --red-bg:#fbe7e6;
+  --radius:10px;
+  --shadow:0 1px 2px rgba(20,30,50,.06),0 1px 8px rgba(20,30,50,.04);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--text); font-size:13.5px; line-height:1.5;}
+.hidden{display:none !important;}
+
+/* login / loading */
+.loading-screen{min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); color:var(--text-2); font-size:14px;}
+.login-wrap{min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#16324f,#1f4e78);}
+.login-card{background:#fff; border-radius:14px; box-shadow:0 12px 50px rgba(0,0,0,.3); padding:36px 34px 30px; width:100%; max-width:380px;}
+.login-brand{text-align:center; margin-bottom:22px;}
+.login-brand .emoji{font-size:32px;}
+.login-brand-title{font-size:17px; font-weight:700; color:var(--text); margin-top:6px;}
+.login-brand-sub{font-size:12px; color:var(--text-3); margin-top:2px;}
+.login-card .form-row label{font-size:12.5px;}
+.login-card .btn-primary{width:100%; padding:11px; font-size:14px; margin-top:6px;}
+.login-error{background:var(--red-bg); color:var(--red); font-size:12.5px; padding:9px 12px; border-radius:8px; margin-bottom:14px; display:none;}
+.login-error.show{display:block;}
+.login-foot{text-align:center; margin-top:18px; font-size:11.5px; color:var(--text-3);}
+
+/* topbar */
+.topbar{background:linear-gradient(180deg,#16324f,#1f4e78); color:#fff; padding:16px 26px;}
+.topbar-row{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.topbar h1{font-size:18px; margin:0; font-weight:700;}
+.topbar .sub{font-size:12px; color:#bcd3e8; margin-top:2px;}
+.obra-select{background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:#fff; padding:8px 12px; border-radius:8px; font-size:13px; font-weight:600;}
+.obra-select option{color:#1d2733;}
+.topbar-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+.user-chip{font-size:12px; color:#dce8f2; display:flex; align-items:center; gap:8px;}
+.btn-logout{background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.3); color:#fff; font-size:12px; padding:7px 12px; border-radius:7px; cursor:pointer; font-weight:600;}
+.btn-logout:hover{background:rgba(255,255,255,.22);}
+.sync-note{font-size:11px; color:#9fc0da; display:flex; align-items:center; gap:5px;}
+.sync-dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:#4fd18b; animation:pulse 1.6s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+.content{padding:22px 26px 60px; max-width:1500px; margin:0 auto;}
+.kpi-grid{display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:18px;}
+.kpi-card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow);}
+.kpi-card .kpi-label{font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:.04em; font-weight:700;}
+.kpi-card .kpi-value{font-size:24px; font-weight:800; margin-top:4px; color:var(--accent);}
+.kpi-card.critico .kpi-value{color:#c62828;}
+.kpi-card.atencao .kpi-value{color:#b8860b;}
+.kpi-card.ok .kpi-value{color:#1a7f4b;}
+.panel{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px 18px; margin-bottom:16px;}
+.toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;}
+.search-input,.filter-select{border:1px solid var(--border-strong); border-radius:8px; padding:9px 12px; font-size:13px; background:#fff; color:var(--text);}
+.search-input{flex:1; min-width:220px;}
+.filter-select{min-width:150px;}
+.btn{border:none; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
+.btn-primary{background:var(--accent); color:#fff;}
+.btn-primary:hover{background:var(--accent-2);}
+.btn-secondary{background:#fff; border:1px solid var(--border-strong); color:var(--text-2);}
+.btn-secondary:hover{border-color:var(--accent-2); color:var(--accent-2);}
+.btn-danger-outline{background:#fff; border:1px solid #e3b3b0; color:var(--red);}
+.btn-sm{padding:5px 10px; font-size:11.5px;}
+.btn:disabled{opacity:.55; cursor:default;}
+.table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:#fff;}
+table{width:100%; border-collapse:collapse; font-size:12.5px;}
+thead th{background:#f6f8fb; text-align:left; padding:10px 10px; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-3); border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0;}
+tbody td{padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:top;}
+tbody tr:hover{background:#fafbfd;}
+.badge{display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap;}
+.desc-cell{max-width:340px;}
+.desc-cell .desc-main{font-weight:600; color:var(--text);}
+.obs-note{font-size:11px; color:var(--text-3); margin-top:5px; line-height:1.45; white-space:pre-wrap;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer;}
+.obs-note.expanded{-webkit-line-clamp:unset; display:block;}
+.obs-note:hover{color:var(--text-2);}
+.qtd-cell{font-size:11.5px; color:var(--text-2); white-space:nowrap;}
+.dias-cell{font-weight:800; white-space:nowrap;}
+.dias-verde{color:#1a7f4b;}
+.dias-amarelo{color:#b8860b;}
+.dias-vermelho{color:#c62828;}
+.acoes-cell{white-space:nowrap;}
+.modal-overlay{position:fixed; inset:0; background:rgba(20,30,50,.45); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; z-index:100; overflow-y:auto;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff; border-radius:12px; width:100%; max-width:640px; padding:22px 24px; box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.modal h3{margin:0 0 4px; font-size:17px; color:var(--accent);}
+.modal-sub{font-size:12px; color:var(--text-3); margin-bottom:16px;}
+.form-row{margin-bottom:12px;}
+.form-row label{display:block; font-size:12px; font-weight:700; color:var(--text-2); margin-bottom:4px;}
+.form-row input,.form-row select,.form-row textarea{width:100%; border:1px solid var(--border-strong); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; color:var(--text);}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none; border-color:var(--accent-2); box-shadow:0 0 0 3px var(--accent-light);}
+.form-grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.form-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:18px;}
+.hint{font-size:11px; color:var(--text-3); margin-top:-6px; margin-bottom:12px;}
+.legend-panel{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.legend-chip{font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:999px;}
+.muted{color:var(--text-3);}
+.toggle-legend{cursor:pointer; color:var(--accent-2); font-size:12px; font-weight:700; user-select:none;}
+.empty-obra{padding:40px; text-align:center; color:var(--text-3); font-size:13px;}
+@media (max-width:1100px){ .kpi-grid{grid-template-columns:repeat(3,1fr);} }
+@media (max-width:640px){ .kpi-grid{grid-template-columns:repeat(2,1fr);} }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loading-screen">Carregando…</div>
+
+<div class="login-wrap hidden" id="login-wrap">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="emoji">📋</div>
+      <div class="login-brand-title">Plano de Ação — Mobilização</div>
+      <div class="login-brand-sub">Brasil Pontes Engenharia · Multi-Obras</div>
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <form id="form-login">
+      <div class="form-row"><label>E-mail</label><input type="email" id="login-email" required autocomplete="username"></div>
+      <div class="form-row"><label>Senha</label><input type="password" id="login-senha" required autocomplete="current-password"></div>
+      <button type="submit" class="btn btn-primary" id="btn-login">Entrar</button>
+    </form>
+    <div class="login-foot">Mesmo login do Sistema de Compras. Fale com a coordenação para criar seu usuário.</div>
+  </div>
+</div>
+
+<div class="hidden" id="app-root">
+  <div class="topbar">
+    <div class="topbar-row">
+      <div>
+        <h1>🏗️ Plano de Ação — Mobilização</h1>
+        <div class="sub">Controle de ações por obra · Brasil Pontes Engenharia</div>
+      </div>
+      <div class="topbar-right">
+        <label style="font-size:11px; color:#bcd3e8; text-transform:uppercase; letter-spacing:.04em; font-weight:700;">Obra</label>
+        <select class="obra-select" id="obra-select"></select>
+        <div class="sync-note"><span class="sync-dot"></span> em nuvem</div>
+        <div class="user-chip" id="user-chip-text"></div>
+        <button class="btn-logout" id="btn-logout">Sair</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <div class="panel">
+      <div class="toolbar">
+        <button class="btn btn-primary" id="btn-nova-acao">+ Nova Ação</button>
+        <input class="search-input" id="f-busca" placeholder="Buscar por ação, responsável ou observação...">
+        <select class="filter-select" id="f-area"><option value="">Todas as áreas</option></select>
+        <select class="filter-select" id="f-status"><option value="">Todos os status</option></select>
+        <select class="filter-select" id="f-farol"><option value="">Todos os faróis</option></select>
+        <select class="filter-select" id="f-responsavel"><option value="">Todos os responsáveis</option></select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Área</th><th>Ação / Descrição</th><th>Qtd. / Unid.</th><th>Responsável</th>
+            <th>Início</th><th>Necessária</th><th>Dias Rest.</th><th>Status</th><th>Farol</th>
+            <th>Entrega</th><th>Dias Gastos</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px; font-size:11.5px; color:var(--text-3);" id="contagem"></div>
+    </div>
+
+    <div class="panel">
+      <div class="toggle-legend" id="toggle-legend">▸ Ver legenda de cores (Status, Farol, Área)</div>
+      <div id="legend-body" style="display:none; margin-top:10px;"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-title">Nova Ação</h3>
+    <div class="modal-sub">Farol e Dias Restantes são calculados automaticamente.</div>
+    <form id="form-acao">
+      <div class="form-grid2">
+        <div class="form-row"><label>Área *</label>
+          <select id="m-area" required></select>
+        </div>
+        <div class="form-row"><label>Responsável *</label><input type="text" id="m-responsavel" required list="lista-responsaveis"></div>
+      </div>
+      <datalist id="lista-responsaveis"></datalist>
+      <div class="form-row"><label>Ação / Descrição *</label><input type="text" id="m-descricao" required></div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Quantidade</label><input type="text" id="m-quantidade" placeholder="Ex: 5, A definir, -"></div>
+        <div class="form-row"><label>Unidade</label><input type="text" id="m-unidade" placeholder="Ex: un, m, kits"></div>
+      </div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Data Início</label><input type="date" id="m-data-inicio"></div>
+        <div class="form-row"><label>Data Necessária</label><input type="date" id="m-data-necessaria"></div>
+      </div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Status *</label>
+          <select id="m-status" required></select>
+        </div>
+        <div class="form-row"><label>Data de Entrega</label><input type="date" id="m-data-entrega"></div>
+      </div>
+      <div class="hint">Preencher "Data de Entrega" trava os "Dias Gastos p/ Concluir" — igual na planilha original.</div>
+      <div class="form-row"><label>Observações</label><textarea id="m-obs" rows="4" placeholder="Registro de atualizações, ex: 07/08 - Cotações enviadas..."></textarea></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="btn-cancelar-modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-salvar-acao">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ============== supabase (mesmo backend do Sistema de Compras) ============== */
+const SUPABASE_URL = 'https://nlitnenswxdpwtlhdpwd.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_1648rfGAwh29GpHK5sagFQ_Sxi0PAv2';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let CURRENT_USER = null;
+let CURRENT_PROFILE = null;
+let IS_GESTOR = false;
+let OBRAS = [];
+let realtimeChannel = null;
+
+const AREAS = ['PMO','RH','Meio Ambiente','Segurança','Engenharia','Planejamento','Obra','Compras','Faixa','Diretoria','Qualidade','Operacional'];
+const STATUS_LIST = ['Não iniciado','Reprogramado','Concluído','Cancelado','Em cotação','Aguardando aprovação','Pedido realizado','Aguardando entrega','Em andamento','Atrasado','Bloqueado'];
+
+const COR_STATUS = {
+  'Não iniciado':'#D9D9D9','Reprogramado':'#FFD966','Concluído':'#A9D08E','Cancelado':'#BFBFBF',
+  'Em cotação':'#BDD7EE','Aguardando aprovação':'#FFE699','Pedido realizado':'#9DC3E6','Aguardando entrega':'#B4A7D6',
+  'Em andamento':'#C6E0B4','Atrasado':'#E06666','Bloqueado':'#434343',
+};
+const TEXTO_ESCURO_STATUS = new Set(['Bloqueado']);
+const COR_FAROL = {'Crítico':'#FF0000','Atenção':'#FFC000','No prazo':'#00B050','-':'#c9ced7'};
+const TEXTO_ESCURO_FAROL = new Set(['Atenção','-']);
+const COR_AREA = {
+  'PMO':'#D9E2F3','RH':'#FCE4D6','Meio Ambiente':'#E2EFDA','Segurança':'#F8CBAD','Engenharia':'#D9D2E9',
+  'Planejamento':'#D0E0E3','Obra':'#FFF2CC','Compras':'#DDEBF7','Faixa':'#EAD1DC','Diretoria':'#F4CCCC',
+  'Qualidade':'#D0E0E3','Operacional':'#E8E8E8',
+};
+
+let STATE = { obraAtual: null, acoes: [] };
+let editandoId = null;
+
+/* ============== helpers ============== */
+function esc(s){ return (s===null||s===undefined) ? "" : String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function escAttr(s){ return esc(s).replace(/"/g,'&quot;'); }
+function fmtDate(v){ if(!v) return "—"; const p=String(v).split("-"); if(p.length!==3) return v; return p[2]+"/"+p[1]+"/"+p[0]; }
+function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0'); }
+
+function diasRestantes(dataNecessaria){
+  if(!dataNecessaria) return null;
+  const hoje = new Date(todayISO()+'T00:00:00');
+  const dn = new Date(dataNecessaria+'T00:00:00');
+  return Math.round((dn - hoje) / 86400000);
+}
+function calcFarol(status, dias){
+  if(status === 'Concluído') return 'No prazo';
+  if(status === 'Cancelado') return '-';
+  if(dias === null || dias === undefined) return '-';
+  if(dias < 0) return 'Crítico';
+  if(dias <= 3) return 'Atenção';
+  return 'No prazo';
+}
+function diasRestantesClasse(dias){
+  if(dias === null || dias === undefined) return '';
+  if(dias < 0) return 'dias-vermelho';
+  if(dias <= 3) return 'dias-amarelo';
+  return 'dias-verde';
+}
+function badgeStatus(status){
+  const cor = COR_STATUS[status] || '#D9D9D9';
+  const texto = TEXTO_ESCURO_STATUS.has(status) ? '#fff' : '#3a3a3a';
+  return `<span class="badge" style="background:${cor}; color:${texto};">${esc(status)}</span>`;
+}
+function badgeFarol(farol){
+  const cor = COR_FAROL[farol] || '#c9ced7';
+  const texto = TEXTO_ESCURO_FAROL.has(farol) ? '#3a3a3a' : '#fff';
+  return `<span class="badge" style="background:${cor}; color:${texto};">${esc(farol)}</span>`;
+}
+function badgeArea(area){
+  const cor = COR_AREA[area] || '#E8E8E8';
+  return `<span class="badge" style="background:${cor}; color:#3a3a3a;">${esc(area)||'—'}</span>`;
+}
+function fillSelectPlain(id, values, placeholder){
+  const sel = document.getElementById(id);
+  sel.innerHTML = (placeholder ? `<option value="">${placeholder}</option>` : '') + values.map(v=>`<option value="${escAttr(v)}">${esc(v)}</option>`).join('');
+}
+function toast(msg, isError){
+  console[isError?'error':'log'](msg);
+  alert(msg);
+}
+function friendlyErrorMsg(error){
+  const msg = String((error && error.message) || error || '');
+  if(/row-level security|JWT|jwt expired|401/i.test(msg)){
+    return 'Sua sessão expirou. Atualize a página (F5) e faça login de novo antes de tentar novamente.';
+  }
+  return msg;
+}
+
+/* ============== auth ============== */
+async function initAuthGate(){
+  const { data: { session } } = await sb.auth.getSession();
+  document.getElementById('loading-screen').classList.add('hidden');
+  if(session){
+    await enterApp(session);
+  }else{
+    document.getElementById('login-wrap').classList.remove('hidden');
+  }
+}
+
+document.getElementById('form-login').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  const errBox = document.getElementById('login-error');
+  const btn = document.getElementById('btn-login');
+  errBox.classList.remove('show');
+  btn.disabled = true; btn.textContent = 'Entrando…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
+  btn.disabled = false; btn.textContent = 'Entrar';
+  if(error){
+    errBox.textContent = 'Não foi possível entrar: e-mail ou senha incorretos.';
+    errBox.classList.add('show');
+    return;
+  }
+  document.getElementById('login-wrap').classList.add('hidden');
+  await enterApp(data.session);
+});
+
+document.getElementById('btn-logout').addEventListener('click', async ()=>{
+  teardownRealtime();
+  await sb.auth.signOut();
+  document.getElementById('app-root').classList.add('hidden');
+  document.getElementById('login-email').value='';
+  document.getElementById('login-senha').value='';
+  document.getElementById('login-wrap').classList.remove('hidden');
+});
+
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState === 'visible' && CURRENT_USER){
+    try{ await sb.auth.getSession(); }catch(e){ console.warn('Falha ao renovar sessão:', e); }
+  }
+});
+
+async function enterApp(session){
+  CURRENT_USER = session.user;
+  const { data: obrasData } = await sb.from('obras').select('*').order('id');
+  OBRAS = (obrasData || []).map(o=>o.id);
+  if(OBRAS.length === 0) OBRAS = ['CD 54 RIBEIRÃO PRETO'];
+
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', CURRENT_USER.id).maybeSingle();
+  CURRENT_PROFILE = profile || null;
+  IS_GESTOR = !!(profile && profile.papel === 'gestor');
+  document.getElementById('user-chip-text').textContent = ((profile && profile.nome) ? profile.nome : CURRENT_USER.email) + (IS_GESTOR ? ' · Gestor' : '');
+
+  fillSelectPlain('obra-select', OBRAS, '');
+  const preferida = (profile && profile.obra_padrao && OBRAS.includes(profile.obra_padrao)) ? profile.obra_padrao : (OBRAS.includes('CD 54 RIBEIRÃO PRETO') ? 'CD 54 RIBEIRÃO PRETO' : OBRAS[0]);
+  STATE.obraAtual = preferida;
+  document.getElementById('obra-select').value = preferida;
+
+  document.getElementById('app-root').classList.remove('hidden');
+  refreshFilterOptionsStatic();
+  await loadAcoes();
+  setupRealtime();
+}
+
+document.getElementById('obra-select').addEventListener('change', async (e)=>{
+  STATE.obraAtual = e.target.value;
+  await loadAcoes();
+});
+
+/* ============== dados ============== */
+async function loadAcoes(){
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:24px; color:var(--text-3);">Carregando…</td></tr>`;
+  const { data, error } = await sb.from('plano_acoes').select('*').eq('obra', STATE.obraAtual).order('id', { ascending:false });
+  if(error){
+    tbody.innerHTML = `<tr><td colspan="12" class="empty-obra">Erro ao carregar: ${esc(friendlyErrorMsg(error))}</td></tr>`;
+    return;
+  }
+  STATE.acoes = data || [];
+  refreshFilterOptionsDynamic();
+  render();
+}
+
+function setupRealtime(){
+  teardownRealtime();
+  realtimeChannel = sb.channel('rt-plano-acoes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'plano_acoes' }, (payload)=>{
+      const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
+      if(row && row.obra === STATE.obraAtual){ loadAcoes(); }
+    })
+    .subscribe((status, err)=>{
+      if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+        setTimeout(()=>{ if(CURRENT_USER) setupRealtime(); }, 4000);
+      }
+    });
+}
+function teardownRealtime(){
+  if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+}
+
+/* ============== render ============== */
+function refreshFilterOptionsStatic(){
+  fillSelectPlain('f-area', AREAS, 'Todas as áreas');
+  fillSelectPlain('f-status', STATUS_LIST, 'Todos os status');
+  fillSelectPlain('f-farol', ['Crítico','Atenção','No prazo','-'], 'Todos os faróis');
+}
+function refreshFilterOptionsDynamic(){
+  const resp = [...new Set(STATE.acoes.map(a=>a.responsavel).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  fillSelectPlain('f-responsavel', resp, 'Todos os responsáveis');
+  document.getElementById('lista-responsaveis').innerHTML = resp.map(r=>`<option value="${escAttr(r)}">`).join('');
+}
+
+function renderKpis(){
+  const acoes = STATE.acoes;
+  const total = acoes.length;
+  let critico=0, atencao=0, noprazo=0, concluido=0;
+  acoes.forEach(a=>{
+    const dias = diasRestantes(a.data_necessaria);
+    const farol = calcFarol(a.status, dias);
+    if(a.status==='Concluído') concluido++;
+    if(farol==='Crítico') critico++;
+    else if(farol==='Atenção') atencao++;
+    else if(farol==='No prazo') noprazo++;
+  });
+  const pct = total ? Math.round(concluido/total*100) : 0;
+  const cards = [
+    {label:'Total de ações', value:total, cls:''},
+    {label:'Críticas', value:critico, cls:'critico'},
+    {label:'Em atenção', value:atencao, cls:'atencao'},
+    {label:'No prazo', value:noprazo, cls:'ok'},
+    {label:'Concluídas', value:concluido, cls:'ok'},
+    {label:'% concluído', value:pct+'%', cls:'ok'},
+  ];
+  document.getElementById('kpi-grid').innerHTML = cards.map(c=>`
+    <div class="kpi-card ${c.cls}"><div class="kpi-label">${c.label}</div><div class="kpi-value">${c.value}</div></div>
+  `).join('');
+}
+
+function getFiltered(){
+  const q = document.getElementById('f-busca').value.trim().toLowerCase();
+  const fArea = document.getElementById('f-area').value;
+  const fStatus = document.getElementById('f-status').value;
+  const fFarol = document.getElementById('f-farol').value;
+  const fResp = document.getElementById('f-responsavel').value;
+  return STATE.acoes.filter(a=>{
+    const dias = diasRestantes(a.data_necessaria);
+    const farol = calcFarol(a.status, dias);
+    if(fArea && a.area !== fArea) return false;
+    if(fStatus && a.status !== fStatus) return false;
+    if(fFarol && farol !== fFarol) return false;
+    if(fResp && a.responsavel !== fResp) return false;
+    if(q && !(String(a.descricao||'').toLowerCase().includes(q) || String(a.responsavel||'').toLowerCase().includes(q) || String(a.obs||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function render(){
+  const lista = getFiltered();
+  const tbody = document.getElementById('tbody');
+  if(STATE.acoes.length === 0){
+    tbody.innerHTML = `<tr><td colspan="12" class="empty-obra">Nenhuma ação cadastrada ainda para ${esc(STATE.obraAtual)}. Clique em "+ Nova Ação" para começar.</td></tr>`;
+    document.getElementById('contagem').textContent = '';
+    renderKpis();
+    return;
+  }
+  tbody.innerHTML = lista.map(a=>{
+    const dias = diasRestantes(a.data_necessaria);
+    const farol = calcFarol(a.status, dias);
+    const diasTxt = dias===null ? '—' : (dias===0 ? 'Hoje' : (dias>0 ? dias+'d' : (Math.abs(dias)+'d atraso')));
+    return `<tr>
+      <td>${badgeArea(a.area)}</td>
+      <td class="desc-cell"><div class="desc-main">${esc(a.descricao)}</div>${a.obs ? `<div class="obs-note" onclick="this.classList.toggle('expanded')">${esc(a.obs)}</div>` : ''}</td>
+      <td class="qtd-cell">${esc(a.quantidade)||'—'} ${esc(a.unidade)||''}</td>
+      <td>${esc(a.responsavel)||'—'}</td>
+      <td>${fmtDate(a.data_inicio)}</td>
+      <td>${fmtDate(a.data_necessaria)}</td>
+      <td class="dias-cell ${diasRestantesClasse(dias)}">${diasTxt}</td>
+      <td>${badgeStatus(a.status)}</td>
+      <td>${badgeFarol(farol)}</td>
+      <td>${fmtDate(a.data_entrega)}</td>
+      <td>${a.dias_gastos!==null && a.dias_gastos!==undefined ? a.dias_gastos+'d' : '—'}</td>
+      <td class="acoes-cell">
+        <button class="btn btn-sm btn-secondary" onclick="abrirEdicao(${a.id})">✏️</button>
+        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirAcao(${a.id})">🗑</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-3);">Nenhuma ação encontrada com esses filtros.</td></tr>`;
+  document.getElementById('contagem').textContent = `${lista.length} de ${STATE.acoes.length} ações`;
+  renderKpis();
+}
+
+['f-busca','f-area','f-status','f-farol','f-responsavel'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', render);
+  document.getElementById(id).addEventListener('change', render);
+});
+
+/* ============== modal / CRUD ============== */
+function abrirModal(){ document.getElementById('modal-overlay').classList.add('open'); }
+function fecharModal(){ document.getElementById('modal-overlay').classList.remove('open'); editandoId = null; }
+document.getElementById('btn-cancelar-modal').addEventListener('click', fecharModal);
+document.getElementById('modal-overlay').addEventListener('click', e=>{ if(e.target.id==='modal-overlay') fecharModal(); });
+
+document.getElementById('btn-nova-acao').addEventListener('click', ()=>{
+  editandoId = null;
+  document.getElementById('modal-title').textContent = 'Nova Ação';
+  document.getElementById('form-acao').reset();
+  fillSelectPlain('m-area', AREAS, '');
+  fillSelectPlain('m-status', STATUS_LIST, '');
+  document.getElementById('m-status').value = 'Não iniciado';
+  document.getElementById('m-data-inicio').value = todayISO();
+  abrirModal();
+});
+
+window.abrirEdicao = function(id){
+  const a = STATE.acoes.find(x=>x.id===id);
+  if(!a) return;
+  editandoId = id;
+  document.getElementById('modal-title').textContent = 'Editar Ação #' + id;
+  fillSelectPlain('m-area', AREAS, '');
+  fillSelectPlain('m-status', STATUS_LIST, '');
+  document.getElementById('m-area').value = a.area;
+  document.getElementById('m-responsavel').value = a.responsavel || '';
+  document.getElementById('m-descricao').value = a.descricao || '';
+  document.getElementById('m-quantidade').value = a.quantidade || '';
+  document.getElementById('m-unidade').value = a.unidade || '';
+  document.getElementById('m-data-inicio').value = a.data_inicio || '';
+  document.getElementById('m-data-necessaria').value = a.data_necessaria || '';
+  document.getElementById('m-status').value = a.status;
+  document.getElementById('m-data-entrega').value = a.data_entrega || '';
+  document.getElementById('m-obs').value = a.obs || '';
+  abrirModal();
+};
+
+window.excluirAcao = async function(id){
+  const a = STATE.acoes.find(x=>x.id===id);
+  if(!a) return;
+  if(!confirm(`Excluir a ação "${a.descricao}"? Essa ação não pode ser desfeita.`)) return;
+  const { error } = await sb.from('plano_acoes').delete().eq('id', id);
+  if(error){ toast('Erro ao excluir: ' + friendlyErrorMsg(error), true); return; }
+  await loadAcoes();
+};
+
+document.getElementById('form-acao').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const btn = document.getElementById('btn-salvar-acao');
+  const dataInicio = document.getElementById('m-data-inicio').value || null;
+  const dataEntrega = document.getElementById('m-data-entrega').value || null;
+  let diasGastos = null;
+  if(dataEntrega && dataInicio){
+    diasGastos = Math.round((new Date(dataEntrega+'T00:00:00') - new Date(dataInicio+'T00:00:00')) / 86400000);
+  }
+  const existente = editandoId ? STATE.acoes.find(x=>x.id===editandoId) : null;
+  const rec = {
+    obra: STATE.obraAtual,
+    area: document.getElementById('m-area').value,
+    responsavel: document.getElementById('m-responsavel').value.trim(),
+    descricao: document.getElementById('m-descricao').value.trim(),
+    quantidade: document.getElementById('m-quantidade').value.trim(),
+    unidade: document.getElementById('m-unidade').value.trim(),
+    data_inicio: dataInicio,
+    data_necessaria: document.getElementById('m-data-necessaria').value || null,
+    status: document.getElementById('m-status').value,
+    data_entrega: dataEntrega,
+    dias_gastos: dataEntrega ? diasGastos : (existente ? existente.dias_gastos : null),
+    obs: document.getElementById('m-obs').value.trim(),
+  };
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  let error;
+  if(editandoId){
+    ({ error } = await sb.from('plano_acoes').update(rec).eq('id', editandoId));
+  }else{
+    rec.criado_por = (CURRENT_PROFILE && CURRENT_PROFILE.nome) || (CURRENT_USER && CURRENT_USER.email) || null;
+    ({ error } = await sb.from('plano_acoes').insert(rec));
+  }
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if(error){ toast('Erro ao salvar: ' + friendlyErrorMsg(error), true); return; }
+  fecharModal();
+  await loadAcoes();
+});
+
+/* ============== legenda ============== */
+document.getElementById('toggle-legend').addEventListener('click', ()=>{
+  const body = document.getElementById('legend-body');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  document.getElementById('toggle-legend').textContent = (open?'▸':'▾') + ' Ver legenda de cores (Status, Farol, Área)';
+});
+document.getElementById('legend-body').innerHTML = `
+  <div style="margin-bottom:10px;"><strong style="font-size:12px;">Status</strong><div class="legend-panel">${STATUS_LIST.map(s=>`<span class="legend-chip" style="background:${COR_STATUS[s]}; color:${TEXTO_ESCURO_STATUS.has(s)?'#fff':'#3a3a3a'};">${s}</span>`).join('')}</div></div>
+  <div style="margin-bottom:10px;"><strong style="font-size:12px;">Farol</strong><div class="legend-panel">${['Crítico','Atenção','No prazo','-'].map(s=>`<span class="legend-chip" style="background:${COR_FAROL[s]}; color:${TEXTO_ESCURO_FAROL.has(s)?'#3a3a3a':'#fff'};">${s}</span>`).join('')}</div></div>
+  <div><strong style="font-size:12px;">Área</strong><div class="legend-panel">${AREAS.map(s=>`<span class="legend-chip" style="background:${COR_AREA[s]}; color:#3a3a3a;">${s}</span>`).join('')}</div></div>
+`;
+
+initAuthGate();
+</script>
+</body>
+</html>
