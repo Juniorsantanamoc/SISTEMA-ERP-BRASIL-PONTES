@@ -4749,6 +4749,20 @@ const CONTRATO_TIPOS = {
 };
 let contratosAba = 'todos';
 
+/* Títulos das cláusulas FIXAS do modelo-base de cada tipo, na ordem em que
+   gerarTextoContratoBase() as escreve. Usado só para exibir a lista completa
+   e reordenável de cláusulas (fixas + adicionais) na tela — o texto de cada
+   cláusula fixa continua sendo gerado dinamicamente a partir dos dados do
+   formulário; aqui é só o rótulo, pra manter a lista sempre coerente com o
+   texto real e permitir mover as fixas junto com as adicionais. */
+const CONTRATO_CLAUSULAS_FIXAS = {
+  locacao: ['DO OBJETO','DA VIGÊNCIA','DO VALOR E FORMA DE PAGAMENTO','DAS OBRIGAÇÕES DA CONTRATADA','DAS OBRIGAÇÕES DA CONTRATANTE','DA RESCISÃO','DO FORO'],
+  servico: ['DO OBJETO','DA VIGÊNCIA','DO VALOR E FORMA DE PAGAMENTO','DA GARANTIA','DAS OBRIGAÇÕES DA CONTRATADA','DAS OBRIGAÇÕES DA CONTRATANTE','DA RESCISÃO','DO FORO'],
+  hospedagem: ['DO OBJETO','DA VIGÊNCIA','DO VALOR E FORMA DE PAGAMENTO','DO ESTADO DO IMÓVEL E VISTORIA','DAS OBRIGAÇÕES DAS PARTES','DA RESCISÃO','DO FORO'],
+  galpao: ['DO OBJETO','DA VIGÊNCIA','DO VALOR E FORMA DE PAGAMENTO','DO ESTADO DO IMÓVEL E VISTORIA','DAS OBRIGAÇÕES DAS PARTES','DA RESCISÃO','DO FORO'],
+  alimentacao: ['DO OBJETO','DA VIGÊNCIA','DO VALOR E FORMA DE PAGAMENTO','DAS OBRIGAÇÕES DA CONTRATADA','DAS OBRIGAÇÕES DA CONTRATANTE','DA RESCISÃO','DO FORO'],
+};
+
 /* ============== Cláusulas adicionais do contrato (catálogo + IA) ==============
    O texto "base" do contrato (objeto, vigência, valor, obrigações, rescisão, foro)
    continua sendo gerado pelo template fixo de cada tipo (gerarTextoContratoBase).
@@ -4759,6 +4773,47 @@ let contratosAba = 'todos';
    gerado (depois da cláusula de Foro, antes do fecho/assinatura). */
 let CT_CLAUSULAS_SEL = [];
 let CT_TIPO_ATUAL = 'locacao';
+/* Ordem de TODAS as cláusulas do contrato (fixas do modelo + adicionais),
+   como uma lista de tokens: 'f0','f1',... para as fixas (índice em
+   CONTRATO_CLAUSULAS_FIXAS[tipo]) e 's<uid>' para cada item de
+   CT_CLAUSULAS_SEL. Permite reordenar tudo junto, inclusive as fixas. */
+let CT_ORDEM_CLAUSULAS = [];
+
+function uidClausula(s){
+  if(!s._uid) s._uid = 'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  return s._uid;
+}
+
+/* Garante que CT_ORDEM_CLAUSULAS tenha exatamente um token pra cada cláusula
+   fixa do tipo atual + um token pra cada item de CT_CLAUSULAS_SEL. Se o tipo
+   mudou (contagem de fixas diferente) ou a ordem nunca foi montada, reconstrói
+   do zero (fixas na ordem original, adicionais inseridas antes do Foro — a
+   última fixa). Se só faltar/sobrar token de adicional, ajusta sem bagunçar
+   o resto da ordem que a pessoa já tenha organizado. */
+function garantirOrdemClausulas(tipo){
+  const fixas = CONTRATO_CLAUSULAS_FIXAS[tipo] || [];
+  const nFixas = fixas.length;
+  const tokensFixasEsperados = fixas.map((_,i)=>'f'+i);
+  const tokensExtrasEsperados = CT_CLAUSULAS_SEL.map(s=>'s'+uidClausula(s));
+
+  const fixasNaOrdem = CT_ORDEM_CLAUSULAS.filter(t=>t[0]==='f');
+  const fixasValidas = fixasNaOrdem.length===nFixas && fixasNaOrdem.every(t=>tokensFixasEsperados.includes(t));
+
+  if(!CT_ORDEM_CLAUSULAS.length || !fixasValidas){
+    CT_ORDEM_CLAUSULAS = tokensFixasEsperados.slice(0, Math.max(0,nFixas-1))
+      .concat(tokensExtrasEsperados)
+      .concat(tokensFixasEsperados.slice(Math.max(0,nFixas-1)));
+    return;
+  }
+  CT_ORDEM_CLAUSULAS = CT_ORDEM_CLAUSULAS.filter(t=> t[0]==='f' || tokensExtrasEsperados.includes(t));
+  tokensExtrasEsperados.forEach(t=>{
+    if(!CT_ORDEM_CLAUSULAS.includes(t)){
+      const idxUltimaFixa = CT_ORDEM_CLAUSULAS.lastIndexOf('f'+(nFixas-1));
+      const pos = idxUltimaFixa>=0 ? idxUltimaFixa : CT_ORDEM_CLAUSULAS.length;
+      CT_ORDEM_CLAUSULAS.splice(pos, 0, t);
+    }
+  });
+}
 
 function catalogoClausulasParaTipo(tipo){
   return (STATE.contratoClausulasModelo||[])
@@ -4769,6 +4824,7 @@ function catalogoClausulasParaTipo(tipo){
 function renderClausulasContratoUI(){
   const wrap = document.getElementById('ct-clausulas-wrap');
   if(!wrap) return;
+  garantirOrdemClausulas(CT_TIPO_ATUAL);
   const catalogo = catalogoClausulasParaTipo(CT_TIPO_ATUAL);
   const catalogoHTML = catalogo.length ? catalogo.map(cl=>{
     const marcada = CT_CLAUSULAS_SEL.some(s=>s.catalogo_id===cl.id);
@@ -4780,19 +4836,37 @@ function renderClausulasContratoUI(){
     </div>`;
   }).join('') : '<div class="hint">Nenhuma cláusula cadastrada no catálogo para este tipo ainda.</div>';
 
-  const selecionadasHTML = CT_CLAUSULAS_SEL.length ? CT_CLAUSULAS_SEL.map((s,i)=>`
-    <div class="clausula-selecionada">
-      <div class="clausula-selecionada-head">
-        <div style="display:flex; flex-direction:column; gap:2px;">
-          <button type="button" class="btn btn-sm btn-secondary" data-sel-subir="${i}" title="Mover para cima" ${i===0?'disabled style="opacity:.35; cursor:default;"':''} style="padding:0 6px; line-height:1.4;">▲</button>
-          <button type="button" class="btn btn-sm btn-secondary" data-sel-descer="${i}" title="Mover para baixo" ${i===CT_CLAUSULAS_SEL.length-1?'disabled style="opacity:.35; cursor:default;"':''} style="padding:0 6px; line-height:1.4;">▼</button>
+  const fixas = CONTRATO_CLAUSULAS_FIXAS[CT_TIPO_ATUAL] || [];
+  const n = CT_ORDEM_CLAUSULAS.length;
+  const selecionadasHTML = n ? CT_ORDEM_CLAUSULAS.map((token,i)=>{
+    const setas = `<div style="display:flex; flex-direction:column; gap:2px;">
+      <button type="button" class="btn btn-sm btn-secondary" data-ord-subir="${i}" title="Mover para cima" ${i===0?'disabled style="opacity:.35; cursor:default;"':''} style="padding:0 6px; line-height:1.4;">▲</button>
+      <button type="button" class="btn btn-sm btn-secondary" data-ord-descer="${i}" title="Mover para baixo" ${i===n-1?'disabled style="opacity:.35; cursor:default;"':''} style="padding:0 6px; line-height:1.4;">▼</button>
+    </div>`;
+    if(token[0]==='f'){
+      const idx = Number(token.slice(1));
+      const titulo = fixas[idx] || 'CLÁUSULA DO MODELO';
+      return `<div class="clausula-selecionada" style="background:#f1f4f8;">
+        <div class="clausula-selecionada-head">
+          ${setas}
+          <span style="font-weight:600; font-size:13px; flex:1; padding:5px 8px;">🔒 ${esc(titulo)}</span>
+          <span class="hint" style="white-space:nowrap;">cláusula do modelo</span>
         </div>
-        <input type="text" data-sel-titulo="${i}" value="${escAttr(s.titulo)}" placeholder="Título da cláusula" style="font-weight:600; font-size:13px; border:1px solid var(--border,#cbd5e0); background:#fff; border-radius:4px; flex:1; padding:5px 8px;">
-        <button type="button" class="btn btn-sm btn-danger-outline" data-sel-remover="${i}">✕</button>
+        <div class="hint" style="padding:0 4px 2px;">Texto gerado automaticamente a partir dos dados preenchidos acima — só é possível reordenar, não editar aqui.</div>
+      </div>`;
+    }
+    const uid = token.slice(1);
+    const s = CT_CLAUSULAS_SEL.find(x=>x._uid===uid);
+    if(!s) return '';
+    return `<div class="clausula-selecionada">
+      <div class="clausula-selecionada-head">
+        ${setas}
+        <input type="text" data-sel-titulo="${esc(uid)}" value="${escAttr(s.titulo)}" placeholder="Título da cláusula" style="font-weight:600; font-size:13px; border:1px solid var(--border,#cbd5e0); background:#fff; border-radius:4px; flex:1; padding:5px 8px;">
+        <button type="button" class="btn btn-sm btn-danger-outline" data-sel-remover="${esc(uid)}">✕</button>
       </div>
-      <textarea data-sel-texto="${i}" rows="2">${esc(s.texto)}</textarea>
-    </div>
-  `).join('') : '<div class="hint">Nenhuma cláusula adicional selecionada ainda.</div>';
+      <textarea data-sel-texto="${esc(uid)}" rows="2">${esc(s.texto)}</textarea>
+    </div>`;
+  }).join('') : '<div class="hint">Nenhuma cláusula ainda.</div>';
 
   wrap.innerHTML = `
     <div class="clausulas-box">
@@ -4800,7 +4874,7 @@ function renderClausulasContratoUI(){
       ${catalogoHTML}
     </div>
     <div style="margin-top:10px;">
-      <strong style="font-size:13px;">Cláusulas selecionadas para este contrato (edite o título/texto se precisar):</strong>
+      <strong style="font-size:13px;">Todas as cláusulas do contrato (fixas do modelo 🔒 + adicionais) — use as setas pra posicionar do jeito que fizer mais sentido:</strong>
       <div id="ct-clausulas-selecionadas" style="margin-top:6px;">${selecionadasHTML}</div>
     </div>
     <div class="clausula-ia-box">
@@ -4820,36 +4894,46 @@ function renderClausulasContratoUI(){
         const cat = catalogo.find(c=>c.id===id);
         if(cat) CT_CLAUSULAS_SEL.push({catalogo_id: cat.id, titulo: cat.titulo, texto: cat.texto, origem:'catalogo'});
       }else{
+        const alvo = CT_CLAUSULAS_SEL.find(s=>s.catalogo_id===id);
+        if(alvo) CT_ORDEM_CLAUSULAS = CT_ORDEM_CLAUSULAS.filter(t=>t!=='s'+alvo._uid);
         CT_CLAUSULAS_SEL = CT_CLAUSULAS_SEL.filter(s=>s.catalogo_id!==id);
       }
       renderClausulasContratoUI();
     });
   });
   wrap.querySelectorAll('[data-sel-titulo]').forEach(inp=>{
-    inp.addEventListener('input', ()=>{ CT_CLAUSULAS_SEL[Number(inp.getAttribute('data-sel-titulo'))].titulo = inp.value; });
+    inp.addEventListener('input', ()=>{
+      const s = CT_CLAUSULAS_SEL.find(x=>x._uid===inp.getAttribute('data-sel-titulo'));
+      if(s) s.titulo = inp.value;
+    });
   });
   wrap.querySelectorAll('[data-sel-texto]').forEach(ta=>{
-    ta.addEventListener('input', ()=>{ CT_CLAUSULAS_SEL[Number(ta.getAttribute('data-sel-texto'))].texto = ta.value; });
+    ta.addEventListener('input', ()=>{
+      const s = CT_CLAUSULAS_SEL.find(x=>x._uid===ta.getAttribute('data-sel-texto'));
+      if(s) s.texto = ta.value;
+    });
   });
   wrap.querySelectorAll('[data-sel-remover]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      CT_CLAUSULAS_SEL.splice(Number(btn.getAttribute('data-sel-remover')),1);
+      const uid = btn.getAttribute('data-sel-remover');
+      CT_CLAUSULAS_SEL = CT_CLAUSULAS_SEL.filter(s=>s._uid!==uid);
+      CT_ORDEM_CLAUSULAS = CT_ORDEM_CLAUSULAS.filter(t=>t!=='s'+uid);
       renderClausulasContratoUI();
     });
   });
-  wrap.querySelectorAll('[data-sel-subir]').forEach(btn=>{
+  wrap.querySelectorAll('[data-ord-subir]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const i = Number(btn.getAttribute('data-sel-subir'));
+      const i = Number(btn.getAttribute('data-ord-subir'));
       if(i<=0) return;
-      [CT_CLAUSULAS_SEL[i-1], CT_CLAUSULAS_SEL[i]] = [CT_CLAUSULAS_SEL[i], CT_CLAUSULAS_SEL[i-1]];
+      [CT_ORDEM_CLAUSULAS[i-1], CT_ORDEM_CLAUSULAS[i]] = [CT_ORDEM_CLAUSULAS[i], CT_ORDEM_CLAUSULAS[i-1]];
       renderClausulasContratoUI();
     });
   });
-  wrap.querySelectorAll('[data-sel-descer]').forEach(btn=>{
+  wrap.querySelectorAll('[data-ord-descer]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const i = Number(btn.getAttribute('data-sel-descer'));
-      if(i>=CT_CLAUSULAS_SEL.length-1) return;
-      [CT_CLAUSULAS_SEL[i+1], CT_CLAUSULAS_SEL[i]] = [CT_CLAUSULAS_SEL[i], CT_CLAUSULAS_SEL[i+1]];
+      const i = Number(btn.getAttribute('data-ord-descer'));
+      if(i>=CT_ORDEM_CLAUSULAS.length-1) return;
+      [CT_ORDEM_CLAUSULAS[i+1], CT_ORDEM_CLAUSULAS[i]] = [CT_ORDEM_CLAUSULAS[i], CT_ORDEM_CLAUSULAS[i+1]];
       renderClausulasContratoUI();
     });
   });
@@ -5137,7 +5221,11 @@ async function abrirFormContratoModal(c){
   const tipo = (c && c.tipo) || 'locacao';
   const numeroInicial = (c && c.numero) ? c.numero : await proximoNumeroContrato(tipo);
   CT_TIPO_ATUAL = tipo;
-  CT_CLAUSULAS_SEL = (c && Array.isArray(c.clausulas_selecionadas)) ? c.clausulas_selecionadas.map(s=>Object.assign({}, s)) : [];
+  // uid é a mesma chave salva em clausulas_selecionadas[].uid — preserva ela ao
+  // reabrir/editar pra manter os tokens de CT_ORDEM_CLAUSULAS válidos; só gera
+  // um uid novo (via uidClausula) se o registro salvo não tiver (dado antigo).
+  CT_CLAUSULAS_SEL = (c && Array.isArray(c.clausulas_selecionadas)) ? c.clausulas_selecionadas.map(s=>Object.assign({}, s, {_uid: s.uid})) : [];
+  CT_ORDEM_CLAUSULAS = (c && Array.isArray(c.ordem_clausulas)) ? c.ordem_clausulas.slice() : [];
   openModal(`
     <h3>${editando ? 'Editar Contrato #'+esc(c.numero) : 'Novo Contrato'}</h3>
     <div class="modal-sub">Obra: <strong>${esc(STATE.currentObra)}</strong></div>
@@ -5246,7 +5334,8 @@ function lerFormularioContrato(){
     renovacao_automatica: document.getElementById('ct-renovacao').value==='true',
     aviso_renovacao_dias: Number(document.getElementById('ct-aviso-dias').value)||15,
     observacoes: document.getElementById('ct-obs').value.trim(),
-    clausulas_selecionadas: CT_CLAUSULAS_SEL.map(s=>({titulo:s.titulo, texto:s.texto, origem:s.origem||'manual', catalogo_id:s.catalogo_id||null})),
+    clausulas_selecionadas: CT_CLAUSULAS_SEL.map(s=>({titulo:s.titulo, texto:s.texto, origem:s.origem||'manual', catalogo_id:s.catalogo_id||null, uid:uidClausula(s)})),
+    ordem_clausulas: (()=>{ garantirOrdemClausulas(tipo); return CT_ORDEM_CLAUSULAS.slice(); })(),
   };
   return Object.assign(base, lerCamposExtrasContrato(tipo));
 }
@@ -5475,45 +5564,63 @@ function aditivosHistoricoHTML(c){
   `).join('');
   return `<div class="form-row"><label>Termos aditivos (${aditivos.length})</label>${linhas}</div>`;
 }
-/* gerarTextoContrato: gera o texto base (template fixo por tipo) e, se o contrato
-   tiver cláusulas adicionais selecionadas (catálogo/IA/manual), acrescenta-as no
-   final, numeradas em sequência, logo antes do fecho "E, por estarem assim justas
-   e contratadas...". Mantém compatibilidade total com os geradores de .docx/impressão,
-   que só dependem do padrão "CLÁUSULA Nª — TÍTULO". */
+/* gerarTextoContrato: gera o texto base (template fixo por tipo, com o corpo de
+   cada cláusula já preenchido a partir dos dados do contrato) e reorganiza TODAS
+   as cláusulas — fixas do modelo + adicionais (catálogo/IA/manual) — na ordem que
+   a pessoa escolheu em c.ordem_clausulas (tela "Cláusulas adicionais"), renumerando
+   em sequência. Contratos antigos, sem ordem salva, caem no comportamento anterior:
+   adicionais entram logo antes da última cláusula fixa (o Foro). Mantém
+   compatibilidade total com os geradores de .docx/impressão, que só dependem do
+   padrão "CLÁUSULA Nª — TÍTULO". */
 function gerarTextoContrato(c){
-  let texto = gerarTextoContratoBase(c);
-  if(c && Array.isArray(c.clausulas_selecionadas) && c.clausulas_selecionadas.length){
-    texto = inserirClausulasAdicionaisNoTexto(texto, c.clausulas_selecionadas);
-  }
-  return texto;
+  const base = gerarTextoContratoBase(c);
+  const adicionais = (c && Array.isArray(c.clausulas_selecionadas)) ? c.clausulas_selecionadas.filter(cl=>cl && (cl.titulo||cl.texto)) : [];
+  const ordem = (c && Array.isArray(c.ordem_clausulas) && c.ordem_clausulas.length) ? c.ordem_clausulas : null;
+  return montarTextoContratoComOrdem(base, adicionais, ordem);
 }
-function inserirClausulasAdicionaisNoTexto(texto, clausulas){
-  const validas = (clausulas||[]).filter(cl=>cl && (cl.titulo||cl.texto));
-  if(!validas.length) return texto;
+function montarTextoContratoComOrdem(texto, adicionais, ordemTokens){
+  const marcadores = [...texto.matchAll(/CLÁUSULA\s+\d+ª\s+—\s+[^\n]+/g)];
+  if(!marcadores.length) return texto; // formato inesperado — devolve como veio
 
-  // A cláusula "DO FORO" é sempre a última do modelo-base. Para não deixar as
-  // cláusulas adicionais (ex.: pagamento) depois do foro, elas são inseridas
-  // ANTES dele, e o foro é renumerado para ficar sempre por último.
-  const foroMatch = texto.match(/CLÁUSULA\s+(\d+)ª\s+—\s+DO FORO[\s\S]*?(?=\n\nE, por estarem assim justas e contratadas|$)/);
-  const todosNums = [...texto.matchAll(/CLÁUSULA\s+(\d+)ª/g)].map(m=>Number(m[1]));
-  const foroNumAntigo = foroMatch ? Number(foroMatch[1]) : null;
-  const numsSemForo = foroNumAntigo!==null ? todosNums.filter(x=>x!==foroNumAntigo) : todosNums;
-  let n = numsSemForo.length ? Math.max(...numsSemForo) : 0;
+  const fimFechoIdx = texto.indexOf('\n\nE, por estarem assim justas e contratadas');
+  const preambulo = texto.slice(0, marcadores[0].index).replace(/\n+$/,'');
+  const fecho = fimFechoIdx>=0 ? texto.slice(fimFechoIdx).replace(/^\n+/,'') : '';
+  const fimClausulas = fimFechoIdx>=0 ? fimFechoIdx : texto.length;
 
-  const bloco = validas.map(cl=>{
-    n++;
-    return `CLÁUSULA ${n}ª — ${String(cl.titulo||'CLÁUSULA ADICIONAL').toUpperCase()}\n${cl.texto||''}`;
-  }).join('\n\n');
+  const fixas = marcadores.map((m,i)=>{
+    const inicioCorpo = m.index + m[0].length;
+    const fimCorpo = i+1<marcadores.length ? marcadores[i+1].index : fimClausulas;
+    const titulo = m[0].replace(/^CLÁUSULA\s+\d+ª\s+—\s+/, '').trim();
+    const corpo = texto.slice(inicioCorpo, fimCorpo).replace(/^\n+/,'').replace(/\n+$/,'');
+    return { titulo, texto: corpo };
+  });
 
-  if(foroMatch){
-    const foroNumNovo = n + 1;
-    const foroBlocoNovo = foroMatch[0].replace(new RegExp('^CLÁUSULA\\s+'+foroNumAntigo+'ª'), 'CLÁUSULA '+foroNumNovo+'ª');
-    return texto.replace(foroMatch[0], bloco + '\n\n' + foroBlocoNovo);
+  const validas = (adicionais||[]).filter(cl=>cl && (cl.titulo||cl.texto));
+
+  let itens;
+  const fTokens = ordemTokens ? ordemTokens.filter(t=>t[0]==='f') : null;
+  const ordemValida = fTokens && fTokens.length===fixas.length;
+  if(ordemValida){
+    const mapaExtras = {};
+    validas.forEach(cl=>{ if(cl.uid) mapaExtras['s'+cl.uid] = cl; });
+    itens = ordemTokens.map(token=>{
+      if(token[0]==='f') return fixas[Number(token.slice(1))];
+      return mapaExtras[token] ? { titulo: mapaExtras[token].titulo, texto: mapaExtras[token].texto } : null;
+    }).filter(Boolean);
+    // qualquer adicional que por algum motivo não esteja na ordem salva ainda
+    // entra antes do Foro, pra não sumir do contrato.
+    const jaIncluidos = new Set(ordemTokens.filter(t=>t[0]==='s'));
+    const faltando = validas.filter(cl=>!cl.uid || !jaIncluidos.has('s'+cl.uid));
+    if(faltando.length) itens.splice(Math.max(0,itens.length-1), 0, ...faltando.map(cl=>({titulo:cl.titulo, texto:cl.texto})));
+  }else{
+    itens = fixas.slice();
+    if(validas.length){
+      itens.splice(Math.max(0, itens.length-1), 0, ...validas.map(cl=>({titulo:cl.titulo, texto:cl.texto})));
+    }
   }
-  if(/\n\nE, por estarem assim justas e contratadas/.test(texto)){
-    return texto.replace(/\n\nE, por estarem assim justas e contratadas/, '\n\n'+bloco+'\n\nE, por estarem assim justas e contratadas');
-  }
-  return texto + '\n\n' + bloco;
+
+  const blocoClausulas = itens.map((it,i)=>`CLÁUSULA ${i+1}ª — ${String(it.titulo||'CLÁUSULA ADICIONAL').toUpperCase()}\n${it.texto||''}`).join('\n\n');
+  return [preambulo, blocoClausulas, fecho].filter(Boolean).join('\n\n');
 }
 function gerarTextoContratoBase(c){
   // Dados fixos da Brasil Pontes (padrão em todo contrato) — endereço e telefone vêm
