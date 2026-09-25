@@ -5605,7 +5605,7 @@ function montarTextoContratoComOrdem(texto, adicionais, ordemTokens){
     const fimCorpo = i+1<marcadores.length ? marcadores[i+1].index : fimClausulas;
     const titulo = m[0].replace(/^CLÁUSULA\s+\d+ª\s+—\s+/, '').trim();
     const corpo = texto.slice(inicioCorpo, fimCorpo).replace(/^\n+/,'').replace(/\n+$/,'');
-    return { titulo, texto: corpo };
+    return { titulo, texto: corpo, origNum: i+1 };
   });
 
   const validas = (adicionais||[]).filter(cl=>cl && (cl.titulo||cl.texto));
@@ -5632,7 +5632,22 @@ function montarTextoContratoComOrdem(texto, adicionais, ordemTokens){
     }
   }
 
-  const blocoClausulas = itens.map((it,i)=>`CLÁUSULA ${i+1}ª — ${String(it.titulo||'CLÁUSULA ADICIONAL').toUpperCase()}\n${it.texto||''}`).join('\n\n');
+  // Os textos das cláusulas fixas do modelo trazem sub-itens numerados no
+  // padrão "N.M." (ex.: "3.1.", "3.2."), em que N é a posição ORIGINAL da
+  // cláusula no template. Se a pessoa reordenar as cláusulas (ou inserir
+  // adicionais antes), a cláusula muda de posição mas esse texto interno
+  // continua com o N antigo — daí o bug relatado ("CLÁUSULA 4ª" com corpo
+  // ainda numerado "3.1./3.2."). Corrige isso renumerando esses prefixos
+  // para bater com a nova posição, antes de montar o texto final.
+  const blocoClausulas = itens.map((it,i)=>{
+    const novoNum = i+1;
+    let corpo = it.texto||'';
+    if(it.origNum && it.origNum!==novoNum){
+      const re = new RegExp('(^|\\n)'+it.origNum+'\\.(\\d+)\\.', 'g');
+      corpo = corpo.replace(re, (_m,pre,sub)=> pre+novoNum+'.'+sub+'.');
+    }
+    return `CLÁUSULA ${novoNum}ª — ${String(it.titulo||'CLÁUSULA ADICIONAL').toUpperCase()}\n${corpo}`;
+  }).join('\n\n');
   return [preambulo, blocoClausulas, fecho].filter(Boolean).join('\n\n');
 }
 function gerarTextoContratoBase(c){
