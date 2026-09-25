@@ -5525,7 +5525,7 @@ window.abrirPreviewAditivo = function(contratoId, aditivoNumero){
     <div class="form-actions">
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Fechar</button>
       <button type="button" class="btn btn-primary" onclick="baixarContratoDocx('${escAttr(c.numero||'')}-ADT${aditivo.numero}', 'Termo Aditivo')">⬇️ Baixar aditivo (.docx)</button>
-      <button type="button" class="btn btn-secondary" onclick="imprimirContrato('Termo Aditivo', '${escAttr(c.numero||'')}-ADT${aditivo.numero}')">🖨 Imprimir / Salvar PDF</button>
+      <button type="button" class="btn btn-secondary" onclick="baixarContratoPdf('Termo Aditivo', '${escAttr(c.numero||'')}-ADT${aditivo.numero}')">📄 Baixar aditivo (PDF)</button>
     </div>
   `, true);
 };
@@ -5903,7 +5903,7 @@ window.abrirPreviewContrato = function(c){
     <div class="form-actions">
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Fechar</button>
       <button type="button" class="btn btn-primary" onclick="baixarContratoDocx('${escAttr(c.numero||'')}', '${escAttr(CONTRATO_TIPOS[c.tipo].label)}')">⬇️ Baixar contrato (.docx)</button>
-      <button type="button" class="btn btn-secondary" onclick="imprimirContrato('${esc(CONTRATO_TIPOS[c.tipo].label)}', '${escAttr(c.numero||'')}')">🖨 Imprimir / Salvar PDF</button>
+      <button type="button" class="btn btn-secondary" onclick="baixarContratoPdf('${esc(CONTRATO_TIPOS[c.tipo].label)}', '${escAttr(c.numero||'')}')">📄 Baixar contrato (PDF)</button>
     </div>
   `, true);
 };
@@ -5983,6 +5983,162 @@ function buildContratoParagraphsHtml(texto){
   }
   return out.join('');
 }
+/* Geração de PDF direta via jsPDF (sem passar pelo diálogo de impressão do
+   navegador) — desenha o cabeçalho/rodapé azul em TODA página manualmente
+   (chamando drawChrome() de novo a cada doc.addPage()), então não depende
+   de configuração de margem do navegador nem sofre o bug do rodapé "órfão"
+   numa página em branco. Reaproveita os mesmos regex de classificação de
+   linha (LABEL_RE, CLAUSULA_RE, UNDERSCORE_RE, DATA_LOCAL_RE) usados no
+   .docx e na versão HTML acima, e a mesma CONTRATO_LOGO_BASE64. */
+function gerarContratoPdfDireto(texto){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'mm', format:'a4'});
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 20;
+  const headerH = 24;
+  const footerH = 16;
+  const contentW = pageW - marginX*2;
+  const topY = headerH + 10;
+  const bottomLimit = pageH - footerH - 8;
+  let y = topY;
+
+  function drawChrome(){
+    doc.setFillColor(68,114,196);
+    doc.rect(0,0,pageW,headerH,'F');
+    try{ doc.addImage(CONTRATO_LOGO_BASE64,'PNG', 10, (headerH-14)/2, 17.5, 14); }catch(e){ /* logo opcional */ }
+    doc.setFillColor(68,114,196);
+    doc.rect(0,pageH-footerH,pageW,footerH,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    doc.text('Rua Grécia, 59, Ibituruna – Montes Claros/MG · CEP: 39408-087 · Telefone: (31) 3658-9664', pageW/2, pageH-footerH/2+1.2, {align:'center'});
+    doc.setTextColor(26,26,26);
+  }
+  drawChrome();
+
+  function ensureSpace(neededH){
+    if(y + neededH > bottomLimit){
+      doc.addPage();
+      drawChrome();
+      y = topY;
+    }
+  }
+
+  function addLines(lines, fontSize, style, opts){
+    opts = opts || {};
+    doc.setFont('times', style);
+    doc.setFontSize(fontSize);
+    const lh = fontSize * 0.42;
+    lines.forEach(line=>{
+      ensureSpace(lh);
+      if(opts.align==='center'){
+        doc.text(line, pageW/2, y, {align:'center'});
+      }else if(opts.justify){
+        doc.text(line, marginX+(opts.indent||0), y, {align:'justify', maxWidth: contentW-(opts.indent||0)});
+      }else{
+        doc.text(line, marginX+(opts.indent||0), y);
+      }
+      y += lh;
+    });
+  }
+
+  function addLabelParagraph(label, resto){
+    doc.setFont('times','bold');
+    doc.setFontSize(10.2);
+    const labelW = doc.getTextWidth(label);
+    doc.setFont('times','normal');
+    const full = label + resto;
+    const lines = doc.splitTextToSize(full, contentW);
+    const lh = 10.2*0.42;
+    lines.forEach((line,i)=>{
+      ensureSpace(lh);
+      if(i===0){
+        doc.setFont('times','bold');
+        doc.text(label, marginX, y);
+        doc.setFont('times','normal');
+        doc.text(line.slice(label.length), marginX+labelW, y, {align:'justify', maxWidth: contentW-labelW});
+      }else{
+        doc.text(line, marginX, y, {align:'justify', maxWidth: contentW});
+      }
+      y += lh;
+    });
+    y += 2;
+  }
+
+  const linhas = String(texto||'').replace(/\r\n/g,'\n').split('\n').map(l=>l.trimEnd());
+  let isFirstNonEmpty = true;
+  for(let i=0;i<linhas.length;i++){
+    const linha = linhas[i].trim();
+    if(!linha) continue;
+
+    if(isFirstNonEmpty){
+      const lines = doc.splitTextToSize(linha, contentW);
+      addLines(lines, 13, 'bold', {align:'center'});
+      y += 4;
+      isFirstNonEmpty = false;
+      continue;
+    }
+
+    if(UNDERSCORE_RE.test(linha)){
+      let labelEsq = 'CONTRATANTE', labelDir = 'CONTRATADA';
+      let jProx = i+1;
+      while(jProx<linhas.length && !linhas[jProx].trim()) jProx++;
+      const proxima = (linhas[jProx]||'').trim();
+      if(proxima && !UNDERSCORE_RE.test(proxima)){
+        const partes = proxima.split(/\s{2,}/).filter(Boolean);
+        if(partes.length>=2){ labelEsq = partes[0]; labelDir = partes[1]; i = jProx; }
+      }
+      ensureSpace(20);
+      y += 8;
+      const colW = (contentW - 16)/2;
+      doc.setDrawColor(51,51,51);
+      doc.line(marginX, y, marginX+colW, y);
+      doc.line(marginX+colW+16, y, marginX+colW+16+colW, y);
+      y += 4;
+      doc.setFont('times','normal'); doc.setFontSize(9);
+      doc.text(labelEsq, marginX+colW/2, y, {align:'center', maxWidth: colW});
+      doc.text(labelDir, marginX+colW+16+colW/2, y, {align:'center', maxWidth: colW});
+      y += 6;
+      continue;
+    }
+
+    if(CLAUSULA_RE.test(linha)){
+      y += 3;
+      const lines = doc.splitTextToSize(linha, contentW);
+      addLines(lines, 10.5, 'bold', {});
+      y += 1;
+      continue;
+    }
+
+    if(DATA_LOCAL_RE.test(linha)){
+      y += 3;
+      const lines = doc.splitTextToSize(linha, contentW);
+      addLines(lines, 10.2, 'normal', {align:'center'});
+      y += 2;
+      continue;
+    }
+
+    const m = linha.match(LABEL_RE);
+    if(m){
+      const label = linha.slice(0, m[0].length);
+      const resto = linha.slice(m[0].length);
+      addLabelParagraph(label, resto);
+      continue;
+    }
+
+    const lines = doc.splitTextToSize(linha, contentW-6);
+    addLines(lines, 10.2, 'normal', {justify:true, indent:6});
+    y += 2;
+  }
+
+  return doc;
+}
+window.baixarContratoPdf = function(tituloTipo, numero){
+  const texto = document.getElementById('contrato-texto-gerado').value;
+  const doc = gerarContratoPdfDireto(texto);
+  doc.save(`Contrato_${(numero||'documento').replace(/[^\w\-]+/g,'_')}.pdf`);
+};
 window.imprimirContrato = function(tituloTipo, numero){
   const texto = document.getElementById('contrato-texto-gerado').value;
   // Cabeçalho e rodapé viram position:fixed no @media print (ver CSS), então
