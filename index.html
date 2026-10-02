@@ -1151,7 +1151,7 @@ tbody tr:last-child td{border-bottom:none;}
         <div class="modal-sub" style="margin-bottom:14px;">Controla quem pode aprovar/rejeitar requisições e excluir registros. Usuário novo sempre começa como "Engenheiro".</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Nome</th><th>Obra padrão</th><th>Papel</th><th>Permissões de acesso</th></tr></thead>
+            <thead><tr><th>Nome</th><th>Obra padrão</th><th>Papel</th><th>Gestor Mestre</th><th>Permissões de acesso</th></tr></thead>
             <tbody id="usuarios-body"></tbody>
           </table>
         </div>
@@ -1875,6 +1875,7 @@ function toast(msg, isError){
 let CURRENT_USER = null;
 let CURRENT_PROFILE = null;
 let IS_GESTOR = false;
+let IS_MESTRE = false; // Gestor Mestre: acesso total sempre, só quem é mestre configura permissões/mestre de outros gestores
 let STATE = {
   currentObra: OBRAS[0],
   compras: [],
@@ -1968,20 +1969,26 @@ const TABELA_PARA_PAGINA = {
 };
 let PAGINAS_PERMITIDAS = null; // null = sem restrição
 /* Pode essa conta (gestor) usar os poderes de gestor (aprovar/rejeitar/
-   editar/excluir/etc.) na página indicada? Sem restrição configurada =
-   gestor pleno, como sempre foi. Com restrição, só nas páginas marcadas. */
+   editar/excluir/etc.) na página indicada? Gestor Mestre sempre pode, em
+   qualquer página, mesmo que uma restrição tenha sido configurada antes.
+   Gestor normal: sem restrição configurada = pleno, como sempre foi; com
+   restrição, só nas páginas marcadas. */
 function podeGerir(pageKey){
   if(!IS_GESTOR) return false;
+  if(IS_MESTRE) return true;
   if(!Array.isArray(PAGINAS_PERMITIDAS)) return true;
   return PAGINAS_PERMITIDAS.includes(pageKey);
 }
 /* Esconde do menu lateral as páginas que não estão na lista liberada do
    usuário — vale pra engenheiro e pra gestor, sempre que a conta tiver uma
    restrição configurada (null = sem restrição, vê tudo que o papel já
-   permite). Usuários/Reverter Conclusões nunca aparecem pra quem não é
-   gestor, independente da lista. Se a página ativa foi escondida, pula pra
-   primeira página visível pra não deixar a tela em branco. */
+   permite). Gestor Mestre nunca é restrito, mesmo que uma lista tenha
+   ficado salva no perfil dele. Usuários/Reverter Conclusões nunca aparecem
+   pra quem não é gestor, independente da lista. Se a página ativa foi
+   escondida, pula pra primeira página visível pra não deixar a tela em
+   branco. */
 function aplicarPermissoesNav(){
+  if(IS_MESTRE) return;
   if(!Array.isArray(PAGINAS_PERMITIDAS)) return;
   const permitido = new Set(PAGINAS_PERMITIDAS);
   let primeiraVisivel = null;
@@ -2056,8 +2063,9 @@ async function enterApp(session){
   }catch(e){}
   CURRENT_PROFILE = profile;
   IS_GESTOR = !!(profile && profile.papel === 'gestor');
+  IS_MESTRE = IS_GESTOR && !!(profile && profile.mestre);
   PAGINAS_PERMITIDAS = Array.isArray(profile && profile.paginas_permitidas) ? profile.paginas_permitidas : null;
-  document.getElementById('user-chip-text').textContent = ((profile && profile.nome) ? profile.nome : CURRENT_USER.email) + (IS_GESTOR ? ' · Gestor' : '');
+  document.getElementById('user-chip-text').textContent = ((profile && profile.nome) ? profile.nome : CURRENT_USER.email) + (IS_MESTRE ? ' · Gestor Mestre' : IS_GESTOR ? ' · Gestor' : '');
   if(IS_GESTOR){
     document.getElementById('nav-group-admin').style.display = '';
     document.getElementById('nav-usuarios').style.display = 'flex';
@@ -7213,20 +7221,54 @@ async function loadAndRenderUsuarios(){
   const tbody = document.getElementById('usuarios-body');
   if(error){ toast('Erro ao carregar usuários: ' + error.message, true); tbody.innerHTML = ''; return; }
   const rows = data || [];
-  tbody.innerHTML = rows.length ? rows.map(u=>`<tr>
+  tbody.innerHTML = rows.length ? rows.map(u=>{
+    const ehGestor = u.papel==='gestor';
+    const ehMestre = ehGestor && !!u.mestre;
+    let mestreCell;
+    if(!ehGestor){
+      mestreCell = '<span class="muted">—</span>';
+    }else if(ehMestre){
+      mestreCell = `<span class="badge b-purple">👑 Mestre</span>${IS_MESTRE ? ` <button class="btn btn-sm btn-secondary" onclick="alterarMestreUsuario('${u.id}', false)">Remover</button>` : ''}`;
+    }else{
+      mestreCell = IS_MESTRE ? `<button class="btn btn-sm btn-secondary" onclick="alterarMestreUsuario('${u.id}', true)">👑 Tornar Mestre</button>` : '<span class="muted">—</span>';
+    }
+    let permCell;
+    if(ehMestre){
+      permCell = '<span class="badge b-gray">Acesso total (Mestre)</span>';
+    }else if(ehGestor && !IS_MESTRE){
+      permCell = '<span class="muted">Só o Gestor Mestre configura</span>';
+    }else{
+      permCell = `<button class="btn btn-sm" onclick='abrirPermissoesModal(${JSON.stringify(u.id)}, ${JSON.stringify(u.nome||u.id)}, ${JSON.stringify(Array.isArray(u.paginas_permitidas)?u.paginas_permitidas:null)}, ${JSON.stringify(u.papel)})'>🔒 Permissões${Array.isArray(u.paginas_permitidas)?` <span class="badge b-amber">${u.paginas_permitidas.length}</span>`:''}</button>`;
+    }
+    return `<tr>
     <td>${esc(u.nome)||'<span class="muted">—</span>'}${u.id===CURRENT_USER.id?' <span class="badge b-blue">Você</span>':''}</td>
     <td>${esc(u.obra_padrao)||'<span class="muted">Nenhuma (vê a primeira obra ao entrar)</span>'}</td>
     <td>
-      <select class="status-select" onchange="alterarPapelUsuario('${u.id}', this.value)">
+      <select class="status-select" onchange="alterarPapelUsuario('${u.id}', this.value, ${ehMestre?'true':'false'})" ${ehMestre && !IS_MESTRE ? 'disabled title="Só o Gestor Mestre pode mudar o papel de outro Gestor Mestre"' : ''}>
         <option value="engenheiro" ${u.papel==='engenheiro'?'selected':''}>Engenheiro (solicitante)</option>
         <option value="gestor" ${u.papel==='gestor'?'selected':''}>Gestor (aprova/exclui)</option>
       </select>
     </td>
-    <td>
-      <button class="btn btn-sm" onclick='abrirPermissoesModal(${JSON.stringify(u.id)}, ${JSON.stringify(u.nome||u.id)}, ${JSON.stringify(Array.isArray(u.paginas_permitidas)?u.paginas_permitidas:null)}, ${JSON.stringify(u.papel)})'>🔒 Permissões${Array.isArray(u.paginas_permitidas)?` <span class="badge b-amber">${u.paginas_permitidas.length}</span>`:''}</button>
-    </td>
-  </tr>`).join('') : `<tr class="empty-row"><td colspan="4">Nenhum usuário encontrado.</td></tr>`;
+    <td>${mestreCell}</td>
+    <td>${permCell}</td>
+  </tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="5">Nenhum usuário encontrado.</td></tr>`;
 }
+window.alterarMestreUsuario = async function(id, novoMestre){
+  if(!IS_MESTRE){ toast('Só o Gestor Mestre pode fazer isso.', true); return; }
+  const msg = id===CURRENT_USER.id
+    ? (novoMestre ? '' : 'Tem certeza que quer remover seu próprio acesso de Gestor Mestre? Você vira um gestor comum (sujeito a permissões, se alguém configurar).')
+    : (novoMestre ? 'Tornar este usuário um Gestor Mestre? Ele passa a ter acesso total e a poder gerenciar permissões e o status de Mestre de qualquer gestor, inclusive de outros mestres.' : 'Remover o acesso de Gestor Mestre deste usuário?');
+  if(msg && !confirm(msg)) return;
+  const { error } = await sb.from('profiles').update({ mestre: novoMestre }).eq('id', id);
+  if(error){ toast('Erro ao alterar Gestor Mestre: ' + error.message, true); return; }
+  toast(novoMestre ? 'Usuário agora é Gestor Mestre.' : 'Acesso de Gestor Mestre removido.');
+  if(id === CURRENT_USER.id){
+    IS_MESTRE = novoMestre;
+    aplicarPermissoesNav();
+  }
+  await loadAndRenderUsuarios();
+};
 function abrirPermissoesModal(userId, nomeUsuario, paginasAtuais, papelUsuario){
   const temRestricao = Array.isArray(paginasAtuais);
   const atuais = new Set(temRestricao ? paginasAtuais : []);
@@ -7282,12 +7324,20 @@ window.salvarPermissoesUsuario = async function(userId){
   }
   await loadAndRenderUsuarios();
 };
-window.alterarPapelUsuario = async function(id, novoPapel){
-  const { error } = await sb.from('profiles').update({papel: novoPapel}).eq('id', id);
+window.alterarPapelUsuario = async function(id, novoPapel, eraMestre){
+  if(eraMestre && !IS_MESTRE){
+    toast('Só o Gestor Mestre pode mudar o papel de outro Gestor Mestre.', true);
+    await loadAndRenderUsuarios();
+    return;
+  }
+  // mestre só faz sentido com papel=gestor — se está saindo de gestor, perde o mestre junto
+  const payload = novoPapel==='gestor' ? {papel: novoPapel} : {papel: novoPapel, mestre: false};
+  const { error } = await sb.from('profiles').update(payload).eq('id', id);
   if(error){ toast('Erro ao alterar papel: ' + error.message, true); await loadAndRenderUsuarios(); return; }
   toast('Papel atualizado.');
   if(id === CURRENT_USER.id){
     IS_GESTOR = novoPapel === 'gestor';
+    if(novoPapel!=='gestor') IS_MESTRE = false;
     if(!IS_GESTOR){
       document.getElementById('nav-group-admin').style.display = 'none';
       document.getElementById('nav-usuarios').style.display = 'none';
