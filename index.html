@@ -1620,7 +1620,7 @@ function aprovacaoBadge(status, por, em, motivo){
 }
 function aprovacaoCell(tabela, r){
   const status = r.aprovacao_status || 'pendente';
-  if(IS_GESTOR && status==='pendente'){
+  if(podeGerir(TABELA_PARA_PAGINA[tabela]||tabela) && status==='pendente'){
     return `<div style="display:flex;gap:4px;">
       <button class="btn btn-sm btn-primary" onclick="aprovarRequisicao('${tabela}',${r.numero})">✔ Aprovar</button>
       <button class="btn btn-sm btn-danger-outline" onclick="rejeitarRequisicaoModal('${tabela}',${r.numero})">✘ Rejeitar</button>
@@ -1665,12 +1665,12 @@ function exclusaoCell(tabela, r){
     const quando = r.exclusao_solicitada_em ? fmtDateHora(r.exclusao_solicitada_em) : '';
     const tip = `Motivo: ${r.exclusao_motivo||'—'}\nSolicitado por: ${r.exclusao_solicitada_por||'—'}${quando?(' em '+quando):''}`;
     const badge = `<span class="badge b-red" title="${escAttr(tip)}" style="cursor:help;">⚠ Exclusão solicitada</span>`;
-    if(IS_GESTOR){
+    if(podeGerir(TABELA_PARA_PAGINA[tabela]||tabela)){
       return `<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">${badge}<button class="btn btn-sm btn-secondary" onclick="negarExclusao('${tabela}',${r.numero})">Negar</button></div>`;
     }
     return badge;
   }
-  if(!IS_GESTOR){
+  if(!podeGerir(TABELA_PARA_PAGINA[tabela]||tabela)){
     return `<button class="btn btn-sm btn-danger-outline" onclick="solicitarExclusaoModal('${tabela}',${r.numero})">🚫 Solicitar exclusão</button>`;
   }
   return '';
@@ -1810,7 +1810,7 @@ window.cancelarItemModal = function(tabela, id){
   });
 };
 window.reativarItemCancelado = async function(tabela, id){
-  if(!IS_GESTOR) return;
+  if(!podeGerir('cancelados')) return;
   const item = REQ_TABLE_MAP[tabela].getArr().find(r=>r.id===id);
   if(!item) return;
   if(!confirm('Reativar esta solicitação? Ela volta para a lista normal.')) return;
@@ -1823,7 +1823,7 @@ window.reativarItemCancelado = async function(tabela, id){
   await refetchAndRenderTabela(tabela);
 };
 window.excluirRegistro = async function(tabela, id){
-  if(!IS_GESTOR) return;
+  if(!podeGerir(TABELA_PARA_PAGINA[tabela]||tabela)) return;
   const map = {
     compras:['compras',()=>STATE.compras,renderCompras],
     servicos:['servicos',()=>STATE.servicos,renderServicos],
@@ -1917,9 +1917,12 @@ let REGRAS = [];
 let realtimeChannels = [];
 
 /* ============== permissões de acesso por página (granular, por usuário) ==============
-   Catálogo de toda página normal do menu (fora as de Administração, que já são
-   só-gestor por conta própria). null em profiles.paginas_permitidas = sem
-   restrição, continua vendo tudo normalmente; array = só essas páginas. */
+   Catálogo de toda página do menu, incluindo Administração. null em
+   profiles.paginas_permitidas = sem restrição, continua vendo/podendo tudo
+   que o papel já permite (comportamento de sempre). Array = só essas
+   páginas aparecem no menu — e, pra quem é gestor, são também as únicas
+   páginas onde os botões de gestor (aprovar/rejeitar/editar/excluir) ficam
+   disponíveis. Vale tanto pra engenheiro quanto pra gestor. */
 const PAGINAS_NAV_CATALOGO = [
   {grupo:'Visão Geral', key:'dashboard', label:'Dashboard'},
   {grupo:'Visão Geral', key:'painel-geral', label:'Painel Geral (Todas Obras)'},
@@ -1950,21 +1953,42 @@ const PAGINAS_NAV_CATALOGO = [
   {grupo:'RH · Alimentação', key:'alim-nova', label:'Alimentação — Nova Solicitação'},
   {grupo:'RH · Alimentação', key:'alim-tickets', label:'Alimentação — Tickets Gerados'},
   {grupo:'Ajuda', key:'regras', label:'Regras Gerais'},
+  {grupo:'Administração (só gestor)', key:'usuarios', label:'Usuários'},
+  {grupo:'Administração (só gestor)', key:'reverter-conclusoes', label:'Reverter Conclusões'},
 ];
-let PAGINAS_PERMITIDAS = null; // null = sem restrição (gestor sempre fica null/ignorado)
+/* Tabela/identificador usado nas funções genéricas (excluirRegistro,
+   aprovacaoCell, exclusaoCell etc.) → chave de página correspondente no
+   catálogo acima, pra podeGerir() saber qual restrição checar. */
+const TABELA_PARA_PAGINA = {
+  compras:'compras', servicos:'servicos', epi_requisicoes:'epi', reembolsos:'reembolsos',
+  historico_compras:'historico', cotacoes:'cotacoes', contratos:'contratos',
+  almoxarifado:'almoxarifado', almoxarifado_eletrico:'almoxarifado-eletrico',
+  epi_estoque:'epi-estoque', funcionarios:'funcionarios', fornecedores:'fornecedores',
+  cadastro_extra:'cadastro', locacoes_equipamentos:'locacoes-equip', contas_pagar:'contas-pagar',
+};
+let PAGINAS_PERMITIDAS = null; // null = sem restrição
+/* Pode essa conta (gestor) usar os poderes de gestor (aprovar/rejeitar/
+   editar/excluir/etc.) na página indicada? Sem restrição configurada =
+   gestor pleno, como sempre foi. Com restrição, só nas páginas marcadas. */
+function podeGerir(pageKey){
+  if(!IS_GESTOR) return false;
+  if(!Array.isArray(PAGINAS_PERMITIDAS)) return true;
+  return PAGINAS_PERMITIDAS.includes(pageKey);
+}
 /* Esconde do menu lateral as páginas que não estão na lista liberada do
-   usuário (só roda pra quem tem restrição configurada — gestor e usuário sem
-   restrição continuam vendo tudo, igual sempre foi). Se a página que estava
-   ativa foi escondida, pula pra primeira página visível pra não deixar a
-   tela em branco. */
+   usuário — vale pra engenheiro e pra gestor, sempre que a conta tiver uma
+   restrição configurada (null = sem restrição, vê tudo que o papel já
+   permite). Usuários/Reverter Conclusões nunca aparecem pra quem não é
+   gestor, independente da lista. Se a página ativa foi escondida, pula pra
+   primeira página visível pra não deixar a tela em branco. */
 function aplicarPermissoesNav(){
-  if(IS_GESTOR || !Array.isArray(PAGINAS_PERMITIDAS)) return;
+  if(!Array.isArray(PAGINAS_PERMITIDAS)) return;
   const permitido = new Set(PAGINAS_PERMITIDAS);
   let primeiraVisivel = null;
   let ativaEscondida = false;
   document.querySelectorAll('.nav-item[data-page]').forEach(item=>{
     const key = item.dataset.page;
-    if(key==='usuarios' || key==='reverter-conclusoes') return; // essas já são só-gestor
+    if((key==='usuarios' || key==='reverter-conclusoes') && !IS_GESTOR) return; // nunca pra quem não é gestor
     const pode = permitido.has(key);
     item.style.display = pode ? '' : 'none';
     if(pode && !primeiraVisivel) primeiraVisivel = item;
@@ -3573,13 +3597,13 @@ function initCompras(){
       <td>${aprovacaoCell('compras', r)}</td>
       <td>
         ${exclusaoCell('compras', r)}
-        ${String(r.status).toUpperCase()!=='CONCLUÍDO' && IS_GESTOR ? (r.entregue_obra
+        ${String(r.status).toUpperCase()!=='CONCLUÍDO' && podeGerir('compras') ? (r.entregue_obra
           ? `<button class="btn btn-sm btn-primary" onclick="receberCompraModal(${r.numero})">✅ Receber</button>`
           : `<span class="muted" style="font-size:11px;">Aguardando confirmação de entrega</span>`) : ''}
         <button class="btn btn-sm btn-secondary" onclick="abrirCotacaoDaRequisicao(${r.id})">💬 Cotação</button>
-        ${IS_GESTOR ? statusControlCell('compras', r) : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarComprasModal(${r.id})">✏️</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('compras',${r.id})">🗑</button>` : ''}
+        ${podeGerir('compras') ? statusControlCell('compras', r) : ''}
+        ${podeGerir('compras') ? `<button class="btn btn-sm btn-secondary" onclick="editarComprasModal(${r.id})">✏️</button>` : ''}
+        ${podeGerir('compras') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('compras',${r.id})">🗑</button>` : ''}
       </td>
     </tr>`
   });
@@ -3667,12 +3691,12 @@ function initServicos(){
       <td>${aprovacaoCell('servicos', r)}</td>
       <td>
         ${exclusaoCell('servicos', r)}
-        ${String(r.status).toUpperCase()!=='CONCLUÍDO' && IS_GESTOR ? (r.entregue_obra
+        ${String(r.status).toUpperCase()!=='CONCLUÍDO' && podeGerir('servicos') ? (r.entregue_obra
           ? `<button class="btn btn-sm btn-primary" onclick="concluirServicoModal(${r.numero})">✅ Concluir</button>`
           : '<span class="muted" style="font-size:11px;">Aguardando confirmação de realização</span>') : ''}
-        ${IS_GESTOR ? statusControlCell('servicos', r) : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarServicoModal(${r.id})">✏️</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('servicos',${r.id})">🗑</button>` : ''}
+        ${podeGerir('servicos') ? statusControlCell('servicos', r) : ''}
+        ${podeGerir('servicos') ? `<button class="btn btn-sm btn-secondary" onclick="editarServicoModal(${r.id})">✏️</button>` : ''}
+        ${podeGerir('servicos') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('servicos',${r.id})">🗑</button>` : ''}
       </td>
     </tr>`
   });
@@ -3714,12 +3738,12 @@ function initEpi(){
       <td>${aprovacaoCell('epi_requisicoes', r)}</td>
       <td>
         ${exclusaoCell('epi_requisicoes', r)}
-        ${IS_GESTOR ? (r.entregue_obra
+        ${podeGerir('epi') ? (r.entregue_obra
           ? `<button class="btn btn-sm btn-primary" onclick="receberEpiModal(${r.numero})">✅ Receber</button>`
           : '<span class="muted" style="font-size:11px;">Aguardando confirmação de entrega</span>') : ''}
-        ${IS_GESTOR ? statusControlCell('epi_requisicoes', r) : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarEpiModal(${r.id})">✏️</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('epi_requisicoes',${r.id})">🗑</button>` : ''}
+        ${podeGerir('epi') ? statusControlCell('epi_requisicoes', r) : ''}
+        ${podeGerir('epi') ? `<button class="btn btn-sm btn-secondary" onclick="editarEpiModal(${r.id})">✏️</button>` : ''}
+        ${podeGerir('epi') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('epi_requisicoes',${r.id})">🗑</button>` : ''}
       </td>
     </tr>`
   });
@@ -3782,12 +3806,12 @@ function initReembolsos(){
       <td>
         <button class="btn btn-sm btn-secondary" onclick="reembolsoImprimirSolicitacao(${r.id})">🖨 Imprimir</button>
         ${exclusaoCell('reembolsos', r)}
-        ${String(r.aprovacao_status).toLowerCase()==='aprovado' && IS_GESTOR ? (r.entregue_obra
+        ${String(r.aprovacao_status).toLowerCase()==='aprovado' && podeGerir('reembolsos') ? (r.entregue_obra
           ? `<button class="btn btn-sm btn-primary" onclick="receberReembolsoModal(${r.id})">✅ Receber</button>`
           : '<span class="muted" style="font-size:11px;">Aguardando confirmação de pagamento</span>') : ''}
-        ${IS_GESTOR ? statusControlCell('reembolsos', r) : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarReembolsoModal(${r.id})">✏️</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('reembolsos',${r.id})">🗑</button>` : ''}
+        ${podeGerir('reembolsos') ? statusControlCell('reembolsos', r) : ''}
+        ${podeGerir('reembolsos') ? `<button class="btn btn-sm btn-secondary" onclick="editarReembolsoModal(${r.id})">✏️</button>` : ''}
+        ${podeGerir('reembolsos') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('reembolsos',${r.id})">🗑</button>` : ''}
       </td>
     </tr>`;
     }
@@ -4137,7 +4161,7 @@ function initHistorico(){
       <td>${esc(r.aprovacao_por)||'<span class="muted">—</span>'}${r.aprovacao_em?`<div class="rastro-sub">${fmtDateHora(r.aprovacao_em)}</div>`:''}</td>
       <td>${fmtDate(r.data_conclusao)}</td>
       <td>${esc(r.recebido_por)||'<span class="muted">—</span>'}${r.recebido_em?`<div class="rastro-sub">${fmtDateHora(r.recebido_em)}</div>`:''}</td>
-      <td>${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('historico_compras',${r.id})">🗑 Excluir</button>` : ''}</td>
+      <td>${podeGerir('historico') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('historico_compras',${r.id})">🗑 Excluir</button>` : ''}</td>
     </tr>`
   });
 }
@@ -4223,7 +4247,7 @@ function initCancelados(){
       <td class="desc-cell">${descTrunc(r.motivo)||'<span class="muted">—</span>'}</td>
       <td>${esc(r.cancelado_por)||'<span class="muted">—</span>'}</td>
       <td>${r.cancelado_em?fmtDateHora(r.cancelado_em):'<span class="muted">—</span>'}</td>
-      <td>${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="reativarItemCancelado('${r.tabela}',${r.id})">↩️ Reativar</button>` : ''}</td>
+      <td>${podeGerir('cancelados') ? `<button class="btn btn-sm btn-secondary" onclick="reativarItemCancelado('${r.tabela}',${r.id})">↩️ Reativar</button>` : ''}</td>
     </tr>`
   });
 }
@@ -4248,12 +4272,12 @@ function initReverterConclusoes(){
       <td class="num">${fmtBRL(r.valor)}</td>
       <td>${esc(r.criado_por)||'<span class="muted">—</span>'}</td>
       <td>${fmtDateHora(r.criado_em)}</td>
-      <td>${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="reverterRecebimentoAction(${r.id})">↩️ Reverter</button>` : ''}</td>
+      <td>${podeGerir('reverter-conclusoes') ? `<button class="btn btn-sm btn-danger-outline" onclick="reverterRecebimentoAction(${r.id})">↩️ Reverter</button>` : ''}</td>
     </tr>`
   });
 }
 window.reverterRecebimentoAction = async function(logId){
-  if(!IS_GESTOR) return;
+  if(!podeGerir('reverter-conclusoes')) return;
   if(!confirm('Reverter esta conclusão? A solicitação volta para pendente e o que foi gerado (Histórico/Almoxarifado/Estoque de EPI) será desfeito. Essa ação não pode ser desfeita de volta automaticamente.')) return;
   const { error } = await sb.rpc('reverter_recebimento', { p_log_id: logId });
   if(error){ toast('Erro ao reverter: ' + error.message, true); return; }
@@ -4316,7 +4340,7 @@ function initCotacoes(){
         <td colspan="2" style="padding-left:26px;">↳ ${esc(r.fornecedor)||'<span class="muted">fornecedor não informado</span>'}${anexoIcon(r.anexo_path, r.anexo_nome)}</td>
         <td class="num" colspan="2">${isNum(r.preco)?fmtBRL(r.preco):'<span class="muted">—</span>'}</td>
         <td colspan="2">${r.vencedor ? '<span class="badge b-green">🏆 Vencedora</span>' : (rows.length>1 ? `<button class="btn btn-sm btn-secondary" onclick="marcarCotacaoVencedora(${r.id})">Marcar vencedora</button>` : '<span class="muted">única cotação</span>')}</td>
-        <td>${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('cotacoes',${r.id})">🗑</button>` : ''}</td>
+        <td>${podeGerir('cotacoes') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('cotacoes',${r.id})">🗑</button>` : ''}</td>
       </tr>`).join('');
       return header + sub;
     }).join('');
@@ -4438,8 +4462,8 @@ function initAlmoxarifado(){
       <td>${fmtDate(r.data_envio)}</td><td>${statusBadge(r.status)}</td><td>${esc(r.responsavel)}</td>
       <td>${esc(r.recebido_por)||'<span class="muted">—</span>'}${r.recebido_em?`<div class="rastro-sub">${fmtDateHora(r.recebido_em)}</div>`:''}</td>
       <td>
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoModal(${r.id})">✏️ Editar</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado',${r.id})">🗑 Excluir</button>` : ''}
+        ${podeGerir('almoxarifado') ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoModal(${r.id})">✏️ Editar</button>` : ''}
+        ${podeGerir('almoxarifado') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado',${r.id})">🗑 Excluir</button>` : ''}
       </td>
     </tr>`
   });
@@ -4468,7 +4492,7 @@ function initAlmoxarifadoManutencao(){
       <td class="num">${dias===null?'—':dias}</td>
       <td>
         <button class="btn btn-sm btn-primary" onclick="darBaixaManutencaoModal(${r.id})">✅ Dar baixa</button>
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoModal(${r.id})">✏️ Editar</button>` : ''}
+        ${podeGerir('almoxarifado-manutencao') ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoModal(${r.id})">✏️ Editar</button>` : ''}
       </td>
     </tr>`;
     }
@@ -4544,8 +4568,8 @@ function initAlmoxarifadoEletrico(){
       <td>${fmtDate(r.data_envio)}</td><td>${statusBadge(r.status)}</td><td>${esc(r.responsavel)}</td>
       <td>${esc(r.recebido_por)||'<span class="muted">—</span>'}${r.recebido_em?`<div class="rastro-sub">${fmtDateHora(r.recebido_em)}</div>`:''}</td>
       <td>
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoEletricoModal(${r.id})">✏️ Editar</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado_eletrico',${r.id})">🗑 Excluir</button>` : ''}
+        ${podeGerir('almoxarifado-eletrico') ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoEletricoModal(${r.id})">✏️ Editar</button>` : ''}
+        ${podeGerir('almoxarifado-eletrico') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado_eletrico',${r.id})">🗑 Excluir</button>` : ''}
       </td>
     </tr>`
   });
@@ -4566,8 +4590,8 @@ function initEpiEstoque(){
       <td class="num">${fmtNum(r.qtde)}</td><td>${esc(r.obra)}</td>
       <td>
         <button class="btn btn-sm btn-primary" onclick="darBaixaEpiModal(${r.id})">📤 Dar baixa</button>
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarEpiEstoqueModal(${r.id})">✏️</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('epi_estoque',${r.id})">🗑</button>` : ''}
+        ${podeGerir('epi-estoque') ? `<button class="btn btn-sm btn-secondary" onclick="editarEpiEstoqueModal(${r.id})">✏️</button>` : ''}
+        ${podeGerir('epi-estoque') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('epi_estoque',${r.id})">🗑</button>` : ''}
       </td>
     </tr>`
   });
@@ -4580,7 +4604,7 @@ function renderEpiSaidas(){
     <td>${fmtDate(r.data_saida)}</td><td>${esc(r.codigo)}</td><td class="desc-cell">${descTrunc(r.descricao)}</td>
     <td class="num">${fmtNum(r.qtde)}</td><td>${esc(r.obra)}</td><td>${esc(r.empresa)||'<span class="muted">—</span>'}</td><td>${esc(r.funcionario)}</td><td>${esc(r.responsavel)||'<span class="muted">—</span>'}</td>
     <td>${r.ficha_path ? `<button class="btn btn-sm btn-secondary" onclick="verFichaEpi(${r.id})">📄 Ver</button>` : '<span class="muted">—</span>'}</td>
-    <td>${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirSaidaEpi(${r.id})">🗑</button>` : ''}</td>
+    <td>${podeGerir('epi-estoque') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirSaidaEpi(${r.id})">🗑</button>` : ''}</td>
   </tr>`).join('') : '<tr class="empty-row"><td colspan="10">Nenhuma saída registrada ainda.</td></tr>';
 }
 window.verFichaEpi = async function(saidaId){
@@ -4591,7 +4615,7 @@ window.verFichaEpi = async function(saidaId){
   window.open(data.signedUrl, '_blank');
 };
 window.excluirSaidaEpi = async function(saidaId){
-  if(!IS_GESTOR) return;
+  if(!podeGerir('epi-estoque')) return;
   if(!confirm('Excluir esta saída? A quantidade retirada será devolvida ao estoque.')) return;
   const { data: rows, error } = await sb.rpc('epi_saida_excluir', { p_saida_id: saidaId });
   if(error){ toast('Erro ao excluir saída: ' + error.message, true); return; }
@@ -4634,16 +4658,16 @@ function initFuncionarios(){
       <td>${fmtDate(r.data_admissao)}</td><td>${esc(r.obra)||'<span class="muted">—</span>'}</td>
       <td>${r.ativo===false?'<span class="badge b-gray">Desativado</span>':'<span class="badge b-green">Ativo</span>'}</td>
       <td>
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="toggleAtivoFuncionario(${r.id})">${r.ativo===false?'🔓 Reativar':'🔒 Desativar'}</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarFuncionarioModal(${r.id})">✏️</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('funcionarios',${r.id})">🗑</button>` : ''}
+        ${podeGerir('funcionarios') ? `<button class="btn btn-sm btn-secondary" onclick="toggleAtivoFuncionario(${r.id})">${r.ativo===false?'🔓 Reativar':'🔒 Desativar'}</button>` : ''}
+        ${podeGerir('funcionarios') ? `<button class="btn btn-sm btn-secondary" onclick="editarFuncionarioModal(${r.id})">✏️</button>` : ''}
+        ${podeGerir('funcionarios') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('funcionarios',${r.id})">🗑</button>` : ''}
       </td>
     </tr>`
   });
   document.getElementById('funcionarios-status').addEventListener('change', renderFuncionarios);
 }
 window.toggleAtivoFuncionario = async function(id){
-  if(!IS_GESTOR) return;
+  if(!podeGerir('funcionarios')) return;
   const item = STATE.funcionarios.find(r=>r.id===id);
   if(!item) return;
   const novoAtivo = item.ativo===false ? true : false;
@@ -4666,8 +4690,8 @@ function initFornecedores(){
       <td>${esc(r.telefone_fixo)||'<span class="muted">—</span>'}</td><td>${esc(r.telefone_comercial)||'<span class="muted">—</span>'}</td>
       <td>${esc(r.contato_nome)||'<span class="muted">—</span>'}</td><td>${esc(r.email)||'<span class="muted">—</span>'}</td>
       <td>
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarFornecedorModal(${r.id})">✏️</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('fornecedores',${r.id})">🗑</button>` : ''}
+        ${podeGerir('fornecedores') ? `<button class="btn btn-sm btn-secondary" onclick="editarFornecedorModal(${r.id})">✏️</button>` : ''}
+        ${podeGerir('fornecedores') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('fornecedores',${r.id})">🗑</button>` : ''}
       </td>
     </tr>`
   });
@@ -4681,7 +4705,7 @@ function initCadastro(){
     searchFn:(r,q)=> String(r.descricao||"").toLowerCase().includes(q) || String(r.codigo||"").toLowerCase().includes(q),
     rowFn:r=>`<tr><td>${esc(r.codigo)}</td><td class="desc-cell">${descTrunc(r.descricao)}</td><td>${esc(r.unidade)}</td>
       <td class="num">${fmtBRL(r.preco_ref)}</td><td>${esc(r.fonte_preco)}</td><td>${fmtDate(r.cadastrado_em)}</td>
-      <td>${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarCadastroExtraModal(${r.id})">✏️ Editar</button>` : ''}</td></tr>`
+      <td>${podeGerir('cadastro') ? `<button class="btn btn-sm btn-secondary" onclick="editarCadastroExtraModal(${r.id})">✏️ Editar</button>` : ''}</td></tr>`
   });
 }
 
@@ -5301,9 +5325,9 @@ function renderContratos(){
       <td>${badgeStatusContrato(statusEfetivoContrato(c))}</td>
       <td>
         <button class="btn btn-sm btn-secondary" onclick="verContratoModal('${c.id}')">📄 Ver</button>
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarContratoModal('${c.id}')">✏️</button>` : ''}
-        ${IS_GESTOR && controla ? `<button class="btn btn-sm btn-secondary" onclick="renovarContratoModal('${c.id}')">🔁 Renovar</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirContratoItem('${c.id}')">🗑</button>` : ''}
+        ${podeGerir('contratos') ? `<button class="btn btn-sm btn-secondary" onclick="editarContratoModal('${c.id}')">✏️</button>` : ''}
+        ${podeGerir('contratos') && controla ? `<button class="btn btn-sm btn-secondary" onclick="renovarContratoModal('${c.id}')">🔁 Renovar</button>` : ''}
+        ${podeGerir('contratos') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirContratoItem('${c.id}')">🗑</button>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -6434,7 +6458,7 @@ function renderLocacoesEquip(){
           ? `<button class="btn btn-sm btn-secondary" onclick="renovarLocequip('${e.id}')">🔄 +30d</button>
              <button class="btn btn-sm btn-secondary" onclick="encerrarLocequip('${e.id}')">🔚 Encerrar</button>`
           : `<button class="btn btn-sm btn-secondary" onclick="reativarLocequip('${e.id}')">↩️ Reativar</button>`}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirLocequip('${e.id}')">🗑</button>` : ''}
+        ${podeGerir('locacoes-equip') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirLocequip('${e.id}')">🗑</button>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -6678,7 +6702,7 @@ function renderContasPagar(){
       <td>${c.status==='pago' ? fmtDate(c.data_pagamento) : statusBadgeConta(c)}</td>
       <td>
         ${c.status==='a_pagar' ? `<button class="btn btn-sm btn-secondary" onclick="marcarContaPaga('${c.id}')">💰 Marcar pago</button>` : ''}
-        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirContaPagar('${c.id}')">🗑</button>` : ''}
+        ${podeGerir('contas-pagar') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirContaPagar('${c.id}')">🗑</button>` : ''}
       </td>
     </tr>`).join('');
   renderContasPagarTimelines();
@@ -7184,7 +7208,7 @@ function wireExtras(){
 
 /* ============== USUÁRIOS (gestor) ============== */
 async function loadAndRenderUsuarios(){
-  if(!IS_GESTOR) return;
+  if(!podeGerir('usuarios')) return;
   const { data, error } = await sb.from('profiles').select('*').order('nome');
   const tbody = document.getElementById('usuarios-body');
   if(error){ toast('Erro ao carregar usuários: ' + error.message, true); tbody.innerHTML = ''; return; }
@@ -7199,16 +7223,14 @@ async function loadAndRenderUsuarios(){
       </select>
     </td>
     <td>
-      ${u.papel==='gestor'
-        ? '<span class="badge b-gray">Acesso total (gestor)</span>'
-        : `<button class="btn btn-sm" onclick='abrirPermissoesModal(${JSON.stringify(u.id)}, ${JSON.stringify(u.nome||u.id)}, ${JSON.stringify(Array.isArray(u.paginas_permitidas)?u.paginas_permitidas:null)})'>🔒 Permissões${Array.isArray(u.paginas_permitidas)?` <span class="badge b-amber">${u.paginas_permitidas.length}</span>`:''}</button>`
-      }
+      <button class="btn btn-sm" onclick='abrirPermissoesModal(${JSON.stringify(u.id)}, ${JSON.stringify(u.nome||u.id)}, ${JSON.stringify(Array.isArray(u.paginas_permitidas)?u.paginas_permitidas:null)}, ${JSON.stringify(u.papel)})'>🔒 Permissões${Array.isArray(u.paginas_permitidas)?` <span class="badge b-amber">${u.paginas_permitidas.length}</span>`:''}</button>
     </td>
   </tr>`).join('') : `<tr class="empty-row"><td colspan="4">Nenhum usuário encontrado.</td></tr>`;
 }
-function abrirPermissoesModal(userId, nomeUsuario, paginasAtuais){
+function abrirPermissoesModal(userId, nomeUsuario, paginasAtuais, papelUsuario){
   const temRestricao = Array.isArray(paginasAtuais);
   const atuais = new Set(temRestricao ? paginasAtuais : []);
+  const ehGestor = papelUsuario==='gestor';
   let gruposHtml = '';
   let grupoAtual = null;
   PAGINAS_NAV_CATALOGO.forEach(p=>{
@@ -7225,7 +7247,7 @@ function abrirPermissoesModal(userId, nomeUsuario, paginasAtuais){
   gruposHtml += '</div>';
   openModal(`
     <h3>Permissões de acesso — ${esc(nomeUsuario)}</h3>
-    <div class="modal-sub" style="margin-bottom:10px;">Marque só as páginas que esse usuário pode ver no menu. Desmarcado "Sem restrição" abaixo, todas as páginas marcadas aqui são as únicas que aparecem pra ele. Se deixar "Sem restrição" marcado, ele vê tudo normalmente (como hoje).</div>
+    <div class="modal-sub" style="margin-bottom:10px;">Marque só as páginas que esse usuário pode ver no menu.${ehGestor ? ' Como ele é <strong>gestor</strong>, essas marcadas são também as únicas páginas onde ele mantém os poderes de gestor (aprovar/rejeitar/editar/excluir) — nas demais, mesmo sendo gestor, ele não vê a página.' : ''} Desmarcado "Sem restrição" abaixo, todas as páginas marcadas aqui são as únicas que aparecem pra ele. Se deixar "Sem restrição" marcado, ele vê e pode tudo que o papel dele já permite (como hoje).</div>
     <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:8px;background:#f8f9fb;border-radius:8px;">
       <input type="checkbox" id="perm-sem-restricao" ${!temRestricao?'checked':''} onchange="document.getElementById('perm-lista-paginas').style.display = this.checked ? 'none' : ''">
       <strong>Sem restrição (vê tudo que o papel dele já vê hoje)</strong>
@@ -7273,8 +7295,11 @@ window.alterarPapelUsuario = async function(id, novoPapel){
       aplicarPermissoesNav();
       document.querySelector('.nav-item[data-page="dashboard"]').click();
     }else{
-      // virou gestor: sem restrição de página, garante que tudo volte a aparecer
+      document.getElementById('nav-group-admin').style.display = '';
+      document.getElementById('nav-usuarios').style.display = 'flex';
+      document.getElementById('nav-reverter').style.display = 'flex';
       document.querySelectorAll('.nav-item[data-page], .nav-group-label').forEach(el=> el.style.display = '');
+      aplicarPermissoesNav();
     }
   }
   renderCompras(); renderServicos(); renderEpi(); renderReembolsos(); renderCancelados(); renderHistorico(); renderHistoricoReembolso(); renderHistoricoServico(); renderReverterConclusoes(); renderAlmoxarifado();
@@ -8837,7 +8862,7 @@ function passMealIcons(r){
 /* ---------- rastreabilidade: aprovação (gestor) ---------- */
 function passAprovacaoCell(r){
   const status = r.aprovacao_status || 'pendente';
-  if(IS_GESTOR && status==='pendente'){
+  if(podeGerir('pass-solic') && status==='pendente'){
     return `<div style="display:flex;gap:4px;">
       <button class="btn btn-sm btn-primary" onclick="passAprovar(${r.numero})">✔ Aprovar</button>
       <button class="btn btn-sm btn-danger-outline" onclick="passRejeitarModal(${r.numero})">✘ Rejeitar</button>
@@ -8961,10 +8986,10 @@ function initPassSolic(){
       <td>
         <div style="display:flex; flex-direction:column; gap:4px;">
           <button class="btn btn-sm btn-secondary" onclick="passVerReciboModal(${r.id})">🧾 Recibo</button>
-          ${IS_GESTOR ? `<button class="btn btn-sm btn-secondary" onclick="editarPassagemModal(${r.id})">✏️ Editar</button>` : ''}
+          ${podeGerir('pass-solic') ? `<button class="btn btn-sm btn-secondary" onclick="editarPassagemModal(${r.id})">✏️ Editar</button>` : ''}
           <button class="btn btn-sm btn-primary" onclick="passRegistrarCompraModal(${r.id})">✅ Comprado</button>
           ${passExclusaoCell(r)}
-          ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
+          ${podeGerir('pass-solic') ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
         </div>
       </td>
     </tr>`
@@ -8997,7 +9022,7 @@ function initPassFinanceiro(){
           <button class="btn btn-sm btn-secondary" onclick="passAnexarComprovanteModal(${r.id})">📎 Comprovante</button>
           <button class="btn btn-sm btn-primary" onclick="passMarcarPago(${r.id})">💰 Marcar como pago</button>
           ${passExclusaoCell(r)}
-          ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
+          ${podeGerir('pass-financeiro') ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
         </div>
       </td>
     </tr>`
@@ -9027,7 +9052,7 @@ function initPassHistorico(){
       <td>
         <div style="display:flex; flex-direction:column; gap:4px;">
           <button class="btn btn-sm btn-secondary" onclick="passVerReciboModal(${r.id})">🧾 Recibo</button>
-          ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
+          ${podeGerir('pass-historico') ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
         </div>
       </td>
     </tr>`
@@ -10041,7 +10066,7 @@ window.alimMarcarEntregue = async function(id){
   await refetchAlimentacaoTickets(); renderAlimAll();
 };
 window.alimExcluirTicket = async function(id){
-  if(!IS_GESTOR) return;
+  if(!podeGerir('alim-tickets')) return;
   const t = STATE.alimentacaoTickets.find(x=>x.id===id);
   if(!t) return;
   if(!confirm(`Excluir o ticket #${String(t.numero).padStart(4,'0')}? Essa ação não pode ser desfeita.`)) return;
@@ -10074,7 +10099,7 @@ function initAlimTickets(){
           <button class="btn btn-sm btn-secondary" onclick="alimVerTicketModal(${t.id})">🎫 Ver / Imprimir</button>
           <button class="btn btn-sm btn-secondary" onclick="alimDuplicarTicket(${t.id})">📋 Duplicar p/ hoje</button>
           ${t.status!=='entregue' ? `<button class="btn btn-sm btn-primary" onclick="alimMarcarEntregue(${t.id})">✅ Marcar entregue</button>` : ''}
-          ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="alimExcluirTicket(${t.id})">🗑 Excluir</button>` : ''}
+          ${podeGerir('alim-tickets') ? `<button class="btn btn-sm btn-danger-outline" onclick="alimExcluirTicket(${t.id})">🗑 Excluir</button>` : ''}
         </div>
       </td>
     </tr>`
