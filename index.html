@@ -6497,6 +6497,48 @@ function vinculoLabelConta(c){
 }
 function periodosSeSobrepoemConta(iniA, fimA, iniB, fimB){ return iniA<=fimB && iniB<=fimA; }
 function contasPagarDaObraAtual(){ return STATE.contasPagar; } // já vem filtrado por obra do loadAllForObra
+/* Agrupa as contas por vínculo (contrato/equipamento/livre) — usado tanto nas
+   linhas do tempo quanto no alerta de "cobertura vencendo". Serve pra coisas
+   contínuas/mensais (aluguel de casa, equipamento fixo): cada lançamento cobre
+   um período (ex.: 02/10 a 01/11); a "cobertura" do vínculo é até onde já tem
+   lançamento (pago ou a pagar) — quando essa data fica perto de hoje, é sinal
+   de que está na hora de lançar/pagar o mês seguinte. */
+function agruparContasPorVinculo(lista){
+  const grupos = {};
+  lista.forEach(c=>{
+    if(!c.periodo_inicio || !c.periodo_fim) return;
+    const key = vinculoKeyConta(c);
+    if(!grupos[key]) grupos[key] = { label: vinculoLabelConta(c), itens: [] };
+    grupos[key].itens.push(c);
+  });
+  Object.values(grupos).forEach(g=>{
+    g.itens.sort((a,b)=>String(a.periodo_inicio).localeCompare(String(b.periodo_inicio)));
+    g.minD = g.itens.reduce((m,c)=> c.periodo_inicio<m?c.periodo_inicio:m, g.itens[0].periodo_inicio);
+    g.maxD = g.itens.reduce((m,c)=> c.periodo_fim>m?c.periodo_fim:m, g.itens[0].periodo_fim);
+    g.diasAteFimCobertura = diasAteData(g.maxD);
+    g.farolCobertura = farolCobertura(g.diasAteFimCobertura);
+    g.recorrente = g.itens.length >= 2; // já teve mais de um lançamento = é coisa contínua/mensal
+  });
+  return grupos;
+}
+function diasAteData(dataISO){
+  if(!dataISO) return null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const d = new Date(dataISO+'T00:00:00');
+  return Math.round((d-hoje)/86400000);
+}
+function farolCobertura(dias){
+  if(dias===null||dias===undefined) return '-';
+  if(dias<0) return 'Vencido';
+  if(dias<=10) return 'Atenção';
+  return 'No prazo';
+}
+function badgeFarolCobertura(f, dias){
+  if(f==='Vencido') return `<span class="badge b-red">⏰ Cobertura vencida há ${Math.abs(dias)}d — lançar próximo mês</span>`;
+  if(f==='Atenção') return `<span class="badge b-amber">⚠️ Cobertura acaba em ${dias}d — lançar próximo mês</span>`;
+  if(f==='No prazo') return `<span class="badge b-green">Coberto até ${dias}d</span>`;
+  return '';
+}
 function renderContaspagarKpis(){
   const lista = contasPagarDaObraAtual();
   const hoje = todayISO();
@@ -6504,13 +6546,16 @@ function renderContaspagarKpis(){
   const mesAtual = hoje.slice(0,7);
   const pagoEsteMes = lista.filter(c=>c.status==='pago' && c.data_pagamento && String(c.data_pagamento).slice(0,7)===mesAtual);
   const vencendo = aPagar.filter(c=>c.vencimento && c.vencimento<=addDaysContrato(hoje,7)).length;
-  const vinculos = new Set(lista.map(vinculoKeyConta)).size;
+  const grupos = agruparContasPorVinculo(lista);
+  const vinculos = Object.keys(grupos).length;
+  const cobertVencendo = Object.values(grupos).filter(g=> g.farolCobertura==='Vencido' || g.farolCobertura==='Atenção').length;
   const el = document.getElementById('contaspagar-kpis');
   if(!el) return;
   el.innerHTML = `
     <div class="kpi-card warn"><div class="kpi-label">A pagar (pendente)</div><div class="kpi-value">${fmtBRL(aPagar.reduce((s,c)=>s+(Number(c.valor)||0),0))}</div></div>
     <div class="kpi-card good"><div class="kpi-label">Pago este mês</div><div class="kpi-value">${fmtBRL(pagoEsteMes.reduce((s,c)=>s+(Number(c.valor)||0),0))}</div></div>
     <div class="kpi-card danger"><div class="kpi-label">Vencendo em 7 dias</div><div class="kpi-value">${vencendo}</div></div>
+    <div class="kpi-card ${cobertVencendo>0?'danger':''}"><div class="kpi-label">Renovar cobrança (mês que vem)</div><div class="kpi-value">${cobertVencendo}</div></div>
     <div class="kpi-card"><div class="kpi-label">Vínculos ativos</div><div class="kpi-value">${vinculos}</div></div>`;
 }
 function statusBadgeConta(c){
@@ -6551,20 +6596,16 @@ function renderContasPagarTimelines(){
   const wrap = document.getElementById('contaspagar-timelines');
   if(!wrap) return;
   const lista = contasPagarDaObraAtual();
-  const grupos = {};
-  lista.forEach(c=>{
-    const key = vinculoKeyConta(c);
-    if(!grupos[key]) grupos[key] = { label: vinculoLabelConta(c), itens: [] };
-    grupos[key].itens.push(c);
-  });
+  const grupos = agruparContasPorVinculo(lista);
   const chaves = Object.keys(grupos);
   if(!chaves.length){ wrap.innerHTML = `<p class="hint" style="font-style:italic;">Nenhum vínculo cadastrado ainda.</p>`; return; }
+  // vínculos com alerta de cobertura primeiro (vencido > atenção > no prazo)
+  const ordemFarol = {'Vencido':0, 'Atenção':1, 'No prazo':2, '-':3};
+  chaves.sort((a,b)=> (ordemFarol[grupos[a].farolCobertura]??9) - (ordemFarol[grupos[b].farolCobertura]??9));
   wrap.innerHTML = chaves.map(key=>{
     const grupo = grupos[key];
-    const itens = grupo.itens.slice().filter(c=>c.periodo_inicio && c.periodo_fim).sort((a,b)=>String(a.periodo_inicio).localeCompare(String(b.periodo_inicio)));
-    if(!itens.length) return '';
-    const minD = itens.reduce((m,c)=> c.periodo_inicio<m?c.periodo_inicio:m, itens[0].periodo_inicio);
-    const maxD = itens.reduce((m,c)=> c.periodo_fim>m?c.periodo_fim:m, itens[0].periodo_fim);
+    const itens = grupo.itens;
+    const minD = grupo.minD, maxD = grupo.maxD;
     const totalDias = Math.max(1, (new Date(maxD)-new Date(minD))/86400000 + 1);
     const segs = itens.map(c=>{
       const offDias = (new Date(c.periodo_inicio)-new Date(minD))/86400000;
@@ -6576,11 +6617,15 @@ function renderContasPagarTimelines(){
       return `<div class="timeline-seg ${cls}" style="position:absolute; top:0; bottom:0; left:${left}%; width:${width}%; ${c.status==='pago'?'background:linear-gradient(180deg,#2a9d63,#1a7f4b);':'background:repeating-linear-gradient(135deg,#f0c04c,#f0c04c 6px,#e0ad2e 6px,#e0ad2e 12px);'}" title="${escAttr(title)}"></div>`;
     }).join('');
     const totalPago = itens.filter(c=>c.status==='pago').reduce((s,c)=>s+(Number(c.valor)||0),0);
+    const alertaCobertura = badgeFarolCobertura(grupo.farolCobertura, grupo.diasAteFimCobertura);
     return `
       <div style="margin-bottom:18px;">
-        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; gap:10px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; gap:10px; flex-wrap:wrap;">
           <div style="font-size:13px; font-weight:700;">${grupo.label}</div>
-          <div class="hint">${fmtDate(minD)} – ${fmtDate(maxD)} · ${itens.length} lançamento(s) · ${fmtBRL(totalPago)} pago</div>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div class="hint">${fmtDate(minD)} – ${fmtDate(maxD)} · ${itens.length} lançamento(s) · ${fmtBRL(totalPago)} pago</div>
+            ${alertaCobertura}
+          </div>
         </div>
         <div style="position:relative; height:26px; background:#eef0f3; border-radius:7px; overflow:hidden; border:1px solid var(--border, #e2e6ed);">${segs}</div>
       </div>`;
@@ -6801,7 +6846,12 @@ function refreshBadges(){
     }).length;
   }
   const badgeContasPagar = document.getElementById('badge-contas-pagar');
-  if(badgeContasPagar) badgeContasPagar.textContent = STATE.contasPagar.filter(c=>c.status==='a_pagar').length;
+  if(badgeContasPagar){
+    const aPagarCount = STATE.contasPagar.filter(c=>c.status==='a_pagar').length;
+    const gruposBadge = agruparContasPorVinculo(STATE.contasPagar);
+    const cobertVencendoCount = Object.values(gruposBadge).filter(g=> g.farolCobertura==='Vencido' || g.farolCobertura==='Atenção').length;
+    badgeContasPagar.textContent = aPagarCount + cobertVencendoCount;
+  }
 }
 function refreshFilterOptions(){
   fillSelect('compras-status', STATE.compras.map(r=>r.status));
