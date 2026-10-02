@@ -6498,11 +6498,12 @@ function vinculoLabelConta(c){
 function periodosSeSobrepoemConta(iniA, fimA, iniB, fimB){ return iniA<=fimB && iniB<=fimA; }
 function contasPagarDaObraAtual(){ return STATE.contasPagar; } // já vem filtrado por obra do loadAllForObra
 /* Agrupa as contas por vínculo (contrato/equipamento/livre) — usado tanto nas
-   linhas do tempo quanto no alerta de "cobertura vencendo". Serve pra coisas
-   contínuas/mensais (aluguel de casa, equipamento fixo): cada lançamento cobre
-   um período (ex.: 02/10 a 01/11); a "cobertura" do vínculo é até onde já tem
-   lançamento (pago ou a pagar) — quando essa data fica perto de hoje, é sinal
-   de que está na hora de lançar/pagar o mês seguinte. */
+   linhas do tempo quanto no alerta de "próximo vencimento". Pra vínculo
+   marcado como recorrente (contínuo — aluguel, locação de equipamento etc.),
+   provisiona a data do PRÓXIMO vencimento a partir do vencimento do último
+   lançamento + 1 mês — isso dá uma referência fixa de prazo mesmo que o
+   pagamento atual esteja atrasado (não "foge" só porque você pagou tarde).
+   Vínculo marcado como esporádico/pontual não gera esse alerta. */
 function agruparContasPorVinculo(lista){
   const grupos = {};
   lista.forEach(c=>{
@@ -6515,9 +6516,18 @@ function agruparContasPorVinculo(lista){
     g.itens.sort((a,b)=>String(a.periodo_inicio).localeCompare(String(b.periodo_inicio)));
     g.minD = g.itens.reduce((m,c)=> c.periodo_inicio<m?c.periodo_inicio:m, g.itens[0].periodo_inicio);
     g.maxD = g.itens.reduce((m,c)=> c.periodo_fim>m?c.periodo_fim:m, g.itens[0].periodo_fim);
-    g.diasAteFimCobertura = diasAteData(g.maxD);
-    g.farolCobertura = farolCobertura(g.diasAteFimCobertura);
-    g.recorrente = g.itens.length >= 2; // já teve mais de um lançamento = é coisa contínua/mensal
+    const ultimo = g.itens[g.itens.length-1]; // lançamento mais recente (maior periodo_inicio)
+    g.recorrente = !!ultimo.recorrente;
+    if(g.recorrente){
+      const baseVencimento = ultimo.vencimento || ultimo.periodo_fim;
+      g.proximoVencimentoPrevisto = addMonthsISO(baseVencimento, 1);
+      g.diasAteProximoVencimento = diasAteData(g.proximoVencimentoPrevisto);
+      g.farolProximoVencimento = farolCobertura(g.diasAteProximoVencimento);
+    }else{
+      g.proximoVencimentoPrevisto = null;
+      g.diasAteProximoVencimento = null;
+      g.farolProximoVencimento = '-';
+    }
   });
   return grupos;
 }
@@ -6527,17 +6537,29 @@ function diasAteData(dataISO){
   const d = new Date(dataISO+'T00:00:00');
   return Math.round((d-hoje)/86400000);
 }
+/* Soma n meses a uma data ISO, preservando o "dia de vencimento" e ajustando
+   pra último dia do mês quando ele não existe (ex.: 31/01 + 1 mês = 28/02). */
+function addMonthsISO(iso, n){
+  const d = new Date(iso+'T00:00:00');
+  const dia = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth()+n);
+  const ultimoDiaMes = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(dia, ultimoDiaMes));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function farolCobertura(dias){
   if(dias===null||dias===undefined) return '-';
   if(dias<0) return 'Vencido';
   if(dias<=10) return 'Atenção';
   return 'No prazo';
 }
-function badgeFarolCobertura(f, dias){
-  if(f==='Vencido') return `<span class="badge b-red">⏰ Cobertura vencida há ${Math.abs(dias)}d — lançar próximo mês</span>`;
-  if(f==='Atenção') return `<span class="badge b-amber">⚠️ Cobertura acaba em ${dias}d — lançar próximo mês</span>`;
-  if(f==='No prazo') return `<span class="badge b-green">Coberto até ${dias}d</span>`;
-  return '';
+function badgeFarolCobertura(f, dataISO, dias){
+  const label = fmtDate(dataISO);
+  if(f==='Vencido') return `<span class="badge b-red">⏰ Venceu em ${label} (há ${Math.abs(dias)}d) — lançar/pagar</span>`;
+  if(f==='Atenção') return `<span class="badge b-amber">⚠️ Vence em ${label} (${dias}d) — lançar/pagar</span>`;
+  if(f==='No prazo') return `<span class="badge b-green">Próximo vencimento: ${label}</span>`;
+  return `<span class="badge b-gray">Pontual — sem alerta de recorrência</span>`;
 }
 function renderContaspagarKpis(){
   const lista = contasPagarDaObraAtual();
@@ -6548,7 +6570,7 @@ function renderContaspagarKpis(){
   const vencendo = aPagar.filter(c=>c.vencimento && c.vencimento<=addDaysContrato(hoje,7)).length;
   const grupos = agruparContasPorVinculo(lista);
   const vinculos = Object.keys(grupos).length;
-  const cobertVencendo = Object.values(grupos).filter(g=> g.farolCobertura==='Vencido' || g.farolCobertura==='Atenção').length;
+  const cobertVencendo = Object.values(grupos).filter(g=> g.farolProximoVencimento==='Vencido' || g.farolProximoVencimento==='Atenção').length;
   const el = document.getElementById('contaspagar-kpis');
   if(!el) return;
   el.innerHTML = `
@@ -6580,7 +6602,7 @@ function renderContasPagar(){
   }
   tbody.innerHTML = lista.map(c=>`
     <tr>
-      <td>${vinculoLabelConta(c)}</td>
+      <td>${vinculoLabelConta(c)}${c.recorrente?' <span class="hint" title="Pagamento contínuo/mensal">🔁</span>':''}</td>
       <td class="desc-cell">${descTrunc(c.descricao)}</td>
       <td>${fmtDate(c.periodo_inicio)} – ${fmtDate(c.periodo_fim)}</td>
       <td class="num">${fmtBRL(c.valor)}</td>
@@ -6599,9 +6621,9 @@ function renderContasPagarTimelines(){
   const grupos = agruparContasPorVinculo(lista);
   const chaves = Object.keys(grupos);
   if(!chaves.length){ wrap.innerHTML = `<p class="hint" style="font-style:italic;">Nenhum vínculo cadastrado ainda.</p>`; return; }
-  // vínculos com alerta de cobertura primeiro (vencido > atenção > no prazo)
+  // vínculos com alerta de vencimento primeiro (vencido > atenção > no prazo > pontual)
   const ordemFarol = {'Vencido':0, 'Atenção':1, 'No prazo':2, '-':3};
-  chaves.sort((a,b)=> (ordemFarol[grupos[a].farolCobertura]??9) - (ordemFarol[grupos[b].farolCobertura]??9));
+  chaves.sort((a,b)=> (ordemFarol[grupos[a].farolProximoVencimento]??9) - (ordemFarol[grupos[b].farolProximoVencimento]??9));
   wrap.innerHTML = chaves.map(key=>{
     const grupo = grupos[key];
     const itens = grupo.itens;
@@ -6617,7 +6639,7 @@ function renderContasPagarTimelines(){
       return `<div class="timeline-seg ${cls}" style="position:absolute; top:0; bottom:0; left:${left}%; width:${width}%; ${c.status==='pago'?'background:linear-gradient(180deg,#2a9d63,#1a7f4b);':'background:repeating-linear-gradient(135deg,#f0c04c,#f0c04c 6px,#e0ad2e 6px,#e0ad2e 12px);'}" title="${escAttr(title)}"></div>`;
     }).join('');
     const totalPago = itens.filter(c=>c.status==='pago').reduce((s,c)=>s+(Number(c.valor)||0),0);
-    const alertaCobertura = badgeFarolCobertura(grupo.farolCobertura, grupo.diasAteFimCobertura);
+    const alertaCobertura = badgeFarolCobertura(grupo.farolProximoVencimento, grupo.proximoVencimentoPrevisto, grupo.diasAteProximoVencimento);
     return `
       <div style="margin-bottom:18px;">
         <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; gap:10px; flex-wrap:wrap;">
@@ -6677,6 +6699,12 @@ function abrirNovaContaPagarModal(){
       <div class="form-row" id="cp-row-contrato"><label>Contrato</label><select id="cp-contrato"></select></div>
       <div class="form-row" id="cp-row-equipamento" style="display:none;"><label>Locação de Equipamento</label><select id="cp-equipamento"></select></div>
       <div class="form-row" id="cp-row-livre" style="display:none;"><label>Descreva o imóvel/equipamento</label><input type="text" id="cp-vinculo-livre" placeholder="Ex.: Casa Alojamento B..."></div>
+      <div class="form-row"><label>Esse pagamento é...</label>
+        <select id="cp-recorrente">
+          <option value="true">🔁 Contínuo / mensal (ex.: aluguel, locação de equipamento) — gera alerta de próximo vencimento</option>
+          <option value="false">Esporádico / pontual (não repete) — sem alerta de recorrência</option>
+        </select>
+      </div>
       <div class="form-row"><label>Descrição da conta *</label><input type="text" id="cp-descricao" required placeholder="Ex.: Conta de luz — Casa Alojamento B"></div>
       <div class="form-grid2">
         <div class="form-row"><label>Início do período de referência *</label><input type="date" id="cp-periodo-inicio" required></div>
@@ -6688,6 +6716,7 @@ function abrirNovaContaPagarModal(){
         <div class="form-row"><label>Valor (R$) *</label><input type="number" id="cp-valor" step="0.01" min="0" required></div>
         <div class="form-row"><label>Vencimento *</label><input type="date" id="cp-vencimento" required></div>
       </div>
+      <div class="hint" style="margin:-8px 0 13px;">Se marcar como contínuo/mensal, essa data de vencimento é a referência usada pro alerta do próximo mês (vencimento + 1 mês) — mesmo que esse pagamento atual esteja atrasado.</div>
       <div class="form-grid2">
         <div class="form-row"><label>Status</label>
           <select id="cp-status">
@@ -6746,6 +6775,7 @@ function abrirNovaContaPagarModal(){
         valor: Number(document.getElementById('cp-valor').value)||0,
         vencimento: document.getElementById('cp-vencimento').value || null,
         status,
+        recorrente: document.getElementById('cp-recorrente').value==='true',
         data_pagamento: status==='pago' ? (document.getElementById('cp-data-pagamento').value || todayISO()) : null,
         observacoes: document.getElementById('cp-obs').value.trim(),
         created_by: CURRENT_USER.id,
@@ -6849,7 +6879,7 @@ function refreshBadges(){
   if(badgeContasPagar){
     const aPagarCount = STATE.contasPagar.filter(c=>c.status==='a_pagar').length;
     const gruposBadge = agruparContasPorVinculo(STATE.contasPagar);
-    const cobertVencendoCount = Object.values(gruposBadge).filter(g=> g.farolCobertura==='Vencido' || g.farolCobertura==='Atenção').length;
+    const cobertVencendoCount = Object.values(gruposBadge).filter(g=> g.farolProximoVencimento==='Vencido' || g.farolProximoVencimento==='Atenção').length;
     badgeContasPagar.textContent = aPagarCount + cobertVencendoCount;
   }
 }
