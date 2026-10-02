@@ -1151,7 +1151,7 @@ tbody tr:last-child td{border-bottom:none;}
         <div class="modal-sub" style="margin-bottom:14px;">Controla quem pode aprovar/rejeitar requisições e excluir registros. Usuário novo sempre começa como "Engenheiro".</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Nome</th><th>Obra padrão</th><th>Papel</th></tr></thead>
+            <thead><tr><th>Nome</th><th>Obra padrão</th><th>Papel</th><th>Permissões de acesso</th></tr></thead>
             <tbody id="usuarios-body"></tbody>
           </table>
         </div>
@@ -1916,6 +1916,73 @@ let SINAPI_ALL = [];
 let REGRAS = [];
 let realtimeChannels = [];
 
+/* ============== permissões de acesso por página (granular, por usuário) ==============
+   Catálogo de toda página normal do menu (fora as de Administração, que já são
+   só-gestor por conta própria). null em profiles.paginas_permitidas = sem
+   restrição, continua vendo tudo normalmente; array = só essas páginas. */
+const PAGINAS_NAV_CATALOGO = [
+  {grupo:'Visão Geral', key:'dashboard', label:'Dashboard'},
+  {grupo:'Visão Geral', key:'painel-geral', label:'Painel Geral (Todas Obras)'},
+  {grupo:'Requisições da obra', key:'compras', label:'Solicitação de Compra'},
+  {grupo:'Requisições da obra', key:'servicos', label:'Solicitação de Serviços'},
+  {grupo:'Requisições da obra', key:'epi', label:'Solicitação de EPI'},
+  {grupo:'Requisições da obra', key:'reembolsos', label:'Solicitação de Reembolso'},
+  {grupo:'Requisições da obra', key:'cancelados', label:'Cancelados'},
+  {grupo:'Requisições da obra', key:'historico-reembolso', label:'Histórico de Reembolso'},
+  {grupo:'Requisições da obra', key:'historico-servico', label:'Histórico de Serviço'},
+  {grupo:'Requisições da obra', key:'historico', label:'Histórico de Compras'},
+  {grupo:'Requisições da obra', key:'cotacoes', label:'Histórico de Cotação'},
+  {grupo:'Requisições da obra', key:'contratos', label:'Gerenciador de Contratos'},
+  {grupo:'Financeiro da obra', key:'locacoes-equip', label:'Locação de Equipamentos'},
+  {grupo:'Financeiro da obra', key:'contas-pagar', label:'Contas a Pagar'},
+  {grupo:'Compartilhado entre obras', key:'almoxarifado', label:'Almoxarifado Geral'},
+  {grupo:'Compartilhado entre obras', key:'almoxarifado-manutencao', label:'Manutenção'},
+  {grupo:'Compartilhado entre obras', key:'almoxarifado-eletrico', label:'Almoxarifado Elétrico'},
+  {grupo:'Compartilhado entre obras', key:'epi-estoque', label:'Almoxarifado de EPI'},
+  {grupo:'Compartilhado entre obras', key:'funcionarios', label:'Funcionários'},
+  {grupo:'Compartilhado entre obras', key:'fornecedores', label:'Fornecedores'},
+  {grupo:'Compartilhado entre obras', key:'cadastro', label:'Cadastro Extra'},
+  {grupo:'Compartilhado entre obras', key:'sinapi', label:'Base SINAPI'},
+  {grupo:'RH · Passagens', key:'pass-solic', label:'Passagens — Solicitações'},
+  {grupo:'RH · Passagens', key:'pass-financeiro', label:'Passagens — Financeiro'},
+  {grupo:'RH · Passagens', key:'pass-historico', label:'Passagens — Histórico'},
+  {grupo:'RH · Passagens', key:'pass-conferidos', label:'Passagens — Conferidos'},
+  {grupo:'RH · Alimentação', key:'alim-nova', label:'Alimentação — Nova Solicitação'},
+  {grupo:'RH · Alimentação', key:'alim-tickets', label:'Alimentação — Tickets Gerados'},
+  {grupo:'Ajuda', key:'regras', label:'Regras Gerais'},
+];
+let PAGINAS_PERMITIDAS = null; // null = sem restrição (gestor sempre fica null/ignorado)
+/* Esconde do menu lateral as páginas que não estão na lista liberada do
+   usuário (só roda pra quem tem restrição configurada — gestor e usuário sem
+   restrição continuam vendo tudo, igual sempre foi). Se a página que estava
+   ativa foi escondida, pula pra primeira página visível pra não deixar a
+   tela em branco. */
+function aplicarPermissoesNav(){
+  if(IS_GESTOR || !Array.isArray(PAGINAS_PERMITIDAS)) return;
+  const permitido = new Set(PAGINAS_PERMITIDAS);
+  let primeiraVisivel = null;
+  let ativaEscondida = false;
+  document.querySelectorAll('.nav-item[data-page]').forEach(item=>{
+    const key = item.dataset.page;
+    if(key==='usuarios' || key==='reverter-conclusoes') return; // essas já são só-gestor
+    const pode = permitido.has(key);
+    item.style.display = pode ? '' : 'none';
+    if(pode && !primeiraVisivel) primeiraVisivel = item;
+    if(!pode && item.classList.contains('active')) ativaEscondida = true;
+  });
+  // some com o rótulo de grupo se nenhum item dele sobrou visível
+  document.querySelectorAll('.nav-group-label').forEach(label=>{
+    let el = label.nextElementSibling;
+    let temVisivel = false;
+    while(el && el.classList.contains('nav-item')){
+      if(el.style.display !== 'none') temVisivel = true;
+      el = el.nextElementSibling;
+    }
+    label.style.display = temVisivel ? '' : 'none';
+  });
+  if(ativaEscondida && primeiraVisivel) primeiraVisivel.click();
+}
+
 /* ============== auth ============== */
 async function initAuthGate(){
   const { data: { session } } = await sb.auth.getSession();
@@ -1965,6 +2032,7 @@ async function enterApp(session){
   }catch(e){}
   CURRENT_PROFILE = profile;
   IS_GESTOR = !!(profile && profile.papel === 'gestor');
+  PAGINAS_PERMITIDAS = Array.isArray(profile && profile.paginas_permitidas) ? profile.paginas_permitidas : null;
   document.getElementById('user-chip-text').textContent = ((profile && profile.nome) ? profile.nome : CURRENT_USER.email) + (IS_GESTOR ? ' · Gestor' : '');
   if(IS_GESTOR){
     document.getElementById('nav-group-admin').style.display = '';
@@ -1981,6 +2049,7 @@ async function enterApp(session){
   initPassSolic(); initPassFinanceiro(); initPassHistorico(); initPassConferidos();
   initAlimNova(); initAlimTickets();
   wireNav();
+  aplicarPermissoesNav();
   wireMenuMobile();
   wireExtras();
   wirePainelGeral();
@@ -7129,8 +7198,68 @@ async function loadAndRenderUsuarios(){
         <option value="gestor" ${u.papel==='gestor'?'selected':''}>Gestor (aprova/exclui)</option>
       </select>
     </td>
-  </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Nenhum usuário encontrado.</td></tr>`;
+    <td>
+      ${u.papel==='gestor'
+        ? '<span class="badge b-gray">Acesso total (gestor)</span>'
+        : `<button class="btn btn-sm" onclick='abrirPermissoesModal(${JSON.stringify(u.id)}, ${JSON.stringify(u.nome||u.id)}, ${JSON.stringify(Array.isArray(u.paginas_permitidas)?u.paginas_permitidas:null)})'>🔒 Permissões${Array.isArray(u.paginas_permitidas)?` <span class="badge b-amber">${u.paginas_permitidas.length}</span>`:''}</button>`
+      }
+    </td>
+  </tr>`).join('') : `<tr class="empty-row"><td colspan="4">Nenhum usuário encontrado.</td></tr>`;
 }
+function abrirPermissoesModal(userId, nomeUsuario, paginasAtuais){
+  const temRestricao = Array.isArray(paginasAtuais);
+  const atuais = new Set(temRestricao ? paginasAtuais : []);
+  let gruposHtml = '';
+  let grupoAtual = null;
+  PAGINAS_NAV_CATALOGO.forEach(p=>{
+    if(p.grupo !== grupoAtual){
+      if(grupoAtual !== null) gruposHtml += '</div>';
+      grupoAtual = p.grupo;
+      gruposHtml += `<div style="margin-bottom:10px;"><div class="muted" style="font-size:12px;font-weight:600;margin-bottom:4px;">${esc(p.grupo)}</div>`;
+    }
+    gruposHtml += `<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:14px;">
+      <input type="checkbox" class="perm-pagina-chk" value="${p.key}" ${atuais.has(p.key)?'checked':''}>
+      ${esc(p.label)}
+    </label>`;
+  });
+  gruposHtml += '</div>';
+  openModal(`
+    <h3>Permissões de acesso — ${esc(nomeUsuario)}</h3>
+    <div class="modal-sub" style="margin-bottom:10px;">Marque só as páginas que esse usuário pode ver no menu. Desmarcado "Sem restrição" abaixo, todas as páginas marcadas aqui são as únicas que aparecem pra ele. Se deixar "Sem restrição" marcado, ele vê tudo normalmente (como hoje).</div>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:8px;background:#f8f9fb;border-radius:8px;">
+      <input type="checkbox" id="perm-sem-restricao" ${!temRestricao?'checked':''} onchange="document.getElementById('perm-lista-paginas').style.display = this.checked ? 'none' : ''">
+      <strong>Sem restrição (vê tudo que o papel dele já vê hoje)</strong>
+    </label>
+    <div id="perm-lista-paginas" style="display:${!temRestricao?'none':''};max-height:360px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+      ${gruposHtml}
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarPermissoesUsuario('${userId}')">Salvar</button>
+    </div>
+  `);
+}
+window.abrirPermissoesModal = abrirPermissoesModal;
+window.salvarPermissoesUsuario = async function(userId){
+  const semRestricao = document.getElementById('perm-sem-restricao').checked;
+  let novoValor = null;
+  if(!semRestricao){
+    novoValor = Array.from(document.querySelectorAll('.perm-pagina-chk:checked')).map(c=>c.value);
+    if(novoValor.length===0){
+      toast('Marque pelo menos uma página, ou deixe "Sem restrição" marcado.', true);
+      return;
+    }
+  }
+  const { error } = await sb.from('profiles').update({ paginas_permitidas: novoValor }).eq('id', userId);
+  if(error){ toast('Erro ao salvar permissões: ' + error.message, true); return; }
+  toast('Permissões salvas.');
+  closeModal();
+  if(userId === CURRENT_USER.id){
+    PAGINAS_PERMITIDAS = novoValor;
+    aplicarPermissoesNav();
+  }
+  await loadAndRenderUsuarios();
+};
 window.alterarPapelUsuario = async function(id, novoPapel){
   const { error } = await sb.from('profiles').update({papel: novoPapel}).eq('id', id);
   if(error){ toast('Erro ao alterar papel: ' + error.message, true); await loadAndRenderUsuarios(); return; }
@@ -7141,7 +7270,11 @@ window.alterarPapelUsuario = async function(id, novoPapel){
       document.getElementById('nav-group-admin').style.display = 'none';
       document.getElementById('nav-usuarios').style.display = 'none';
       document.getElementById('nav-reverter').style.display = 'none';
+      aplicarPermissoesNav();
       document.querySelector('.nav-item[data-page="dashboard"]').click();
+    }else{
+      // virou gestor: sem restrição de página, garante que tudo volte a aparecer
+      document.querySelectorAll('.nav-item[data-page], .nav-group-label').forEach(el=> el.style.display = '');
     }
   }
   renderCompras(); renderServicos(); renderEpi(); renderReembolsos(); renderCancelados(); renderHistorico(); renderHistoricoReembolso(); renderHistoricoServico(); renderReverterConclusoes(); renderAlmoxarifado();
