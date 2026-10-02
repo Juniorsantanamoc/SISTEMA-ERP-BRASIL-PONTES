@@ -6614,17 +6614,19 @@ function renderContasPagar(){
     </tr>`).join('');
   renderContasPagarTimelines();
 }
+let CONTAS_PAGAR_GRUPOS_LIST = []; // snapshot dos grupos exibidos na linha do tempo, pra os botões "marcar mês pago" acharem o vínculo clicado sem precisar embutir chave composta (pode ter aspas) no onclick
 function renderContasPagarTimelines(){
   const wrap = document.getElementById('contaspagar-timelines');
   if(!wrap) return;
   const lista = contasPagarDaObraAtual();
   const grupos = agruparContasPorVinculo(lista);
   const chaves = Object.keys(grupos);
-  if(!chaves.length){ wrap.innerHTML = `<p class="hint" style="font-style:italic;">Nenhum vínculo cadastrado ainda.</p>`; return; }
+  if(!chaves.length){ wrap.innerHTML = `<p class="hint" style="font-style:italic;">Nenhum vínculo cadastrado ainda.</p>`; CONTAS_PAGAR_GRUPOS_LIST = []; return; }
   // vínculos com alerta de vencimento primeiro (vencido > atenção > no prazo > pontual)
   const ordemFarol = {'Vencido':0, 'Atenção':1, 'No prazo':2, '-':3};
   chaves.sort((a,b)=> (ordemFarol[grupos[a].farolProximoVencimento]??9) - (ordemFarol[grupos[b].farolProximoVencimento]??9));
-  wrap.innerHTML = chaves.map(key=>{
+  CONTAS_PAGAR_GRUPOS_LIST = chaves.map(k=>grupos[k]);
+  wrap.innerHTML = chaves.map((key,idx)=>{
     const grupo = grupos[key];
     const itens = grupo.itens;
     const minD = grupo.minD, maxD = grupo.maxD;
@@ -6640,6 +6642,8 @@ function renderContasPagarTimelines(){
     }).join('');
     const totalPago = itens.filter(c=>c.status==='pago').reduce((s,c)=>s+(Number(c.valor)||0),0);
     const alertaCobertura = badgeFarolCobertura(grupo.farolProximoVencimento, grupo.proximoVencimentoPrevisto, grupo.diasAteProximoVencimento);
+    const urgente = grupo.farolProximoVencimento==='Vencido' || grupo.farolProximoVencimento==='Atenção';
+    const botaoMarcarPago = grupo.recorrente ? `<button class="btn btn-sm ${urgente?'btn-primary':'btn-secondary'}" onclick="abrirModalMarcarMesPago(${idx})">💰 Marcar mês como pago</button>` : '';
     return `
       <div style="margin-bottom:18px;">
         <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; gap:10px; flex-wrap:wrap;">
@@ -6647,12 +6651,102 @@ function renderContasPagarTimelines(){
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <div class="hint">${fmtDate(minD)} – ${fmtDate(maxD)} · ${itens.length} lançamento(s) · ${fmtBRL(totalPago)} pago</div>
             ${alertaCobertura}
+            ${botaoMarcarPago}
           </div>
         </div>
         <div style="position:relative; height:26px; background:#eef0f3; border-radius:7px; overflow:hidden; border:1px solid var(--border, #e2e6ed);">${segs}</div>
       </div>`;
   }).join('');
 }
+/* Abre um mini-formulário já pré-preenchido com os dados projetados do mês
+   seguinte (mesmo vínculo, valor e tipo do último lançamento, período e
+   vencimento avançados em 1 mês) — assim não precisa redigitar tudo todo mês,
+   só confirmar (ou ajustar o valor, se mudou) e salvar como pago. */
+window.abrirModalMarcarMesPago = function(idx){
+  const grupo = CONTAS_PAGAR_GRUPOS_LIST[idx];
+  if(!grupo || !grupo.itens.length) return;
+  const ultimo = grupo.itens[grupo.itens.length-1];
+  const periodoInicioProj = addMonthsISO(ultimo.periodo_inicio, 1);
+  const periodoFimProj = addMonthsISO(ultimo.periodo_fim, 1);
+  const vencimentoProj = ultimo.vencimento ? addMonthsISO(ultimo.vencimento, 1) : periodoFimProj;
+  openModal(`
+    <h3>Marcar mês como pago</h3>
+    <div class="modal-sub">${grupo.label}</div>
+    <div class="hint" style="margin-bottom:14px;">Pré-preenchido com base no último lançamento deste vínculo — confira os dados (o valor pode ter mudado) e confirme.</div>
+    <form id="form-marcar-mes-pago">
+      <div class="form-row"><label>Descrição</label><input type="text" id="mp-descricao" value="${escAttr(ultimo.descricao||'')}"></div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Início do período *</label><input type="date" id="mp-periodo-inicio" required value="${periodoInicioProj}"></div>
+        <div class="form-row"><label>Fim do período *</label><input type="date" id="mp-periodo-fim" required value="${periodoFimProj}"></div>
+      </div>
+      <div id="mp-overlap-warning" style="display:none; background:#fbe7e6; border:1px solid #f0c2be; color:#b3261e; border-radius:8px; padding:11px 13px; font-size:12.5px; font-weight:600; line-height:1.55; margin:4px 0 14px;"></div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Valor (R$) *</label><input type="number" id="mp-valor" step="0.01" min="0" required value="${ultimo.valor||''}"></div>
+        <div class="form-row"><label>Vencimento</label><input type="date" id="mp-vencimento" value="${vencimentoProj}"></div>
+      </div>
+      <div class="form-row"><label>Data do pagamento *</label><input type="date" id="mp-data-pagamento" required value="${todayISO()}"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">✅ Confirmar pagamento</button>
+      </div>
+    </form>
+  `);
+  function checarOverlapMp(){
+    const box = document.getElementById('mp-overlap-warning');
+    const ini = document.getElementById('mp-periodo-inicio').value;
+    const fim = document.getElementById('mp-periodo-fim').value;
+    if(!ini || !fim){ box.style.display='none'; return; }
+    const conflitos = STATE.contasPagar.filter(c=> c.status==='pago' && vinculoKeyConta(c)===vinculoKeyConta(ultimo) && periodosSeSobrepoemConta(ini, fim, c.periodo_inicio, c.periodo_fim));
+    if(conflitos.length){
+      box.innerHTML = `⚠️ Esse período já foi coberto por pagamento(s) anterior(es) deste vínculo:` +
+        conflitos.map(c=>`<div style="font-weight:400; margin-top:4px;">• ${fmtDate(c.periodo_inicio)} a ${fmtDate(c.periodo_fim)} — ${fmtBRL(c.valor)}, pago em ${fmtDate(c.data_pagamento)}</div>`).join('') +
+        `<div style="font-weight:400; margin-top:4px;">Confira se não é pagamento em duplicidade antes de salvar.</div>`;
+      box.style.display = 'block';
+    }else{
+      box.style.display = 'none';
+    }
+  }
+  document.getElementById('mp-periodo-inicio').addEventListener('change', checarOverlapMp);
+  document.getElementById('mp-periodo-fim').addEventListener('change', checarOverlapMp);
+  checarOverlapMp();
+  document.getElementById('form-marcar-mes-pago').addEventListener('submit', async ev=>{
+    ev.preventDefault();
+    const submitBtn = ev.target.querySelector('button[type="submit"]');
+    const ini = document.getElementById('mp-periodo-inicio').value;
+    const fim = document.getElementById('mp-periodo-fim').value;
+    if(ini > fim){ toast('O início do período não pode ser depois do fim.', true); return; }
+    submitBtn.disabled = true;
+    try{
+      const rec = {
+        obra: STATE.currentObra,
+        tipo: ultimo.tipo || null,
+        vinculo_tipo: ultimo.vinculo_tipo,
+        vinculo_contrato_id: ultimo.vinculo_contrato_id,
+        vinculo_equipamento_id: ultimo.vinculo_equipamento_id,
+        vinculo_livre_texto: ultimo.vinculo_livre_texto,
+        descricao: document.getElementById('mp-descricao').value.trim(),
+        periodo_inicio: ini,
+        periodo_fim: fim,
+        valor: Number(document.getElementById('mp-valor').value)||0,
+        vencimento: document.getElementById('mp-vencimento').value || null,
+        status: 'pago',
+        recorrente: true,
+        data_pagamento: document.getElementById('mp-data-pagamento').value || todayISO(),
+        observacoes: '',
+        created_by: CURRENT_USER.id,
+      };
+      const { error } = await sb.from('contas_pagar').insert(rec);
+      if(error) throw error;
+      closeModal();
+      await refetchTable('contas_pagar'); renderContasPagar(); refreshBadges();
+      toast('Pagamento do mês lançado.');
+    }catch(err){
+      toast('Erro ao lançar pagamento: ' + err.message, true);
+    }finally{
+      submitBtn.disabled = false;
+    }
+  });
+};
 function initContasPagar(){
   document.getElementById('btn-nova-conta-pagar').addEventListener('click', ()=>abrirNovaContaPagarModal());
   document.getElementById('contaspagar-search').addEventListener('input', renderContasPagar);
