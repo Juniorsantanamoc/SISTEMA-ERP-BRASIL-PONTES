@@ -414,6 +414,9 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="nav-item" data-page="historico"><span class="nav-icon">📚</span>Histórico de Compras<span class="nav-badge" id="badge-historico">0</span></div>
     <div class="nav-item" data-page="cotacoes"><span class="nav-icon">💬</span>Histórico de Cotação<span class="nav-badge" id="badge-cotacoes">0</span></div>
     <div class="nav-item" data-page="contratos"><span class="nav-icon">📄</span>Gerenciador de Contratos<span class="nav-badge" id="badge-contratos">0</span></div>
+    <div class="nav-group-label">Financeiro da obra</div>
+    <div class="nav-item" data-page="locacoes-equip"><span class="nav-icon">🚜</span>Locação de Equipamentos<span class="nav-badge" id="badge-locacoes-equip">0</span></div>
+    <div class="nav-item" data-page="contas-pagar"><span class="nav-icon">💳</span>Contas a Pagar<span class="nav-badge" id="badge-contas-pagar">0</span></div>
     <div class="nav-group-label">Compartilhado entre obras</div>
     <div class="nav-item" data-page="almoxarifado"><span class="nav-icon">🚜</span>Almoxarifado Geral<span class="nav-badge" id="badge-almox">0</span></div>
     <div class="nav-item" data-page="almoxarifado-manutencao"><span class="nav-icon">🔧</span>Manutenção<span class="nav-badge" id="badge-almox-manutencao">0</span></div>
@@ -753,6 +756,58 @@ tbody tr:last-child td{border-bottom:none;}
             <tbody id="contratos-body"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- LOCAÇÃO DE EQUIPAMENTOS (registro leve, sem contrato formal) -->
+      <div class="page" id="page-locacoes-equip">
+        <p class="hint" style="margin-bottom:14px;">Cadastro rápido de equipamentos locados avulsos desta obra (container, gerador, etc.), sem contrato formal. Para locações com contrato assinado, use o Gerenciador de Contratos ▸ Controle de Locação.</p>
+        <div class="kpi-grid" id="locequip-kpis"></div>
+        <div class="toolbar">
+          <button class="btn btn-primary" id="btn-novo-locequip">+ Nova Locação</button>
+          <input class="search-input" id="locequip-search" placeholder="Buscar por equipamento ou fornecedor...">
+          <select class="filter-select" id="locequip-status">
+            <option value="">Todos os status</option>
+            <option value="ativo">Ativo</option>
+            <option value="encerrado">Encerrado</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Equipamento</th><th>Fornecedor</th><th class="num">Valor Mensal</th>
+              <th>Início</th><th>Devolução/Renovação prevista</th><th class="num">Dias Rest.</th><th>Farol</th>
+              <th>Status</th><th>Ações</th>
+            </tr></thead>
+            <tbody id="locequip-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CONTAS A PAGAR -->
+      <div class="page" id="page-contas-pagar">
+        <p class="hint" style="margin-bottom:14px;">Lance aqui os pagamentos recorrentes (conta de luz, água, aluguel, locação de equipamento etc.) vinculando a um contrato, a uma locação de equipamento, ou deixando livre. Ao lançar um período que já foi pago antes para o mesmo vínculo, o sistema avisa (sem bloquear) para evitar pagamento em duplicidade.</p>
+        <div class="kpi-grid" id="contaspagar-kpis"></div>
+        <div class="toolbar">
+          <button class="btn btn-primary" id="btn-nova-conta-pagar">+ Nova Conta</button>
+          <input class="search-input" id="contaspagar-search" placeholder="Buscar por descrição ou vínculo...">
+          <select class="filter-select" id="contaspagar-vinculo-tipo">
+            <option value="">Todos os vínculos</option>
+            <option value="contrato">Contrato</option>
+            <option value="equipamento">Locação de Equipamento</option>
+            <option value="livre">Outro (livre)</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Vínculo</th><th>Descrição</th><th>Período</th>
+              <th class="num">Valor</th><th>Pago em</th><th>Ações</th>
+            </tr></thead>
+            <tbody id="contaspagar-body"></tbody>
+          </table>
+        </div>
+        <h3 style="margin:24px 0 10px;">Linha do tempo por vínculo</h3>
+        <div id="contaspagar-timelines"></div>
       </div>
 
       <!-- ALMOXARIFADO -->
@@ -1832,6 +1887,8 @@ let STATE = {
   contratos: [],
   contratoClausulasModelo: [],
   recebimentosLog: [],
+  locacoesEquip: [],
+  contasPagar: [],
   almoxarifado: [],
   almoxarifadoEletrico: [],
   epiEstoque: [],
@@ -1928,6 +1985,8 @@ async function enterApp(session){
   wireExtras();
   wirePainelGeral();
   wireContratos();
+  initLocacoesEquip();
+  initContasPagar();
   wirePassagensExtras();
   wireAlimentacaoExtras();
   wireNotificacoes();
@@ -2080,7 +2139,7 @@ async function loadRegras(){
 async function loadAllForObra(){
   const obra = STATE.currentObra;
   try{
-    const [comprasRes, servicosRes, epiRes, histRes, cotacoesRes, reembRes, reembItensRes, almoxRes, almoxEletRes, epiEstoqueRes, epiSaidasRes, funcionariosRes, fornecedoresRes, contratosRes, recebLogRes, clausulasModeloRes] = await Promise.all([
+    const [comprasRes, servicosRes, epiRes, histRes, cotacoesRes, reembRes, reembItensRes, almoxRes, almoxEletRes, epiEstoqueRes, epiSaidasRes, funcionariosRes, fornecedoresRes, contratosRes, recebLogRes, clausulasModeloRes, locacoesEquipRes, contasPagarRes] = await Promise.all([
       sb.from('compras').select('*').eq('obra', obra).order('numero'),
       sb.from('servicos').select('*').eq('obra', obra).order('numero'),
       sb.from('epi_requisicoes').select('*').eq('obra', obra).order('numero'),
@@ -2097,6 +2156,8 @@ async function loadAllForObra(){
       sb.from('contratos').select('*').eq('obra', obra).order('data_fim'),
       sb.from('recebimentos_log').select('*').eq('obra', obra).eq('revertido', false).order('criado_em', {ascending:false}),
       sb.from('contrato_clausulas_modelo').select('*').eq('ativa', true).order('tipo_contrato').order('ordem'),
+      sb.from('locacoes_equipamentos').select('*').eq('obra', obra).order('data_prevista'),
+      sb.from('contas_pagar').select('*').eq('obra', obra).order('periodo_inicio', {ascending:false}),
     ]);
     if(comprasRes.error) throw comprasRes.error;
     if(servicosRes.error) throw servicosRes.error;
@@ -2129,6 +2190,8 @@ async function loadAllForObra(){
     STATE.contratos = contratosRes.data || [];
     STATE.recebimentosLog = recebLogRes.data || [];
     if(!clausulasModeloRes.error) STATE.contratoClausulasModelo = clausulasModeloRes.data || [];
+    if(!locacoesEquipRes.error) STATE.locacoesEquip = locacoesEquipRes.data || [];
+    if(!contasPagarRes.error) STATE.contasPagar = contasPagarRes.data || [];
     renderAllForObra();
   }catch(e){
     console.error(e);
@@ -2228,7 +2291,17 @@ function setupRealtime(){
       await refetchTable('recebimentos_log'); if(typeof renderReverterConclusoes==='function') renderReverterConclusoes(); refreshBadges();
     }).subscribe();
 
-  realtimeChannels = [chCompras, chServicos, chHist, chCotacoes, chReembolsos, chReembolsoItens, chAlmox, chAlmoxEletrico, chEpi, chEpiEstoque, chEpiSaidas, chFuncionarios, chFornecedores, chContratos, chClausulasModelo, chRecebimentosLog];
+  const chLocacoesEquip = sb.channel('rt-locacoes-equip-'+obra)
+    .on('postgres_changes', {event:'*', schema:'public', table:'locacoes_equipamentos', filter:`obra=eq.${obra}`}, async ()=>{
+      await refetchTable('locacoes_equipamentos'); renderLocacoesEquip(); renderContasPagar(); refreshBadges();
+    }).subscribe();
+
+  const chContasPagar = sb.channel('rt-contas-pagar-'+obra)
+    .on('postgres_changes', {event:'*', schema:'public', table:'contas_pagar', filter:`obra=eq.${obra}`}, async ()=>{
+      await refetchTable('contas_pagar'); renderContasPagar(); refreshBadges();
+    }).subscribe();
+
+  realtimeChannels = [chCompras, chServicos, chHist, chCotacoes, chReembolsos, chReembolsoItens, chAlmox, chAlmoxEletrico, chEpi, chEpiEstoque, chEpiSaidas, chFuncionarios, chFornecedores, chContratos, chClausulasModelo, chRecebimentosLog, chLocacoesEquip, chContasPagar];
 }
 
 async function refetchTable(which){
@@ -2279,6 +2352,12 @@ async function refetchTable(which){
     }else if(which==='recebimentos_log'){
       const { data, error } = await sb.from('recebimentos_log').select('*').eq('obra', obra).eq('revertido', false).order('criado_em', {ascending:false});
       if(!error) STATE.recebimentosLog = data || [];
+    }else if(which==='locacoes_equipamentos'){
+      const { data, error } = await sb.from('locacoes_equipamentos').select('*').eq('obra', obra).order('data_prevista');
+      if(!error) STATE.locacoesEquip = data || [];
+    }else if(which==='contas_pagar'){
+      const { data, error } = await sb.from('contas_pagar').select('*').eq('obra', obra).order('periodo_inicio', {ascending:false});
+      if(!error) STATE.contasPagar = data || [];
     }
   }catch(e){ console.error(e); }
 }
@@ -6204,6 +6283,483 @@ window.imprimirContrato = function(tituloTipo, numero){
   setTimeout(()=> window.print(), 50);
 };
 
+/* ============== LOCAÇÃO DE EQUIPAMENTOS (cadastro leve, sem contrato formal) ==============
+   Equivalente "leve" ao Gerenciador de Contratos (tipo="locacao") — serve pra
+   equipamento/container alugado avulso que não precisa de cláusulas nem
+   assinatura, só controle de vencimento (farol, igual contratos) e um jeito
+   de vincular Contas a Pagar a ele. Fica escopado por obra, igual contratos. */
+function locacoesEquipDaObraAtual(){ return STATE.locacoesEquip; } // já vem filtrado por obra do loadAllForObra
+function diasRestantesEquip(dataPrevista){
+  if(!dataPrevista) return null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const dp = new Date(dataPrevista+'T00:00:00');
+  return Math.round((dp-hoje)/86400000);
+}
+function farolEquip(dias){
+  if(dias===null||dias===undefined) return '-';
+  if(dias<0) return 'Vencido';
+  if(dias<=7) return 'Vencido'; // mesmo tom de urgência (vermelho) que "vencido" até 7 dias
+  if(dias<=30) return 'Atenção';
+  return 'No prazo';
+}
+function badgeFarolEquip(f){
+  if(f==='Vencido') return '<span class="badge b-red">Vencido</span>';
+  if(f==='Atenção') return '<span class="badge b-amber">Atenção</span>';
+  if(f==='No prazo') return '<span class="badge b-green">No prazo</span>';
+  return '<span class="badge b-gray">—</span>';
+}
+function badgeStatusEquip(status){
+  return status==='encerrado' ? '<span class="badge b-gray">Encerrado</span>' : '<span class="badge b-green">Ativo</span>';
+}
+function renderLocequipKpis(){
+  const lista = locacoesEquipDaObraAtual();
+  const ativos = lista.filter(e=>e.status!=='encerrado');
+  const vencendo = ativos.filter(e=>{ const d=diasRestantesEquip(e.data_prevista); return d!==null && d<=30; }).length;
+  const vencidos = ativos.filter(e=>{ const d=diasRestantesEquip(e.data_prevista); return d!==null && d<0; }).length;
+  const valorMensal = ativos.reduce((s,e)=>s+(Number(e.valor_mensal)||0),0);
+  const el = document.getElementById('locequip-kpis');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Locações ativas</div><div class="kpi-value">${ativos.length}</div></div>
+    <div class="kpi-card warn"><div class="kpi-label">Vencendo em 30 dias</div><div class="kpi-value">${vencendo}</div></div>
+    <div class="kpi-card danger"><div class="kpi-label">Vencidas</div><div class="kpi-value">${vencidos}</div></div>
+    <div class="kpi-card good"><div class="kpi-label">Compromisso mensal</div><div class="kpi-value">${fmtBRL(valorMensal)}</div></div>`;
+}
+function getLocequipFiltered(){
+  const q = (document.getElementById('locequip-search').value||'').trim().toLowerCase();
+  const fStatus = document.getElementById('locequip-status').value;
+  let lista = locacoesEquipDaObraAtual().slice().sort((a,b)=>{
+    const da = diasRestantesEquip(a.data_prevista), db = diasRestantesEquip(b.data_prevista);
+    return (da===null?9999:da) - (db===null?9999:db);
+  });
+  if(fStatus) lista = lista.filter(e=>e.status===fStatus);
+  if(q) lista = lista.filter(e=> [e.descricao,e.fornecedor].some(v=>String(v||'').toLowerCase().includes(q)));
+  return lista;
+}
+function renderLocacoesEquip(){
+  renderLocequipKpis();
+  const tbody = document.getElementById('locequip-body');
+  if(!tbody) return;
+  const lista = getLocequipFiltered();
+  if(!lista.length){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">Nenhuma locação de equipamento cadastrada para ${esc(STATE.currentObra)}.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = lista.map(e=>{
+    const dias = diasRestantesEquip(e.data_prevista);
+    const farol = e.status==='encerrado' ? '-' : farolEquip(dias);
+    const diasTxt = e.status==='encerrado' ? '—' : (dias===null?'—':(dias===0?'Hoje':(dias>0?dias+'d':(Math.abs(dias)+'d vencido'))));
+    const diasCls = (e.status==='encerrado'||dias===null)?'':(dias<0?'dias-vermelho':(dias<=30?'dias-amarelo':'dias-verde'));
+    return `<tr>
+      <td>🚜 ${esc(e.descricao)}</td>
+      <td>${esc(e.fornecedor)}</td>
+      <td class="num">${fmtBRL(e.valor_mensal)}/mês</td>
+      <td>${fmtDate(e.data_inicio)}</td>
+      <td>${fmtDate(e.data_prevista)}</td>
+      <td class="num dias-cell ${diasCls}">${diasTxt}</td>
+      <td>${badgeFarolEquip(farol)}</td>
+      <td>${badgeStatusEquip(e.status)}</td>
+      <td>
+        <button class="btn btn-sm btn-secondary" onclick="editarLocequipModal('${e.id}')">✏️ Editar</button>
+        ${e.status==='ativo'
+          ? `<button class="btn btn-sm btn-secondary" onclick="renovarLocequip('${e.id}')">🔄 +30d</button>
+             <button class="btn btn-sm btn-secondary" onclick="encerrarLocequip('${e.id}')">🔚 Encerrar</button>`
+          : `<button class="btn btn-sm btn-secondary" onclick="reativarLocequip('${e.id}')">↩️ Reativar</button>`}
+        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirLocequip('${e.id}')">🗑</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+function initLocacoesEquip(){
+  document.getElementById('btn-novo-locequip').addEventListener('click', ()=>abrirFormLocequipModal(null));
+  document.getElementById('locequip-search').addEventListener('input', renderLocacoesEquip);
+  document.getElementById('locequip-status').addEventListener('change', renderLocacoesEquip);
+}
+window.editarLocequipModal = function(id){
+  const e = STATE.locacoesEquip.find(x=>String(x.id)===String(id));
+  if(!e) return;
+  abrirFormLocequipModal(e);
+};
+function abrirFormLocequipModal(e){
+  const editando = !!(e && e.id);
+  openModal(`
+    <h3>${editando ? 'Editar Locação de Equipamento' : 'Nova Locação de Equipamento'}</h3>
+    <div class="modal-sub">Obra: <strong>${esc(STATE.currentObra)}</strong> — cadastro rápido, sem cláusulas nem assinatura.</div>
+    <form id="form-locequip">
+      <div class="form-row"><label>Equipamento / Container *</label><input type="text" id="le-descricao" required value="${escAttr(e?e.descricao:'')}" placeholder="Ex.: Container 20 pés #3, Gerador 150kVA avulso..."></div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Fornecedor *</label><input type="text" id="le-fornecedor" required value="${escAttr(e?e.fornecedor:'')}"></div>
+        <div class="form-row"><label>Valor Mensal (R$) *</label><input type="number" step="0.01" min="0" id="le-valor-mensal" required value="${e?e.valor_mensal:''}"></div>
+      </div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Início da locação *</label><input type="date" id="le-data-inicio" required value="${e?e.data_inicio||'':todayISO()}"></div>
+        <div class="form-row"><label>Devolução/renovação prevista *</label><input type="date" id="le-data-prevista" required value="${e?e.data_prevista||'':''}"></div>
+      </div>
+      <div class="hint" style="margin:-8px 0 13px;">Data em que o equipamento deve voltar pro fornecedor ou em que a locação precisa ser renovada — o farol de vencimento usa essa data.</div>
+      <div class="form-row"><label>Observações</label><textarea id="le-obs" rows="2">${esc(e?e.observacoes:'')}</textarea></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">${editando?'Salvar alterações':'Salvar locação'}</button>
+      </div>
+    </form>
+  `);
+  document.getElementById('form-locequip').addEventListener('submit', async ev=>{
+    ev.preventDefault();
+    const submitBtn = ev.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try{
+      const dataInicio = document.getElementById('le-data-inicio').value;
+      const dataPrevista = document.getElementById('le-data-prevista').value;
+      if(dataInicio && dataPrevista && dataInicio > dataPrevista){
+        toast('A data de início não pode ser depois da devolução/renovação prevista.', true);
+        submitBtn.disabled = false;
+        return;
+      }
+      const rec = {
+        descricao: document.getElementById('le-descricao').value.trim(),
+        fornecedor: document.getElementById('le-fornecedor').value.trim(),
+        valor_mensal: Number(document.getElementById('le-valor-mensal').value)||0,
+        data_inicio: dataInicio || null,
+        data_prevista: dataPrevista || null,
+        observacoes: document.getElementById('le-obs').value.trim(),
+      };
+      if(editando){
+        const { error } = await sb.from('locacoes_equipamentos').update(rec).eq('id', e.id);
+        if(error) throw error;
+        toast('Locação atualizada.');
+      }else{
+        rec.obra = STATE.currentObra;
+        rec.status = 'ativo';
+        rec.created_by = CURRENT_USER.id;
+        const { error } = await sb.from('locacoes_equipamentos').insert(rec);
+        if(error) throw error;
+        toast('Locação cadastrada.');
+      }
+      closeModal();
+      await refetchTable('locacoes_equipamentos'); renderLocacoesEquip(); refreshBadges();
+    }catch(err){
+      toast('Erro ao salvar locação: ' + err.message, true);
+    }finally{
+      submitBtn.disabled = false;
+    }
+  });
+}
+window.renovarLocequip = async function(id){
+  const e = STATE.locacoesEquip.find(x=>String(x.id)===String(id));
+  if(!e) return;
+  const novaData = addDaysContrato(e.data_prevista||todayISO(), 30);
+  const { error } = await sb.from('locacoes_equipamentos').update({ data_prevista: novaData }).eq('id', e.id);
+  if(error){ toast('Erro ao renovar: ' + error.message, true); return; }
+  await refetchTable('locacoes_equipamentos'); renderLocacoesEquip(); refreshBadges();
+  toast('Renovado — nova data prevista: ' + fmtDate(novaData) + '.');
+};
+window.encerrarLocequip = async function(id){
+  const { error } = await sb.from('locacoes_equipamentos').update({ status:'encerrado' }).eq('id', id);
+  if(error){ toast('Erro ao encerrar: ' + error.message, true); return; }
+  await refetchTable('locacoes_equipamentos'); renderLocacoesEquip(); refreshBadges();
+  toast('Locação encerrada.');
+};
+window.reativarLocequip = async function(id){
+  const { error } = await sb.from('locacoes_equipamentos').update({ status:'ativo' }).eq('id', id);
+  if(error){ toast('Erro ao reativar: ' + error.message, true); return; }
+  await refetchTable('locacoes_equipamentos'); renderLocacoesEquip(); refreshBadges();
+  toast('Locação reativada.');
+};
+window.excluirLocequip = async function(id){
+  if(!confirm('Excluir esta locação de equipamento? Essa ação não pode ser desfeita.')) return;
+  const { error } = await sb.from('locacoes_equipamentos').delete().eq('id', id);
+  if(error){ toast('Erro ao excluir: ' + error.message, true); return; }
+  await refetchTable('locacoes_equipamentos'); renderLocacoesEquip(); refreshBadges();
+  toast('Locação excluída.');
+};
+
+/* ============== CONTAS A PAGAR ==============
+   Lançamento de pagamentos (conta de luz, água, locação, aluguel etc.)
+   vinculados a um Contrato (Gerenciador de Contratos), a uma Locação de
+   Equipamento (cadastro acima), ou a um texto livre. Ao lançar um período
+   que já se sobrepõe a um pagamento anterior do MESMO vínculo, avisa (não
+   bloqueia) — mesma lógica validada no protótipo. */
+function vinculoKeyConta(c){
+  if(c.vinculo_tipo==='contrato') return 'contrato:'+c.vinculo_contrato_id;
+  if(c.vinculo_tipo==='equipamento') return 'equipamento:'+c.vinculo_equipamento_id;
+  return 'livre:'+String(c.vinculo_livre_texto||'').trim().toLowerCase();
+}
+function vinculoLabelConta(c){
+  if(c.vinculo_tipo==='contrato'){
+    const ct = STATE.contratos.find(x=>String(x.id)===String(c.vinculo_contrato_id));
+    return ct ? `📄 ${esc(ct.numero)} — ${esc(ct.objeto||'')}` : '📄 Contrato não encontrado';
+  }
+  if(c.vinculo_tipo==='equipamento'){
+    const eq = STATE.locacoesEquip.find(x=>String(x.id)===String(c.vinculo_equipamento_id));
+    return eq ? `🚜 ${esc(eq.descricao)} — ${esc(eq.fornecedor||'')}` : '🚜 Locação não encontrada';
+  }
+  return `📍 ${esc(c.vinculo_livre_texto||'(sem descrição)')}`;
+}
+function periodosSeSobrepoemConta(iniA, fimA, iniB, fimB){ return iniA<=fimB && iniB<=fimA; }
+function contasPagarDaObraAtual(){ return STATE.contasPagar; } // já vem filtrado por obra do loadAllForObra
+function renderContaspagarKpis(){
+  const lista = contasPagarDaObraAtual();
+  const hoje = todayISO();
+  const aPagar = lista.filter(c=>c.status==='a_pagar');
+  const mesAtual = hoje.slice(0,7);
+  const pagoEsteMes = lista.filter(c=>c.status==='pago' && c.data_pagamento && String(c.data_pagamento).slice(0,7)===mesAtual);
+  const vencendo = aPagar.filter(c=>c.vencimento && c.vencimento<=addDaysContrato(hoje,7)).length;
+  const vinculos = new Set(lista.map(vinculoKeyConta)).size;
+  const el = document.getElementById('contaspagar-kpis');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="kpi-card warn"><div class="kpi-label">A pagar (pendente)</div><div class="kpi-value">${fmtBRL(aPagar.reduce((s,c)=>s+(Number(c.valor)||0),0))}</div></div>
+    <div class="kpi-card good"><div class="kpi-label">Pago este mês</div><div class="kpi-value">${fmtBRL(pagoEsteMes.reduce((s,c)=>s+(Number(c.valor)||0),0))}</div></div>
+    <div class="kpi-card danger"><div class="kpi-label">Vencendo em 7 dias</div><div class="kpi-value">${vencendo}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vínculos ativos</div><div class="kpi-value">${vinculos}</div></div>`;
+}
+function statusBadgeConta(c){
+  if(c.status==='pago') return '<span class="badge b-green">✅ Pago</span>';
+  const hoje = todayISO();
+  if(c.vencimento && c.vencimento<hoje) return '<span class="badge b-red">⏰ Vencida</span>';
+  return '<span class="badge b-amber">A pagar</span>';
+}
+function renderContasPagar(){
+  renderContaspagarKpis();
+  const tbody = document.getElementById('contaspagar-body');
+  if(!tbody) return;
+  const q = (document.getElementById('contaspagar-search').value||'').trim().toLowerCase();
+  const fVinculo = document.getElementById('contaspagar-vinculo-tipo').value;
+  let lista = contasPagarDaObraAtual().slice().sort((a,b)=> String(b.periodo_inicio).localeCompare(String(a.periodo_inicio)));
+  if(fVinculo) lista = lista.filter(c=>c.vinculo_tipo===fVinculo);
+  if(q) lista = lista.filter(c=> [c.descricao, vinculoLabelConta(c), c.tipo].some(v=>String(v||'').toLowerCase().includes(q)));
+  if(!lista.length){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Nenhuma conta lançada para ${esc(STATE.currentObra)}.</td></tr>`;
+    renderContasPagarTimelines();
+    return;
+  }
+  tbody.innerHTML = lista.map(c=>`
+    <tr>
+      <td>${vinculoLabelConta(c)}</td>
+      <td class="desc-cell">${descTrunc(c.descricao)}</td>
+      <td>${fmtDate(c.periodo_inicio)} – ${fmtDate(c.periodo_fim)}</td>
+      <td class="num">${fmtBRL(c.valor)}</td>
+      <td>${c.status==='pago' ? fmtDate(c.data_pagamento) : statusBadgeConta(c)}</td>
+      <td>
+        ${c.status==='a_pagar' ? `<button class="btn btn-sm btn-secondary" onclick="marcarContaPaga('${c.id}')">💰 Marcar pago</button>` : ''}
+        ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirContaPagar('${c.id}')">🗑</button>` : ''}
+      </td>
+    </tr>`).join('');
+  renderContasPagarTimelines();
+}
+function renderContasPagarTimelines(){
+  const wrap = document.getElementById('contaspagar-timelines');
+  if(!wrap) return;
+  const lista = contasPagarDaObraAtual();
+  const grupos = {};
+  lista.forEach(c=>{
+    const key = vinculoKeyConta(c);
+    if(!grupos[key]) grupos[key] = { label: vinculoLabelConta(c), itens: [] };
+    grupos[key].itens.push(c);
+  });
+  const chaves = Object.keys(grupos);
+  if(!chaves.length){ wrap.innerHTML = `<p class="hint" style="font-style:italic;">Nenhum vínculo cadastrado ainda.</p>`; return; }
+  wrap.innerHTML = chaves.map(key=>{
+    const grupo = grupos[key];
+    const itens = grupo.itens.slice().filter(c=>c.periodo_inicio && c.periodo_fim).sort((a,b)=>String(a.periodo_inicio).localeCompare(String(b.periodo_inicio)));
+    if(!itens.length) return '';
+    const minD = itens.reduce((m,c)=> c.periodo_inicio<m?c.periodo_inicio:m, itens[0].periodo_inicio);
+    const maxD = itens.reduce((m,c)=> c.periodo_fim>m?c.periodo_fim:m, itens[0].periodo_fim);
+    const totalDias = Math.max(1, (new Date(maxD)-new Date(minD))/86400000 + 1);
+    const segs = itens.map(c=>{
+      const offDias = (new Date(c.periodo_inicio)-new Date(minD))/86400000;
+      const durDias = (new Date(c.periodo_fim)-new Date(c.periodo_inicio))/86400000 + 1;
+      const left = (offDias/totalDias*100).toFixed(2);
+      const width = Math.max(0.6, (durDias/totalDias*100)).toFixed(2);
+      const cls = c.status==='pago' ? 'timeline-pago' : 'timeline-apagar';
+      const title = `${c.descricao||''} — ${fmtDate(c.periodo_inicio)} a ${fmtDate(c.periodo_fim)} — ${fmtBRL(c.valor)} — ${c.status==='pago'?'pago em '+fmtDate(c.data_pagamento):'a pagar'}`;
+      return `<div class="timeline-seg ${cls}" style="position:absolute; top:0; bottom:0; left:${left}%; width:${width}%; ${c.status==='pago'?'background:linear-gradient(180deg,#2a9d63,#1a7f4b);':'background:repeating-linear-gradient(135deg,#f0c04c,#f0c04c 6px,#e0ad2e 6px,#e0ad2e 12px);'}" title="${escAttr(title)}"></div>`;
+    }).join('');
+    const totalPago = itens.filter(c=>c.status==='pago').reduce((s,c)=>s+(Number(c.valor)||0),0);
+    return `
+      <div style="margin-bottom:18px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; gap:10px;">
+          <div style="font-size:13px; font-weight:700;">${grupo.label}</div>
+          <div class="hint">${fmtDate(minD)} – ${fmtDate(maxD)} · ${itens.length} lançamento(s) · ${fmtBRL(totalPago)} pago</div>
+        </div>
+        <div style="position:relative; height:26px; background:#eef0f3; border-radius:7px; overflow:hidden; border:1px solid var(--border, #e2e6ed);">${segs}</div>
+      </div>`;
+  }).join('');
+}
+function initContasPagar(){
+  document.getElementById('btn-nova-conta-pagar').addEventListener('click', ()=>abrirNovaContaPagarModal());
+  document.getElementById('contaspagar-search').addEventListener('input', renderContasPagar);
+  document.getElementById('contaspagar-vinculo-tipo').addEventListener('change', renderContasPagar);
+}
+function popularSelectContratosConta(){
+  const sel = document.getElementById('cp-contrato');
+  if(!sel) return;
+  sel.innerHTML = STATE.contratos.map(ct=>`<option value="${ct.id}">${esc(ct.numero)} — ${esc(ct.objeto||'')}</option>`).join('') || `<option value="">Nenhum contrato cadastrado</option>`;
+}
+function popularSelectEquipamentosConta(){
+  const sel = document.getElementById('cp-equipamento');
+  if(!sel) return;
+  const ativos = STATE.locacoesEquip.filter(e=>e.status==='ativo');
+  const lista = ativos.length ? ativos : STATE.locacoesEquip;
+  sel.innerHTML = lista.map(e=>`<option value="${e.id}">${esc(e.descricao)} — ${esc(e.fornecedor||'')}${e.status==='encerrado'?' (encerrada)':''}</option>`).join('') || `<option value="">Nenhuma locação cadastrada</option>`;
+}
+function abrirNovaContaPagarModal(){
+  openModal(`
+    <h3>Nova Conta</h3>
+    <div class="modal-sub">Obra: <strong>${esc(STATE.currentObra)}</strong> — lance o pagamento e o período que ele cobre.</div>
+    <form id="form-conta-pagar">
+      <div class="form-grid2">
+        <div class="form-row"><label>Tipo</label>
+          <select id="cp-tipo">
+            <option value="">Selecione...</option>
+            <option>Energia Elétrica</option>
+            <option>Água e Esgoto</option>
+            <option>Internet</option>
+            <option>Telefone</option>
+            <option>Locação de Equipamento</option>
+            <option>Locação de Imóvel</option>
+            <option>Outro</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Vínculo *</label>
+          <select id="cp-vinculo-tipo" required>
+            <option value="contrato">Contrato cadastrado</option>
+            <option value="equipamento">Locação de Equipamento cadastrada</option>
+            <option value="livre">Outro (descrever livremente)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" id="cp-row-contrato"><label>Contrato</label><select id="cp-contrato"></select></div>
+      <div class="form-row" id="cp-row-equipamento" style="display:none;"><label>Locação de Equipamento</label><select id="cp-equipamento"></select></div>
+      <div class="form-row" id="cp-row-livre" style="display:none;"><label>Descreva o imóvel/equipamento</label><input type="text" id="cp-vinculo-livre" placeholder="Ex.: Casa Alojamento B..."></div>
+      <div class="form-row"><label>Descrição da conta *</label><input type="text" id="cp-descricao" required placeholder="Ex.: Conta de luz — Casa Alojamento B"></div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Início do período de referência *</label><input type="date" id="cp-periodo-inicio" required></div>
+        <div class="form-row"><label>Fim do período de referência *</label><input type="date" id="cp-periodo-fim" required></div>
+      </div>
+      <div class="hint" style="margin:-8px 0 13px;">Ex.: leitura de energia do dia 02/10 até 01/11 → esse é o período que essa conta está cobrindo.</div>
+      <div id="cp-overlap-warning" style="display:none; background:#fbe7e6; border:1px solid #f0c2be; color:#b3261e; border-radius:8px; padding:11px 13px; font-size:12.5px; font-weight:600; line-height:1.55; margin:4px 0 14px;"></div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Valor (R$) *</label><input type="number" id="cp-valor" step="0.01" min="0" required></div>
+        <div class="form-row"><label>Vencimento *</label><input type="date" id="cp-vencimento" required></div>
+      </div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Status</label>
+          <select id="cp-status">
+            <option value="a_pagar">A pagar</option>
+            <option value="pago">Já pago</option>
+          </select>
+        </div>
+        <div class="form-row" id="cp-row-data-pagamento" style="display:none;"><label>Data do pagamento</label><input type="date" id="cp-data-pagamento"></div>
+      </div>
+      <div class="form-row"><label>Observações</label><textarea id="cp-obs" rows="2"></textarea></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar Conta</button>
+      </div>
+    </form>
+  `);
+  popularSelectContratosConta();
+  popularSelectEquipamentosConta();
+  document.getElementById('cp-vinculo-tipo').addEventListener('change', e=>{
+    const tipo = e.target.value;
+    document.getElementById('cp-row-contrato').style.display = tipo==='contrato' ? '' : 'none';
+    document.getElementById('cp-row-equipamento').style.display = tipo==='equipamento' ? '' : 'none';
+    document.getElementById('cp-row-livre').style.display = tipo==='livre' ? '' : 'none';
+    checarSobreposicaoConta();
+  });
+  ['cp-contrato','cp-equipamento'].forEach(id=> document.getElementById(id).addEventListener('change', checarSobreposicaoConta));
+  document.getElementById('cp-vinculo-livre').addEventListener('input', checarSobreposicaoConta);
+  document.getElementById('cp-periodo-inicio').addEventListener('change', checarSobreposicaoConta);
+  document.getElementById('cp-periodo-fim').addEventListener('change', checarSobreposicaoConta);
+  document.getElementById('cp-status').addEventListener('change', e=>{
+    const pago = e.target.value==='pago';
+    document.getElementById('cp-row-data-pagamento').style.display = pago ? '' : 'none';
+    if(pago && !document.getElementById('cp-data-pagamento').value) document.getElementById('cp-data-pagamento').value = todayISO();
+  });
+  document.getElementById('form-conta-pagar').addEventListener('submit', async ev=>{
+    ev.preventDefault();
+    const submitBtn = ev.target.querySelector('button[type="submit"]');
+    const v = vinculoAtualDoFormConta();
+    if(v.vinculo_tipo==='livre' && !v.vinculo_livre_texto){ toast('Descreva o imóvel/equipamento.', true); return; }
+    const ini = document.getElementById('cp-periodo-inicio').value;
+    const fim = document.getElementById('cp-periodo-fim').value;
+    if(ini > fim){ toast('O início do período não pode ser depois do fim.', true); return; }
+    submitBtn.disabled = true;
+    try{
+      const status = document.getElementById('cp-status').value;
+      const rec = {
+        obra: STATE.currentObra,
+        tipo: document.getElementById('cp-tipo').value,
+        vinculo_tipo: v.vinculo_tipo,
+        vinculo_contrato_id: v.vinculo_contrato_id,
+        vinculo_equipamento_id: v.vinculo_equipamento_id,
+        vinculo_livre_texto: v.vinculo_livre_texto,
+        descricao: document.getElementById('cp-descricao').value.trim(),
+        periodo_inicio: ini,
+        periodo_fim: fim,
+        valor: Number(document.getElementById('cp-valor').value)||0,
+        vencimento: document.getElementById('cp-vencimento').value || null,
+        status,
+        data_pagamento: status==='pago' ? (document.getElementById('cp-data-pagamento').value || todayISO()) : null,
+        observacoes: document.getElementById('cp-obs').value.trim(),
+        created_by: CURRENT_USER.id,
+      };
+      const { error } = await sb.from('contas_pagar').insert(rec);
+      if(error) throw error;
+      closeModal();
+      await refetchTable('contas_pagar'); renderContasPagar(); refreshBadges();
+      toast('Conta lançada com sucesso.');
+    }catch(err){
+      toast('Erro ao salvar conta: ' + err.message, true);
+    }finally{
+      submitBtn.disabled = false;
+    }
+  });
+}
+function vinculoAtualDoFormConta(){
+  const tipo = document.getElementById('cp-vinculo-tipo').value;
+  if(tipo==='contrato'){
+    return { vinculo_tipo:'contrato', vinculo_contrato_id: document.getElementById('cp-contrato').value || null, vinculo_equipamento_id:null, vinculo_livre_texto:null };
+  }
+  if(tipo==='equipamento'){
+    return { vinculo_tipo:'equipamento', vinculo_contrato_id:null, vinculo_equipamento_id: document.getElementById('cp-equipamento').value || null, vinculo_livre_texto:null };
+  }
+  return { vinculo_tipo:'livre', vinculo_contrato_id:null, vinculo_equipamento_id:null, vinculo_livre_texto: document.getElementById('cp-vinculo-livre').value.trim() };
+}
+function checarSobreposicaoConta(){
+  const box = document.getElementById('cp-overlap-warning');
+  const ini = document.getElementById('cp-periodo-inicio').value;
+  const fim = document.getElementById('cp-periodo-fim').value;
+  if(!ini || !fim){ box.style.display='none'; return; }
+  const v = vinculoAtualDoFormConta();
+  if(v.vinculo_tipo==='livre' && !v.vinculo_livre_texto){ box.style.display='none'; return; }
+  const key = vinculoKeyConta(v);
+  const conflitos = STATE.contasPagar.filter(c=> c.status==='pago' && vinculoKeyConta(c)===key && periodosSeSobrepoemConta(ini, fim, c.periodo_inicio, c.periodo_fim));
+  if(conflitos.length){
+    box.innerHTML = `⚠️ Esse período já foi coberto por pagamento(s) anterior(es) deste vínculo:` +
+      conflitos.map(c=>`<div style="font-weight:400; margin-top:4px;">• ${fmtDate(c.periodo_inicio)} a ${fmtDate(c.periodo_fim)} — ${fmtBRL(c.valor)}, pago em ${fmtDate(c.data_pagamento)}</div>`).join('') +
+      `<div style="font-weight:400; margin-top:4px;">Confira se não é pagamento em duplicidade antes de salvar.</div>`;
+    box.style.display = 'block';
+  }else{
+    box.style.display = 'none';
+  }
+}
+window.marcarContaPaga = async function(id){
+  const hoje = todayISO();
+  const { error } = await sb.from('contas_pagar').update({ status:'pago', data_pagamento: hoje }).eq('id', id);
+  if(error){ toast('Erro ao marcar como pago: ' + error.message, true); return; }
+  await refetchTable('contas_pagar'); renderContasPagar(); refreshBadges();
+  toast('Conta marcada como paga.');
+};
+window.excluirContaPagar = async function(id){
+  if(!confirm('Excluir esta conta? Essa ação não pode ser desfeita.')) return;
+  const { error } = await sb.from('contas_pagar').delete().eq('id', id);
+  if(error){ toast('Erro ao excluir: ' + error.message, true); return; }
+  await refetchTable('contas_pagar'); renderContasPagar(); refreshBadges();
+  toast('Conta excluída.');
+};
+
 /* ============== badges / obra switch / nav ============== */
 function refreshBadges(){
   document.getElementById('badge-compras').textContent = STATE.compras.filter(r=>String(r.status).toUpperCase()!=='CANCELADO').length;
@@ -6236,6 +6792,16 @@ function refreshBadges(){
     return d!==null && d<=30;
   }).length;
   document.getElementById('badge-contratos').textContent = contratosUrgentes;
+  const badgeLocequip = document.getElementById('badge-locacoes-equip');
+  if(badgeLocequip){
+    badgeLocequip.textContent = STATE.locacoesEquip.filter(e=>{
+      if(e.status==='encerrado') return false;
+      const d = diasRestantesEquip(e.data_prevista);
+      return d!==null && d<=30;
+    }).length;
+  }
+  const badgeContasPagar = document.getElementById('badge-contas-pagar');
+  if(badgeContasPagar) badgeContasPagar.textContent = STATE.contasPagar.filter(c=>c.status==='a_pagar').length;
 }
 function refreshFilterOptions(){
   fillSelect('compras-status', STATE.compras.map(r=>r.status));
@@ -6253,7 +6819,7 @@ function refreshFilterOptions(){
 }
 function renderAllForObra(){
   refreshFilterOptions();
-  renderCompras(); renderServicos(); renderEpi(); renderReembolsos(); renderCancelados(); renderHistorico(); renderHistoricoReembolso(); renderHistoricoServico(); renderReverterConclusoes(); renderCotacoes(); renderAlmoxarifado(); renderAlmoxarifadoManutencao(); renderAlmoxarifadoEletrico(); renderEpiEstoque(); renderEpiSaidas(); renderFuncionarios(); renderContratos(); renderDashboard(); refreshBadges();
+  renderCompras(); renderServicos(); renderEpi(); renderReembolsos(); renderCancelados(); renderHistorico(); renderHistoricoReembolso(); renderHistoricoServico(); renderReverterConclusoes(); renderCotacoes(); renderAlmoxarifado(); renderAlmoxarifadoManutencao(); renderAlmoxarifadoEletrico(); renderEpiEstoque(); renderEpiSaidas(); renderFuncionarios(); renderContratos(); renderLocacoesEquip(); renderContasPagar(); renderDashboard(); refreshBadges();
 }
 
 function initObraSwitch(){
