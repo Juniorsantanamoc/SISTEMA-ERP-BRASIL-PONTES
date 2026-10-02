@@ -6693,17 +6693,21 @@ window.abrirModalMarcarMesPago = function(idx){
   `);
   function checarOverlapMp(){
     const box = document.getElementById('mp-overlap-warning');
+    const form = document.getElementById('form-marcar-mes-pago');
+    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
     const ini = document.getElementById('mp-periodo-inicio').value;
     const fim = document.getElementById('mp-periodo-fim').value;
-    if(!ini || !fim){ box.style.display='none'; return; }
-    const conflitos = STATE.contasPagar.filter(c=> c.status==='pago' && vinculoKeyConta(c)===vinculoKeyConta(ultimo) && periodosSeSobrepoemConta(ini, fim, c.periodo_inicio, c.periodo_fim));
+    if(!ini || !fim){ box.style.display='none'; if(submitBtn) submitBtn.disabled=false; return; }
+    const conflitos = conflitosPeriodoPago(ultimo, ini, fim);
     if(conflitos.length){
-      box.innerHTML = `⚠️ Esse período já foi coberto por pagamento(s) anterior(es) deste vínculo:` +
+      box.innerHTML = `🚫 Esse período já foi pago neste vínculo — não dá pra lançar outro pagamento em cima dele:` +
         conflitos.map(c=>`<div style="font-weight:400; margin-top:4px;">• ${fmtDate(c.periodo_inicio)} a ${fmtDate(c.periodo_fim)} — ${fmtBRL(c.valor)}, pago em ${fmtDate(c.data_pagamento)}</div>`).join('') +
-        `<div style="font-weight:400; margin-top:4px;">Confira se não é pagamento em duplicidade antes de salvar.</div>`;
+        `<div style="font-weight:400; margin-top:4px;">Ajuste o período pra não cruzar com o que já foi pago.</div>`;
       box.style.display = 'block';
+      if(submitBtn) submitBtn.disabled = true;
     }else{
       box.style.display = 'none';
+      if(submitBtn) submitBtn.disabled = false;
     }
   }
   document.getElementById('mp-periodo-inicio').addEventListener('change', checarOverlapMp);
@@ -6715,6 +6719,7 @@ window.abrirModalMarcarMesPago = function(idx){
     const ini = document.getElementById('mp-periodo-inicio').value;
     const fim = document.getElementById('mp-periodo-fim').value;
     if(ini > fim){ toast('O início do período não pode ser depois do fim.', true); return; }
+    if(conflitosPeriodoPago(ultimo, ini, fim).length){ toast('Esse período já foi pago neste vínculo — ajuste as datas antes de confirmar.', true); return; }
     submitBtn.disabled = true;
     try{
       const rec = {
@@ -6853,6 +6858,7 @@ function abrirNovaContaPagarModal(){
     const ini = document.getElementById('cp-periodo-inicio').value;
     const fim = document.getElementById('cp-periodo-fim').value;
     if(ini > fim){ toast('O início do período não pode ser depois do fim.', true); return; }
+    if(conflitosPeriodoPago(v, ini, fim).length){ toast('Esse período já foi pago neste vínculo — ajuste as datas antes de salvar.', true); return; }
     submitBtn.disabled = true;
     try{
       const status = document.getElementById('cp-status').value;
@@ -6896,22 +6902,35 @@ function vinculoAtualDoFormConta(){
   }
   return { vinculo_tipo:'livre', vinculo_contrato_id:null, vinculo_equipamento_id:null, vinculo_livre_texto: document.getElementById('cp-vinculo-livre').value.trim() };
 }
+/* Retorna os lançamentos PAGOS do mesmo vínculo cujo período se sobrepõe ao
+   informado — usado tanto pro aviso visual quanto pro bloqueio real do envio
+   (ver submit handlers). Bloqueia só contra período já PAGO (um "a pagar"
+   pendente não bloqueia, só o que já foi efetivamente pago). */
+function conflitosPeriodoPago(vinculoObjOuConta, ini, fim, idIgnorar){
+  const key = vinculoKeyConta(vinculoObjOuConta);
+  return STATE.contasPagar.filter(c=> c.status==='pago' && String(c.id)!==String(idIgnorar) && vinculoKeyConta(c)===key && periodosSeSobrepoemConta(ini, fim, c.periodo_inicio, c.periodo_fim));
+}
 function checarSobreposicaoConta(){
   const box = document.getElementById('cp-overlap-warning');
+  const form = document.getElementById('form-conta-pagar');
+  const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
   const ini = document.getElementById('cp-periodo-inicio').value;
   const fim = document.getElementById('cp-periodo-fim').value;
-  if(!ini || !fim){ box.style.display='none'; return; }
+  if(!ini || !fim){ box.style.display='none'; if(submitBtn) submitBtn.disabled=false; return false; }
   const v = vinculoAtualDoFormConta();
-  if(v.vinculo_tipo==='livre' && !v.vinculo_livre_texto){ box.style.display='none'; return; }
-  const key = vinculoKeyConta(v);
-  const conflitos = STATE.contasPagar.filter(c=> c.status==='pago' && vinculoKeyConta(c)===key && periodosSeSobrepoemConta(ini, fim, c.periodo_inicio, c.periodo_fim));
+  if(v.vinculo_tipo==='livre' && !v.vinculo_livre_texto){ box.style.display='none'; if(submitBtn) submitBtn.disabled=false; return false; }
+  const conflitos = conflitosPeriodoPago(v, ini, fim);
   if(conflitos.length){
-    box.innerHTML = `⚠️ Esse período já foi coberto por pagamento(s) anterior(es) deste vínculo:` +
+    box.innerHTML = `🚫 Esse período já foi pago neste vínculo — não dá pra lançar outro pagamento em cima dele:` +
       conflitos.map(c=>`<div style="font-weight:400; margin-top:4px;">• ${fmtDate(c.periodo_inicio)} a ${fmtDate(c.periodo_fim)} — ${fmtBRL(c.valor)}, pago em ${fmtDate(c.data_pagamento)}</div>`).join('') +
-      `<div style="font-weight:400; margin-top:4px;">Confira se não é pagamento em duplicidade antes de salvar.</div>`;
+      `<div style="font-weight:400; margin-top:4px;">Ajuste o período pra não cruzar com o que já foi pago, ou exclua o lançamento duplicado se for engano.</div>`;
     box.style.display = 'block';
+    if(submitBtn) submitBtn.disabled = true;
+    return true;
   }else{
     box.style.display = 'none';
+    if(submitBtn) submitBtn.disabled = false;
+    return false;
   }
 }
 window.marcarContaPaga = async function(id){
