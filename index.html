@@ -427,6 +427,7 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="nav-item" data-page="pass-solic"><span class="nav-icon">🎫</span>Solicitações<span class="nav-badge" id="badge-pass-solic">0</span></div>
     <div class="nav-item" data-page="pass-financeiro"><span class="nav-icon">💰</span>Financeiro<span class="nav-badge" id="badge-pass-financeiro">0</span></div>
     <div class="nav-item" data-page="pass-historico"><span class="nav-icon">🗂️</span>Histórico<span class="nav-badge" id="badge-pass-historico">0</span></div>
+    <div class="nav-item" data-page="pass-conferidos"><span class="nav-icon">✅</span>Conferidos<span class="nav-badge" id="badge-pass-conferidos">0</span></div>
     <div class="nav-group-label">RH · Alimentação <span style="text-transform:none; opacity:.7;">(todos os CDs)</span></div>
     <div class="nav-item" data-page="alim-nova"><span class="nav-icon">🍽️</span>Nova Solicitação</div>
     <div class="nav-item" data-page="alim-tickets"><span class="nav-icon">🎟️</span>Tickets Gerados<span class="nav-badge" id="badge-alim-tickets">0</span></div>
@@ -976,6 +977,36 @@ tbody tr:last-child td{border-bottom:none;}
               <th>Documento</th><th>Anexos</th><th data-key="data_pagamento">Pago em</th><th>Aprovação</th><th>Ações</th>
             </tr></thead>
             <tbody id="pass-historico-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PASSAGENS · CONFERIDOS -->
+      <div class="page" id="page-pass-conferidos">
+        <p class="hint" style="margin-bottom:14px;">Marque as passagens já pagas que você conferiu (bateu com o extrato/fatura) e exporte o total em Excel ou PDF — com centro de custo, rota e demais dados do histórico — pra anexar na prestação de contas.</p>
+        <div class="toolbar">
+          <input class="search-input" id="pass-conferidos-search" placeholder="Buscar por colaborador, CD, origem ou destino...">
+          <select class="filter-select" id="pass-conferidos-cd"><option value="">Todos os CDs</option></select>
+          <select class="filter-select" id="pass-conferidos-status">
+            <option value="">Conferidas e pendentes</option>
+            <option value="pendente">Só pendentes de conferência</option>
+            <option value="conferido">Só já conferidas</option>
+          </select>
+          <span class="spacer"></span>
+          <button class="btn btn-primary" id="btn-pass-conf-marcar" disabled onclick="passConfMarcarSelecionados()">✅ Marcar conferido (<span id="pass-conf-count">0</span>)</button>
+          <button class="btn btn-secondary" id="btn-pass-conf-xlsx" disabled onclick="passConfExportarExcel()">📊 Excel (<span id="pass-conf-count-xlsx">0</span>)</button>
+          <button class="btn btn-secondary" id="btn-pass-conf-pdf" disabled onclick="passConfExportarPdf()">📄 PDF (<span id="pass-conf-count-pdf">0</span>)</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th><input type="checkbox" id="pass-conf-all" onchange="passConfSelectAllVisible(this.checked)"></th>
+              <th data-key="numero">Nº</th><th data-key="nome">Colaborador</th><th data-key="criado_por">Solicitante</th><th data-key="cd">Centro de Custo</th><th>Rota</th>
+              <th data-key="data_saida">Saída</th><th data-key="data_chegada">Chegada</th><th data-key="tipo">Tipo</th>
+              <th data-key="total_colaborador" class="num">Total Colab.</th><th data-key="valor_passagem" class="num">Passagem</th><th>Total Geral</th>
+              <th data-key="data_pagamento">Pago em</th><th>Conferência</th>
+            </tr></thead>
+            <tbody id="pass-conferidos-body"></tbody>
           </table>
         </div>
       </div>
@@ -1816,6 +1847,7 @@ let STATE = {
     {key:'janta', nome:'Janta', hora:'22:00', valor:35},
   ] },
   orcamentoSel: { compras: new Set(), servicos: new Set(), epi: new Set() },
+  passConferidosSel: new Set(),
   alimentacaoTickets: [],
   alimentacaoConfig: { mlPorColaborador: 200 },
   cdCounts: {},
@@ -1889,7 +1921,7 @@ async function enterApp(session){
 
   initObraSwitch();
   initCompras(); initServicos(); initEpi(); initReembolsos(); initCancelados(); initHistorico(); initHistoricoReembolso(); initHistoricoServico(); initReverterConclusoes(); initCotacoes(); initAlmoxarifado(); initAlmoxarifadoManutencao(); initAlmoxarifadoEletrico(); initEpiEstoque(); initFuncionarios(); initFornecedores(); initCadastro(); initSinapi();
-  initPassSolic(); initPassFinanceiro(); initPassHistorico();
+  initPassSolic(); initPassFinanceiro(); initPassHistorico(); initPassConferidos();
   initAlimNova(); initAlimTickets();
   wireNav();
   wireMenuMobile();
@@ -8109,16 +8141,202 @@ function initPassHistorico(){
     </tr>`
   });
 }
+/* ---------- Conferidos: seleção de passagens pagas p/ conferência + export ----------
+   "Conferido" é um status à parte do fluxo de pagamento (pendente→comprado→pago):
+   só serve pra marcar, com nome e data de quem bateu o olho no extrato/fatura,
+   que aquela passagem já foi verificada — fica salvo (conferido/conferido_por/
+   conferido_em) e não unmarca sozinho. A seleção de checkboxes em si (pra marcar
+   em lote ou exportar) é só da sessão, igual ao padrão de STATE.orcamentoSel. */
+function initPassConferidos(){
+  renderPassConferidos = makeTable({
+    getData: ()=>{
+      const statusFiltro = document.getElementById('pass-conferidos-status').value;
+      let rows = STATE.passagens.filter(r=>r.status==='pago');
+      if(statusFiltro==='conferido') rows = rows.filter(r=>r.conferido);
+      else if(statusFiltro==='pendente') rows = rows.filter(r=>!r.conferido);
+      return rows;
+    },
+    tbodyId:'pass-conferidos-body', searchInput:'pass-conferidos-search',
+    filters:[{selectId:'pass-conferidos-cd', field:'cd'}],
+    searchFn:(r,q)=> [r.nome,r.cd,r.origem,r.destino].some(v=>String(v||'').toLowerCase().includes(q)),
+    rowFn:r=>`<tr>
+      <td><input type="checkbox" class="pass-conf-check" data-id="${r.id}" ${STATE.passConferidosSel.has(r.id)?'checked':''} onchange="passConfToggle(${r.id}, this.checked)"></td>
+      <td>${esc(r.numero)}</td><td>${esc(r.nome)}</td>
+      <td>${r.criado_por ? esc(r.criado_por) : '<span class="muted">—</span>'}</td><td>${esc(r.cd)}</td>
+      <td>${esc(r.origem)} → ${esc(r.destino)}</td>
+      <td>${fmtDate(r.data_saida)} ${passHHMM(r.hora_saida)}</td>
+      <td>${fmtDate(r.data_chegada)} ${passHHMM(r.hora_chegada)}</td>
+      <td>${esc(r.tipo)}</td>
+      <td class="num">${fmtBRL(r.total_colaborador)}</td>
+      <td class="num">${fmtBRL(r.valor_passagem)}</td>
+      <td class="num">${fmtBRL(passTotalGeral(r))}</td>
+      <td>${fmtDateHora(r.data_pagamento)}</td>
+      <td>${r.conferido ? `<span class="badge b-green">✅ Conferido</span><div class="rastro-sub">${esc(r.conferido_por||'')}${r.conferido_em?' · '+fmtDateHora(r.conferido_em):''}</div>` : '<span class="badge b-amber">Pendente</span>'}</td>
+    </tr>`,
+    afterRender: ()=>{
+      const allBox = document.getElementById('pass-conf-all');
+      if(allBox) allBox.checked = false;
+    }
+  });
+}
+function passConfUpdateToolbar(){
+  const n = STATE.passConferidosSel.size;
+  ['pass-conf-count','pass-conf-count-xlsx','pass-conf-count-pdf'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.textContent = n;
+  });
+  ['btn-pass-conf-marcar','btn-pass-conf-xlsx','btn-pass-conf-pdf'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.disabled = n===0;
+  });
+}
+window.passConfToggle = function(id, checked){
+  if(checked) STATE.passConferidosSel.add(id); else STATE.passConferidosSel.delete(id);
+  passConfUpdateToolbar();
+};
+window.passConfSelectAllVisible = function(checked){
+  document.querySelectorAll('#pass-conferidos-body .pass-conf-check').forEach(cb=>{
+    const id = Number(cb.dataset.id);
+    if(checked) STATE.passConferidosSel.add(id); else STATE.passConferidosSel.delete(id);
+    cb.checked = checked;
+  });
+  passConfUpdateToolbar();
+};
+window.passConfMarcarSelecionados = async function(){
+  const ids = [...STATE.passConferidosSel];
+  if(!ids.length) return;
+  const nome = (CURRENT_PROFILE && CURRENT_PROFILE.nome) || (CURRENT_USER && CURRENT_USER.email) || null;
+  const agora = new Date().toISOString();
+  const { error } = await sb.from('passagens').update({ conferido:true, conferido_por:nome, conferido_em:agora }).in('id', ids);
+  if(error){ toast('Erro ao marcar conferência: '+error.message, true); return; }
+  ids.forEach(id=>{
+    const r = STATE.passagens.find(x=>x.id===id);
+    if(r){ r.conferido = true; r.conferido_por = nome; r.conferido_em = agora; }
+  });
+  STATE.passConferidosSel.clear();
+  passConfUpdateToolbar();
+  renderPassConferidos();
+  toast(`${ids.length} passagem(ns) marcada(s) como conferida(s).`);
+};
+function passConfSelecionados(){
+  const ids = STATE.passConferidosSel;
+  return STATE.passagens.filter(r=>ids.has(r.id));
+}
+window.passConfExportarExcel = function(){
+  const itens = passConfSelecionados();
+  if(!itens.length){ toast('Selecione ao menos uma passagem.', true); return; }
+  const linhas = itens.map(r=>({
+    'Nº': r.numero, 'Colaborador': r.nome, 'Solicitante': r.criado_por||'', 'Centro de Custo': r.cd,
+    'Origem': r.origem, 'Destino': r.destino, 'Saída': fmtDate(r.data_saida), 'Hora Saída': passHHMM(r.hora_saida),
+    'Chegada': fmtDate(r.data_chegada), 'Hora Chegada': passHHMM(r.hora_chegada), 'Tipo': r.tipo,
+    'Total Colaborador (R$)': Number(r.total_colaborador)||0, 'Passagem (R$)': Number(r.valor_passagem)||0,
+    'Total Geral (R$)': passTotalGeral(r), 'Pago em': fmtDateHora(r.data_pagamento),
+    'Conferido por': r.conferido_por||'', 'Conferido em': r.conferido_em ? fmtDateHora(r.conferido_em) : '',
+  }));
+  const totalGeral = itens.reduce((s,r)=>s+passTotalGeral(r),0);
+  linhas.push({ 'Nº':'', 'Colaborador':'', 'Solicitante':'', 'Centro de Custo':'', 'Origem':'', 'Destino':'', 'Saída':'', 'Hora Saída':'', 'Chegada':'', 'Hora Chegada':'', 'Tipo':'TOTAL', 'Total Colaborador (R$)':'', 'Passagem (R$)':'', 'Total Geral (R$)': totalGeral, 'Pago em':'', 'Conferido por':'', 'Conferido em':'' });
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  ws['!cols'] = [{wch:6},{wch:22},{wch:18},{wch:14},{wch:16},{wch:16},{wch:11},{wch:9},{wch:11},{wch:9},{wch:10},{wch:16},{wch:12},{wch:13},{wch:16},{wch:18},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Passagens Conferidas');
+  XLSX.writeFile(wb, `Passagens_Conferidas_${todayISO()}.xlsx`);
+};
+window.passConfExportarPdf = function(){
+  const itens = passConfSelecionados();
+  if(!itens.length){ toast('Selecione ao menos uma passagem.', true); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 10;
+  const headerH = 20;
+  const footerH = 13;
+  const topY = headerH + 8;
+  const bottomLimit = pageH - footerH - 6;
+  const cols = [
+    {label:'Nº', w:10, key:r=>r.numero},
+    {label:'Colaborador', w:26, key:r=>r.nome},
+    {label:'Solicitante', w:20, key:r=>r.criado_por||''},
+    {label:'Centro de Custo', w:24, key:r=>r.cd||''},
+    {label:'Rota', w:46, key:r=>`${r.origem||''} -> ${r.destino||''}`},
+    {label:'Saída', w:20, key:r=>fmtDate(r.data_saida)},
+    {label:'Chegada', w:20, key:r=>fmtDate(r.data_chegada)},
+    {label:'Tipo', w:16, key:r=>r.tipo||''},
+    {label:'Total Colab.', w:22, key:r=>fmtBRL(r.total_colaborador), align:'right'},
+    {label:'Passagem', w:22, key:r=>fmtBRL(r.valor_passagem), align:'right'},
+    {label:'Total Geral', w:24, key:r=>fmtBRL(passTotalGeral(r)), align:'right'},
+    {label:'Pago em', w:24, key:r=>fmtDateHora(r.data_pagamento)},
+  ];
+  let y = topY;
+  function drawChrome(){
+    doc.setFillColor(68,114,196);
+    doc.rect(0,0,pageW,headerH,'F');
+    try{ doc.addImage(CONTRATO_LOGO_BASE64,'PNG', 8, (headerH-13)/2, 16.3, 13); }catch(e){}
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text('Passagens Conferidas', pageW/2, headerH/2-1, {align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+    doc.text(`Gerado em ${fmtDateHora(new Date().toISOString())}`, pageW/2, headerH/2+5, {align:'center'});
+    doc.setFillColor(68,114,196);
+    doc.rect(0,pageH-footerH,pageW,footerH,'F');
+    doc.setFontSize(8);
+    doc.text('Rua Grécia, 59, Ibituruna – Montes Claros/MG · CEP: 39408-087 · Telefone: (31) 3658-9664', pageW/2, pageH-footerH/2+1, {align:'center'});
+    doc.setTextColor(26,26,26);
+  }
+  function drawHeadRow(){
+    doc.setFillColor(238,242,247);
+    doc.rect(marginX, y, cols.reduce((s,c)=>s+c.w,0), 7, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.6);
+    let x = marginX;
+    cols.forEach(c=>{
+      doc.text(c.label, x + (c.align==='right'? c.w-2 : 2), y+4.8, c.align==='right' ? {align:'right'} : {});
+      x += c.w;
+    });
+    y += 7;
+  }
+  function ensureSpace(){
+    if(y + 6 > bottomLimit){
+      doc.addPage();
+      drawChrome();
+      y = topY;
+      drawHeadRow();
+    }
+  }
+  drawChrome();
+  drawHeadRow();
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.6);
+  let totalGeral = 0;
+  itens.forEach((r,i)=>{
+    ensureSpace();
+    if(i%2===1){ doc.setFillColor(248,249,251); doc.rect(marginX, y, cols.reduce((s,c)=>s+c.w,0), 6, 'F'); }
+    let x = marginX;
+    cols.forEach(c=>{
+      const val = String(c.key(r)||'');
+      doc.text(val, x + (c.align==='right'? c.w-2 : 2), y+4.2, c.align==='right' ? {align:'right'} : {});
+      x += c.w;
+    });
+    totalGeral += passTotalGeral(r);
+    y += 6;
+  });
+  ensureSpace();
+  doc.setDrawColor(68,114,196); doc.setLineWidth(.4);
+  doc.line(marginX, y+1, marginX+cols.reduce((s,c)=>s+c.w,0), y+1);
+  y += 5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+  doc.text(`TOTAL GERAL: ${fmtBRL(totalGeral)}  (${itens.length} ${itens.length>1?'passagens':'passagem'})`, marginX, y);
+  doc.save(`Passagens_Conferidas_${todayISO()}.pdf`);
+};
+let renderPassConferidos;
 function passRefreshFilterOptions(){
   const cds = STATE.passagens.map(r=>r.cd);
   fillSelect('pass-solic-cd', cds, true);
   fillSelect('pass-financeiro-cd', cds, true);
   fillSelect('pass-historico-cd', cds, true);
+  fillSelect('pass-conferidos-cd', cds, true);
 }
 function passRefreshBadges(){
   document.getElementById('badge-pass-solic').textContent = STATE.passagens.filter(r=>r.status==='pendente').length;
   document.getElementById('badge-pass-financeiro').textContent = STATE.passagens.filter(r=>r.status==='comprado').length;
   document.getElementById('badge-pass-historico').textContent = STATE.passagens.filter(r=>r.status==='pago').length;
+  document.getElementById('badge-pass-conferidos').textContent = STATE.passagens.filter(r=>r.status==='pago' && !r.conferido).length;
 }
 function passRenderKpis(){
   const grid = document.getElementById('pass-kpi-grid');
@@ -8138,7 +8356,8 @@ function passRenderKpis(){
 }
 function renderPassAll(){
   passRefreshFilterOptions();
-  renderPassSolic(); renderPassFinanceiro(); renderPassHistorico();
+  renderPassSolic(); renderPassFinanceiro(); renderPassHistorico(); renderPassConferidos();
+  passConfUpdateToolbar();
   passRefreshBadges();
   passRenderKpis();
 }
