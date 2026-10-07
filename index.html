@@ -1236,7 +1236,11 @@ const SUPABASE_URL = 'https://nlitnenswxdpwtlhdpwd.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_1648rfGAwh29GpHK5sagFQ_Sxi0PAv2';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const OBRAS = ['CD 48 DOM PEDRO','CD 51 PEDRO LEOPOLDO','CD 53 ITABIRITO','CD 54 RIBEIRÃO PRETO','CD 55 CORINTO','CD 56 RIO RELÓGIO - SERRA/ES','CD GALPÃO MONTES CLAROS','CD ESCRITORIO MONTES CLAROS','CD ESCRITORIO BH'];
+/* Obras encerradas (arquivadas): saíram dos menus/seletores, mas todos os dados
+   continuam intactos no banco (compras, passagens, EPI etc. com essa obra).
+   Pra reativar uma, é só mover de volta pra lista OBRAS abaixo. */
+const OBRAS_ARQUIVADAS = ['CD 48 DOM PEDRO','CD 51 PEDRO LEOPOLDO','CD 55 CORINTO'];
+const OBRAS = ['CD 53 ITABIRITO','CD 54 RIBEIRÃO PRETO','CD 56 RIO RELÓGIO - SERRA/ES','CD GALPÃO MONTES CLAROS','CD ESCRITORIO MONTES CLAROS','CD ESCRITORIO BH'];
 
 /* Empresas do grupo — usadas na ficha de EPI (cada uma com seu próprio logo/nome) */
 const EMPRESAS_EPI = {
