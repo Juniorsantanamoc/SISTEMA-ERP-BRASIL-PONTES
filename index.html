@@ -133,6 +133,8 @@ tbody tr.prazo-atencao{background:var(--amber-bg);}
 tbody tr.prazo-atencao:hover{background:#fbe6bd;}
 tbody tr.prazo-critico{background:var(--red-bg);}
 tbody tr.prazo-critico:hover{background:#f6d3d1;}
+tbody tr.comprado-verde, tbody tr.comprado-verde.prazo-atencao, tbody tr.comprado-verde.prazo-critico{background:var(--green-bg);}
+tbody tr.comprado-verde:hover{background:#d2eedd;}
 tbody tr:last-child td{border-bottom:none;}
 .num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
 /* colunas "estreitas" (número, código, data, status, preço...) encolhem pro
@@ -1863,6 +1865,14 @@ function prazoRowClass(dataNecessaria){
   if(d<=7) return 'prazo-atencao';
   return '';
 }
+/* Linha verde + selo quando já tem Data Prevista para Entrega preenchida
+   (= comprador já fechou a compra); vence a cor de prazo. */
+function rowClassCompra(r){
+  return r.data_prevista_entrega ? 'comprado-verde' : prazoRowClass(r.data_necessaria);
+}
+function compradoSelo(r, rotulo){
+  return r.data_prevista_entrega ? `<span class="badge b-green" title="Entrega prevista em ${fmtDate(r.data_prevista_entrega)}">✅ ${rotulo||'Comprado'}</span> ` : '';
+}
 function toast(msg, isError){
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.toggle('error', !!isError);
@@ -3583,11 +3593,11 @@ function initCompras(){
       STATE.orcamentoSel.compras.forEach(id=>{ if(!idsAtuais.has(id)) STATE.orcamentoSel.compras.delete(id); });
       orcUpdateBadge('compras');
     },
-    rowFn:r=>`<tr class="${prazoRowClass(r.data_necessaria)}">
+    rowFn:r=>`<tr class="${rowClassCompra(r)}">
       <td><input type="checkbox" class="orc-check" data-id="${r.id}" ${STATE.orcamentoSel.compras.has(r.id)?'checked':''} onchange="orcToggle('compras',${r.id},this.checked)"></td>
       <td>${esc(r.numero)}</td><td>${esc(r.codigo)}</td>
       <td class="desc-cell">${descTrunc(r.descricao)}</td>
-      <td class="desc-cell">${obsBalao(r.observacoes,'compras',r.id)}${descTrunc(r.observacoes)}</td>
+      <td class="desc-cell">${compradoSelo(r,'Comprado')}${obsBalao(r.observacoes,'compras',r.id)}${descTrunc(r.observacoes)}</td>
       <td>${anexosChipsGenerico(r.anexos)}</td>
       <td class="num">${fmtNum(r.qtde)}</td><td>${esc(r.unidade)}</td>
       <td>${esc(r.solicitante)||'<span class="muted">—</span>'}${r.created_at?`<div class="rastro-sub">${fmtDateHora(r.created_at)}</div>`:''}</td>
@@ -3682,11 +3692,11 @@ function initServicos(){
       STATE.orcamentoSel.servicos.forEach(id=>{ if(!idsAtuais.has(id)) STATE.orcamentoSel.servicos.delete(id); });
       orcUpdateBadge('servicos');
     },
-    rowFn:r=>`<tr class="${prazoRowClass(r.data_necessaria)}">
+    rowFn:r=>`<tr class="${rowClassCompra(r)}">
       <td><input type="checkbox" class="orc-check" data-id="${r.id}" ${STATE.orcamentoSel.servicos.has(r.id)?'checked':''} onchange="orcToggle('servicos',${r.id},this.checked)"></td>
       <td>${esc(r.numero)}</td><td>${esc(r.codigo)}</td>
       <td class="desc-cell">${descTrunc(r.descricao)}</td>
-      <td class="desc-cell">${obsBalao(r.observacoes,'servicos',r.id)}${descTrunc(r.observacoes)}</td>
+      <td class="desc-cell">${compradoSelo(r,'Contratado')}${obsBalao(r.observacoes,'servicos',r.id)}${descTrunc(r.observacoes)}</td>
       <td>${anexosChipsGenerico(r.anexos)}</td>
       <td class="num">${fmtNum(r.qtde)}</td><td>${esc(r.unidade)}</td>
       <td>${esc(r.solicitante)||'<span class="muted">—</span>'}${r.created_at?`<div class="rastro-sub">${fmtDateHora(r.created_at)}</div>`:''}</td>
@@ -3724,11 +3734,11 @@ function initEpi(){
       STATE.orcamentoSel.epi.forEach(id=>{ if(!idsAtuais.has(id)) STATE.orcamentoSel.epi.delete(id); });
       orcUpdateBadge('epi');
     },
-    rowFn:r=>`<tr class="${prazoRowClass(r.data_necessaria)}">
+    rowFn:r=>`<tr class="${rowClassCompra(r)}">
       <td><input type="checkbox" class="orc-check" data-id="${r.id}" ${STATE.orcamentoSel.epi.has(r.id)?'checked':''} onchange="orcToggle('epi',${r.id},this.checked)"></td>
       <td>${esc(r.numero)}</td><td>${esc(r.codigo)}</td>
       <td class="desc-cell">${descTrunc(r.descricao)}</td>
-      <td class="desc-cell">${obsBalao(r.observacoes,'epi_requisicoes',r.id)}${descTrunc(r.observacoes)}</td>
+      <td class="desc-cell">${compradoSelo(r,'Comprado')}${obsBalao(r.observacoes,'epi_requisicoes',r.id)}${descTrunc(r.observacoes)}</td>
       <td>${anexosChipsGenerico(r.anexos)}</td>
       <td class="num">${fmtNum(r.qtde)}</td><td>${esc(r.unidade)}</td>
       <td>${esc(r.solicitante)||'<span class="muted">—</span>'}${r.created_at?`<div class="rastro-sub">${fmtDateHora(r.created_at)}</div>`:''}</td>
