@@ -776,7 +776,7 @@ tbody tr:last-child td{border-bottom:none;}
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Equipamento</th><th>Fornecedor</th><th class="num">Valor Mensal</th>
+              <th>Equipamento</th><th>Fornecedor</th><th class="num">Valor</th>
               <th>Início</th><th>Devolução/Renovação prevista</th><th class="num">Dias Rest.</th><th>Farol</th>
               <th>Status</th><th>Ações</th>
             </tr></thead>
@@ -6417,9 +6417,29 @@ function diasRestantesEquip(dataPrevista){
   const dp = new Date(dataPrevista+'T00:00:00');
   return Math.round((dp-hoje)/86400000);
 }
-function farolEquip(dias){
+/* Cobrança por diária: dias = fim - início (08/10 → 11/10 = 3 dias); total = dias x valor da diária. */
+function locequipEhDiaria(e){ return e && e.tipo_cobranca==='diaria'; }
+function locequipDiasLocados(e){
+  if(!e || !e.data_inicio || !e.data_prevista) return 0;
+  const a = new Date(e.data_inicio+'T00:00:00'), b = new Date(e.data_prevista+'T00:00:00');
+  return Math.max(0, Math.round((b-a)/86400000));
+}
+function locequipTotalDiaria(e){ return locequipDiasLocados(e) * (Number(e.valor_diaria)||0); }
+function locequipValorTxt(e){
+  if(locequipEhDiaria(e)){
+    const d = locequipDiasLocados(e);
+    return `${fmtBRL(e.valor_diaria)}/dia<div class="rastro-sub">${d} dia${d===1?'':'s'} = ${fmtBRL(locequipTotalDiaria(e))}</div>`;
+  }
+  return fmtBRL(e.valor_mensal)+'/mês';
+}
+function farolEquip(dias, e){
   if(dias===null||dias===undefined) return '-';
   if(dias<0) return 'Vencido';
+  if(locequipEhDiaria(e)){ // locação curta: alerta bem mais cedo que a mensal
+    if(dias<=1) return 'Vencido';
+    if(dias<=3) return 'Atenção';
+    return 'No prazo';
+  }
   if(dias<=7) return 'Vencido'; // mesmo tom de urgência (vermelho) que "vencido" até 7 dias
   if(dias<=30) return 'Atenção';
   return 'No prazo';
@@ -6438,14 +6458,14 @@ function renderLocequipKpis(){
   const ativos = lista.filter(e=>e.status!=='encerrado');
   const vencendo = ativos.filter(e=>{ const d=diasRestantesEquip(e.data_prevista); return d!==null && d<=30; }).length;
   const vencidos = ativos.filter(e=>{ const d=diasRestantesEquip(e.data_prevista); return d!==null && d<0; }).length;
-  const valorMensal = ativos.reduce((s,e)=>s+(Number(e.valor_mensal)||0),0);
+  const valorMensal = ativos.reduce((s,e)=>s+(locequipEhDiaria(e) ? locequipTotalDiaria(e) : (Number(e.valor_mensal)||0)),0);
   const el = document.getElementById('locequip-kpis');
   if(!el) return;
   el.innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Locações ativas</div><div class="kpi-value">${ativos.length}</div></div>
     <div class="kpi-card warn"><div class="kpi-label">Vencendo em 30 dias</div><div class="kpi-value">${vencendo}</div></div>
     <div class="kpi-card danger"><div class="kpi-label">Vencidas</div><div class="kpi-value">${vencidos}</div></div>
-    <div class="kpi-card good"><div class="kpi-label">Compromisso mensal</div><div class="kpi-value">${fmtBRL(valorMensal)}</div></div>`;
+    <div class="kpi-card good"><div class="kpi-label">Compromisso atual (mensal + diárias do período)</div><div class="kpi-value">${fmtBRL(valorMensal)}</div></div>`;
 }
 function getLocequipFiltered(){
   const q = (document.getElementById('locequip-search').value||'').trim().toLowerCase();
@@ -6469,13 +6489,13 @@ function renderLocacoesEquip(){
   }
   tbody.innerHTML = lista.map(e=>{
     const dias = diasRestantesEquip(e.data_prevista);
-    const farol = e.status==='encerrado' ? '-' : farolEquip(dias);
+    const farol = e.status==='encerrado' ? '-' : farolEquip(dias, e);
     const diasTxt = e.status==='encerrado' ? '—' : (dias===null?'—':(dias===0?'Hoje':(dias>0?dias+'d':(Math.abs(dias)+'d vencido'))));
-    const diasCls = (e.status==='encerrado'||dias===null)?'':(dias<0?'dias-vermelho':(dias<=30?'dias-amarelo':'dias-verde'));
+    const diasCls = (e.status==='encerrado'||dias===null)?'':(dias<0?'dias-vermelho':(dias<=(locequipEhDiaria(e)?3:30)?'dias-amarelo':'dias-verde'));
     return `<tr>
       <td>🚜 ${esc(e.descricao)}</td>
       <td>${esc(e.fornecedor)}</td>
-      <td class="num">${fmtBRL(e.valor_mensal)}/mês</td>
+      <td class="num">${locequipValorTxt(e)}</td>
       <td>${fmtDate(e.data_inicio)}</td>
       <td>${fmtDate(e.data_prevista)}</td>
       <td class="num dias-cell ${diasCls}">${diasTxt}</td>
@@ -6484,7 +6504,7 @@ function renderLocacoesEquip(){
       <td>
         <button class="btn btn-sm btn-secondary" onclick="editarLocequipModal('${e.id}')">✏️ Editar</button>
         ${e.status==='ativo'
-          ? `<button class="btn btn-sm btn-secondary" onclick="renovarLocequip('${e.id}')">🔄 +30d</button>
+          ? `<button class="btn btn-sm btn-secondary" onclick="renovarLocequip('${e.id}')">🔄 Renovar</button>
              <button class="btn btn-sm btn-secondary" onclick="encerrarLocequip('${e.id}')">🔚 Encerrar</button>`
           : `<button class="btn btn-sm btn-secondary" onclick="reativarLocequip('${e.id}')">↩️ Reativar</button>`}
         ${podeGerir('locacoes-equip') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirLocequip('${e.id}')">🗑</button>` : ''}
@@ -6511,7 +6531,16 @@ function abrirFormLocequipModal(e){
       <div class="form-row"><label>Equipamento / Container *</label><input type="text" id="le-descricao" required value="${escAttr(e?e.descricao:'')}" placeholder="Ex.: Container 20 pés #3, Gerador 150kVA avulso..."></div>
       <div class="form-grid2">
         <div class="form-row"><label>Fornecedor *</label><input type="text" id="le-fornecedor" required value="${escAttr(e?e.fornecedor:'')}"></div>
-        <div class="form-row"><label>Valor Mensal (R$) *</label><input type="number" step="0.01" min="0" id="le-valor-mensal" required value="${e?e.valor_mensal:''}"></div>
+        <div class="form-row"><label>Cobrança *</label>
+          <select id="le-tipo-cobranca">
+            <option value="mensal" ${!e||!locequipEhDiaria(e)?'selected':''}>Mensal</option>
+            <option value="diaria" ${e&&locequipEhDiaria(e)?'selected':''}>Por diária</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" id="le-row-mensal"><label>Valor Mensal (R$) *</label><input type="number" step="0.01" min="0" id="le-valor-mensal" value="${e&&!locequipEhDiaria(e)?e.valor_mensal:''}"></div>
+      <div class="form-row" id="le-row-diaria" style="display:none;"><label>Valor da diária (R$) *</label><input type="number" step="0.01" min="0" id="le-valor-diaria" value="${e&&e.valor_diaria!=null?e.valor_diaria:''}">
+        <div class="hint" id="le-calc-diaria" style="margin-top:6px;"></div>
       </div>
       <div class="form-grid2">
         <div class="form-row"><label>Início da locação *</label><input type="date" id="le-data-inicio" required value="${e?e.data_inicio||'':todayISO()}"></div>
@@ -6525,6 +6554,21 @@ function abrirFormLocequipModal(e){
       </div>
     </form>
   `);
+  const leAtualizaTipo = ()=>{
+    const diaria = document.getElementById('le-tipo-cobranca').value==='diaria';
+    document.getElementById('le-row-mensal').style.display = diaria ? 'none' : '';
+    document.getElementById('le-row-diaria').style.display = diaria ? '' : 'none';
+    const ini = document.getElementById('le-data-inicio').value, fim = document.getElementById('le-data-prevista').value;
+    const box = document.getElementById('le-calc-diaria');
+    if(!diaria){ box.textContent=''; return; }
+    const tmp = { data_inicio: ini, data_prevista: fim, valor_diaria: document.getElementById('le-valor-diaria').value };
+    const d = locequipDiasLocados(tmp);
+    box.innerHTML = (ini && fim) ? `<strong>${d} dia${d===1?'':'s'}</strong> (de ${fmtDate(ini)} até ${fmtDate(fim)}) × ${fmtBRL(Number(tmp.valor_diaria)||0)} = <strong>${fmtBRL(locequipTotalDiaria(tmp))}</strong>` : 'Preencha as datas pra calcular os dias.';
+  };
+  ['le-tipo-cobranca','le-data-inicio','le-data-prevista','le-valor-diaria'].forEach(id=>{
+    const el = document.getElementById(id); el.addEventListener('input', leAtualizaTipo); el.addEventListener('change', leAtualizaTipo);
+  });
+  leAtualizaTipo();
   document.getElementById('form-locequip').addEventListener('submit', async ev=>{
     ev.preventDefault();
     const submitBtn = ev.target.querySelector('button[type="submit"]');
@@ -6537,10 +6581,19 @@ function abrirFormLocequipModal(e){
         submitBtn.disabled = false;
         return;
       }
+      const diaria = document.getElementById('le-tipo-cobranca').value==='diaria';
+      const vMensal = document.getElementById('le-valor-mensal').value, vDiaria = document.getElementById('le-valor-diaria').value;
+      if((diaria && !vDiaria) || (!diaria && !vMensal)){
+        toast(diaria ? 'Informe o valor da diária.' : 'Informe o valor mensal.', true);
+        submitBtn.disabled = false;
+        return;
+      }
       const rec = {
         descricao: document.getElementById('le-descricao').value.trim(),
         fornecedor: document.getElementById('le-fornecedor').value.trim(),
-        valor_mensal: Number(document.getElementById('le-valor-mensal').value)||0,
+        tipo_cobranca: diaria ? 'diaria' : 'mensal',
+        valor_mensal: diaria ? 0 : (Number(vMensal)||0),
+        valor_diaria: diaria ? (Number(vDiaria)||0) : null,
         data_inicio: dataInicio || null,
         data_prevista: dataPrevista || null,
         observacoes: document.getElementById('le-obs').value.trim(),
@@ -6566,14 +6619,47 @@ function abrirFormLocequipModal(e){
     }
   });
 }
-window.renovarLocequip = async function(id){
+window.renovarLocequip = function(id){
   const e = STATE.locacoesEquip.find(x=>String(x.id)===String(id));
   if(!e) return;
-  const novaData = addDaysContrato(e.data_prevista||todayISO(), 30);
-  const { error } = await sb.from('locacoes_equipamentos').update({ data_prevista: novaData }).eq('id', e.id);
-  if(error){ toast('Erro ao renovar: ' + error.message, true); return; }
-  await refetchTable('locacoes_equipamentos'); renderLocacoesEquip(); refreshBadges();
-  toast('Renovado — nova data prevista: ' + fmtDate(novaData) + '.');
+  const diaria = locequipEhDiaria(e);
+  const opcoes = [1,2,3,7,15,30];
+  openModal(`
+    <h3>Renovar locação</h3>
+    <div class="modal-sub">🚜 ${esc(e.descricao)} — vence em <strong>${fmtDate(e.data_prevista)}</strong></div>
+    <div class="form-row"><label>Renovar por quantos dias?</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${opcoes.map(n=>`<button type="button" class="btn btn-secondary le-ren-op" data-n="${n}">${n} dia${n>1?'s':''}</button>`).join('')}
+      </div>
+    </div>
+    <div class="form-row"><label>Ou outra quantidade</label><input type="number" id="le-ren-n" min="1" step="1" placeholder="Ex.: 10"></div>
+    <div class="hint" id="le-ren-prev" style="margin-bottom:10px;"></div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="le-ren-ok">Confirmar renovação</button>
+    </div>
+  `);
+  const inp = document.getElementById('le-ren-n'), prev = document.getElementById('le-ren-prev');
+  const atualiza = ()=>{
+    const n = parseInt(inp.value,10);
+    if(!n || n<1){ prev.textContent=''; return; }
+    const nova = addDaysContrato(e.data_prevista||todayISO(), n);
+    let txt = `Nova data prevista: <strong>${fmtDate(nova)}</strong>`;
+    if(diaria){ const tmp={...e, data_prevista:nova}; txt += ` — ${locequipDiasLocados(tmp)} dias no total = <strong>${fmtBRL(locequipTotalDiaria(tmp))}</strong>`; }
+    prev.innerHTML = txt;
+  };
+  inp.addEventListener('input', atualiza);
+  document.querySelectorAll('.le-ren-op').forEach(b=> b.addEventListener('click', ()=>{ inp.value = b.dataset.n; atualiza(); }));
+  document.getElementById('le-ren-ok').addEventListener('click', async ()=>{
+    const n = parseInt(inp.value,10);
+    if(!n || n<1){ toast('Escolha ou digite quantos dias renovar.', true); return; }
+    const novaData = addDaysContrato(e.data_prevista||todayISO(), n);
+    const { error } = await sb.from('locacoes_equipamentos').update({ data_prevista: novaData }).eq('id', e.id);
+    if(error){ toast('Erro ao renovar: ' + error.message, true); return; }
+    closeModal();
+    await refetchTable('locacoes_equipamentos'); renderLocacoesEquip(); refreshBadges();
+    toast('Renovado por '+n+' dia'+(n>1?'s':'')+' — nova data prevista: ' + fmtDate(novaData) + '.');
+  });
 };
 window.encerrarLocequip = async function(id){
   const { error } = await sb.from('locacoes_equipamentos').update({ status:'encerrado' }).eq('id', id);
