@@ -3069,6 +3069,13 @@ async function resolveFornecedorField(prefix){
   return null;
 }
 
+/* Valor sugerido ao receber/concluir: o Preço Total já preenchido na edição do
+   item; se só tiver Preço Unit., calcula unit x qtde. Vazio se nada preenchido. */
+function precoSugerido(item){
+  if(isNum(item.preco_total) && Number(item.preco_total)>0) return Number(item.preco_total);
+  if(isNum(item.preco_unit) && isNum(item.qtde) && Number(item.preco_unit)>0) return Math.round(Number(item.preco_unit)*Number(item.qtde)*100)/100;
+  return '';
+}
 function receberCompraModal(numero){
   const item = STATE.compras.find(r=>r.numero===numero);
   if(!item) return;
@@ -3083,7 +3090,7 @@ function receberCompraModal(numero){
           <label><input type="radio" name="destino" value="historico"> Histórico de Compras (gasto de obra)</label>
         </div>
       </div>
-      <div class="form-row"><label>Preço pago (total) *</label><input type="number" id="rc-preco" min="0" step="0.01" required></div>
+      <div class="form-row"><label>Preço pago (total) *</label><input type="number" id="rc-preco" min="0" step="0.01" value="${precoSugerido(item)}" required></div>
       ${fornecedorFieldHtml('rc')}
       <div class="form-row"><label>Data de conclusão</label><input type="date" id="rc-data" value="${todayISO()}"></div>
       <div id="rc-almox-fields">
@@ -3153,7 +3160,7 @@ function concluirServicoModal(numero){
     <h3>Concluir serviço</h3>
     <div class="modal-sub">${esc(item.descricao)}</div>
     <form id="form-concluir">
-      <div class="form-row"><label>Preço pago (total) *</label><input type="number" id="cs-preco" min="0" step="0.01" required></div>
+      <div class="form-row"><label>Preço pago (total) *</label><input type="number" id="cs-preco" min="0" step="0.01" value="${precoSugerido(item)}" required></div>
       ${fornecedorFieldHtml('cs', 'Fornecedor / Prestador')}
       <div class="form-row"><label>Data de conclusão</label><input type="date" id="cs-data" value="${todayISO()}"></div>
       <div class="form-row"><label>Observação (opcional)</label><textarea id="cs-obs-receb" rows="2" placeholder="Ex.: serviço concluído com ressalvas, atraso, etc."></textarea></div>
@@ -3196,7 +3203,7 @@ function receberEpiModal(numero){
     <h3>Receber EPI</h3>
     <div class="modal-sub">${esc(item.descricao)} — entra no estoque de EPI da obra <strong>${esc(item.obra)}</strong></div>
     <form id="form-receber-epi">
-      <div class="form-row"><label>Preço pago (total)</label><input type="number" id="re-preco" min="0" step="0.01"></div>
+      <div class="form-row"><label>Preço pago (total)</label><input type="number" id="re-preco" min="0" step="0.01" value="${precoSugerido(item)}"></div>
       ${fornecedorFieldHtml('re')}
       <div class="form-row"><label>Observação (opcional)</label><textarea id="re-obs-receb" rows="2" placeholder="Ex.: caixa lacrada, item avariado, etc."></textarea></div>
       <div class="form-actions">
