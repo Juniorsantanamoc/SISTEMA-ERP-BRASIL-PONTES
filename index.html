@@ -2132,6 +2132,18 @@ async function enterApp(session){
 }
 
 /* ============== data loading (Supabase) ============== */
+// Busca TODAS as linhas de uma tabela (o servidor limita 1000 por requisição) — pagina de 1000 em 1000
+async function fetchAllRows(tabela){
+  const pageSize = 1000;
+  let all = [];
+  for(let from = 0; ; from += pageSize){
+    const { data, error } = await sb.from(tabela).select('*').order('id').range(from, from+pageSize-1);
+    if(error) return { data: null, error };
+    all = all.concat(data || []);
+    if(!data || data.length < pageSize) break;
+  }
+  return { data: all, error: null };
+}
 async function loadLookupData(){
   try{
     // sinapi: 4159 rows, paginate to be safe with default limits
@@ -2262,8 +2274,8 @@ async function loadAllForObra(){
       sb.from('cotacoes').select('*').eq('obra', obra).order('id', {ascending:false}),
       sb.from('reembolsos').select('*').eq('obra', obra).order('numero'),
       sb.from('reembolso_itens').select('*').eq('obra', obra).order('id'),
-      sb.from('almoxarifado').select('*').order('id'),
-      sb.from('almoxarifado_eletrico').select('*').order('id'),
+      fetchAllRows('almoxarifado'),
+      fetchAllRows('almoxarifado_eletrico'),
       sb.from('epi_estoque').select('*').order('descricao'),
       sb.from('epi_saidas').select('*').order('data_saida', {ascending:false}).order('id', {ascending:false}).limit(100),
       sb.from('funcionarios').select('*').order('nome'),
@@ -2441,10 +2453,10 @@ async function refetchTable(which){
       const { data, error } = await sb.from('reembolso_itens').select('*').eq('obra', obra).order('id');
       if(!error) STATE.reembolsoItens = data || [];
     }else if(which==='almoxarifado'){
-      const { data, error } = await sb.from('almoxarifado').select('*').order('id');
+      const { data, error } = await fetchAllRows('almoxarifado');
       if(!error) STATE.almoxarifado = data || [];
     }else if(which==='almoxarifado_eletrico'){
-      const { data, error } = await sb.from('almoxarifado_eletrico').select('*').order('id');
+      const { data, error } = await fetchAllRows('almoxarifado_eletrico');
       if(!error) STATE.almoxarifadoEletrico = data || [];
     }else if(which==='epi'){
       const { data, error } = await sb.from('epi_requisicoes').select('*').eq('obra', obra).order('numero');
