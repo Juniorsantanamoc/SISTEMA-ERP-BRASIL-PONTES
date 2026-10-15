@@ -1432,12 +1432,13 @@ function obsIcon(txt){ return txt ? ` <span class="obs-icon" title="${escAttr(tx
 function obsBalao(txt, origemTabela, origemId){
   if(!origemTabela || origemId===undefined || origemId===null) return txt ? '<span class="obs-icon" title="'+escAttr(txt)+'">📝</span>' : '<span class="muted">—</span>';
   const vazio = !txt;
-  return `<span class="obs-balao${vazio?' obs-balao-vazio':''}" onclick="abrirObsChatModal('${escAttr(origemTabela)}',${Number(origemId)},'${escAttr(txt||'')}')" title="${vazio?'Iniciar conversa sobre esta solicitação':'Ver observação e responder'}">💬</span>`;
+  return `<span class="obs-balao${vazio?' obs-balao-vazio':''}" onclick="abrirObsChatModal('${escAttr(origemTabela)}',${Number(origemId)},'${encodeURIComponent(txt||'').replace(/'/g,'%27')}')" title="${vazio?'Iniciar conversa sobre esta solicitação':'Ver observação e responder'}">💬</span>`;
 }
 let OBS_CHAT_ATUAL = null;
 let OBS_CHAT_CHANNEL = null;
 window.abrirObsChatModal = async function(origemTabela, origemId, textoOriginal){
   OBS_CHAT_ATUAL = { tabela: origemTabela, id: Number(origemId) };
+  try{ textoOriginal = decodeURIComponent(textoOriginal || ''); }catch(e){ textoOriginal = textoOriginal || ''; }
   const origBlock = textoOriginal ? `<div class="obs-chat-original"><strong>Observação original:</strong><br>${esc(textoOriginal)}</div>` : `<div class="hint" style="margin-bottom:10px;">Nenhuma observação registrada ainda. Inicie a conversa abaixo.</div>`;
   openModal(`
     <h3>💬 Conversa da Observação</h3>
