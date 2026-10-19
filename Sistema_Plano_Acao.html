@@ -74,15 +74,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; b
 .table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:#fff;}
 table{width:100%; border-collapse:collapse; font-size:12.5px;}
 thead th{background:#f6f8fb; text-align:left; padding:10px 10px; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-3); border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0;}
-tbody td{padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:top;}
+tbody td{padding:14px 12px; border-bottom:1px solid var(--border); vertical-align:top;}
 tbody tr:hover{background:#fafbfd;}
 .badge{display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap;}
-.desc-cell{max-width:340px;}
-.desc-cell .desc-main{font-weight:600; color:var(--text);}
-.obs-note{font-size:11px; color:var(--text-3); margin-top:5px; line-height:1.45; white-space:pre-wrap;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer;}
+.desc-cell{min-width:300px; max-width:560px; width:34%;}
+.desc-cell .desc-main{font-weight:600; color:var(--text); line-height:1.6; margin-bottom:6px;}
+.obs-note{font-size:12px; color:var(--text-2); margin-top:8px; line-height:1.7; white-space:pre-wrap;
+  display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer;}
 .obs-note.expanded{-webkit-line-clamp:unset; display:block;}
 .obs-note:hover{color:var(--text-2);}
+.anexo-wrap{display:flex; flex-wrap:wrap; gap:4px; max-width:200px;}
+.anexo-chip{display:inline-flex; align-items:center; gap:4px; background:var(--accent-light); color:var(--accent-2); padding:3px 8px; border-radius:6px; font-size:11px; cursor:pointer; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .qtd-cell{font-size:11.5px; color:var(--text-2); white-space:nowrap;}
 .dias-cell{font-weight:800; white-space:nowrap;}
 .dias-verde{color:#1a7f4b;}
@@ -173,9 +175,9 @@ tbody tr:hover{background:#fafbfd;}
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>Área</th><th>Ação / Descrição</th><th>Qtd. / Unid.</th><th>Responsável</th>
-            <th>Início</th><th>Necessária</th><th>Previsão</th><th>Dias Rest.</th><th>Status</th><th>Farol</th>
-            <th>Entrega</th><th>Dias Gastos</th><th>Ações</th>
+            <th>Área</th><th>Ação / Descrição</th><th>Anexos</th><th>Qtd. / Unid.</th><th>Responsável</th>
+            <th>Início</th><th>Necessária</th><th>Previsão</th><th title="Somente dias úteis (sem sábados, domingos e feriados nacionais)">Dias Rest.</th><th>Status</th><th>Farol</th>
+            <th>Entrega</th><th title="Somente dias úteis">Dias Gastos</th><th>Ações</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>
@@ -222,6 +224,10 @@ tbody tr:hover{background:#fafbfd;}
       <div class="form-row"><label>Data de Entrega</label><input type="date" id="m-data-entrega"></div>
       <div class="hint">Preencher "Data de Entrega" trava os "Dias Gastos p/ Concluir" — igual na planilha original.</div>
       <div class="form-row"><label>Observações</label><textarea id="m-obs" rows="4" placeholder="Registro de atualizações, ex: 07/08 - Cotações enviadas..."></textarea></div>
+      <div class="form-row"><label>Anexos (imagens, PDF, Word, Excel…)</label>
+        <div id="m-anexos-atuais" style="margin-bottom:6px;"></div>
+        <input type="file" id="m-anexos" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip">
+      </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" id="btn-cancelar-modal">Cancelar</button>
         <button type="submit" class="btn btn-primary" id="btn-salvar-acao">Salvar</button>
@@ -243,11 +249,11 @@ let OBRAS = [];
 let realtimeChannel = null;
 
 const AREAS = ['PMO','RH','Meio Ambiente','Segurança','Engenharia','Planejamento','Obra','Compras','Faixa','Diretoria','Qualidade','Operacional'];
-const STATUS_LIST = ['Não iniciado','Reprogramado','Concluído','Cancelado','Em cotação','Aguardando aprovação','Pedido realizado','Aguardando entrega','Em andamento','Atrasado','Bloqueado'];
+const STATUS_LIST = ['Não iniciado','Reprogramado','Concluído','Cancelado','Em cotação','Aguardando aprovação','Aguardando retorno BP','Aguardando retorno Fornecedor','Pedido realizado','Aguardando entrega','Em andamento','Atrasado','Bloqueado'];
 
 const COR_STATUS = {
   'Não iniciado':'#D9D9D9','Reprogramado':'#FFD966','Concluído':'#A9D08E','Cancelado':'#BFBFBF',
-  'Em cotação':'#BDD7EE','Aguardando aprovação':'#FFE699','Pedido realizado':'#9DC3E6','Aguardando entrega':'#B4A7D6',
+  'Em cotação':'#BDD7EE','Aguardando aprovação':'#FFE699','Aguardando retorno BP':'#F9CB9C','Aguardando retorno Fornecedor':'#D5A6BD','Pedido realizado':'#9DC3E6','Aguardando entrega':'#B4A7D6',
   'Em andamento':'#C6E0B4','Atrasado':'#E06666','Bloqueado':'#434343',
 };
 const TEXTO_ESCURO_STATUS = new Set(['Bloqueado']);
@@ -270,11 +276,51 @@ function escAttr(s){ return esc(s).replace(/"/g,'&quot;'); }
 function fmtDate(v){ if(!v) return "—"; const p=String(v).split("-"); if(p.length!==3) return v; return p[2]+"/"+p[1]+"/"+p[0]; }
 function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0'); }
 
+/* ---- contagem só de DIAS ÚTEIS (segunda a sexta, sem feriados nacionais) ---- */
+const _feriadosCache = {};
+function feriadosDoAno(ano){
+  if(_feriadosCache[ano]) return _feriadosCache[ano];
+  const set = new Set();
+  const add = (m,d)=> set.add(ano+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0'));
+  [[1,1],[4,21],[5,1],[9,7],[10,12],[11,2],[11,15],[12,25]].forEach(x=>add(x[0],x[1]));
+  if(ano>=2024) add(11,20); /* Consciência Negra (nacional desde 2024) */
+  /* Páscoa (algoritmo de Meeus/Jones/Butcher) -> Sexta-feira Santa */
+  const a=ano%19, b=Math.floor(ano/100), c=ano%100, d=Math.floor(b/4), e=b%4, f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30, i=Math.floor(c/4), k=c%4, l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451);
+  const mes=Math.floor((h+l-7*m+114)/31), dia=((h+l-7*m+114)%31)+1;
+  const pascoa = new Date(ano, mes-1, dia);
+  const sexta = new Date(pascoa); sexta.setDate(pascoa.getDate()-2);
+  add(sexta.getMonth()+1, sexta.getDate());
+  return (_feriadosCache[ano]=set);
+}
+function ehDiaUtil(dt){
+  const w = dt.getDay();
+  if(w===0 || w===6) return false;
+  const iso = dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+  return !feriadosDoAno(dt.getFullYear()).has(iso);
+}
+/* nº de dias úteis de "de" (exclusive) até "ate" (inclusive); negativo se ate < de */
+function diasUteisEntre(deISO, ateISO){
+  const de = new Date(deISO+'T00:00:00'), ate = new Date(ateISO+'T00:00:00');
+  if(ate.getTime() === de.getTime()) return 0;
+  const sinal = ate > de ? 1 : -1;
+  let ini = sinal>0 ? de : ate, fim = sinal>0 ? ate : de;
+  let n = 0;
+  const cur = new Date(ini);
+  while(true){
+    cur.setDate(cur.getDate()+1);
+    if(cur > fim) break;
+    if(ehDiaUtil(cur)) n++;
+  }
+  return n*sinal;
+}
 function diasRestantes(dataNecessaria){
   if(!dataNecessaria) return null;
-  const hoje = new Date(todayISO()+'T00:00:00');
-  const dn = new Date(dataNecessaria+'T00:00:00');
-  return Math.round((dn - hoje) / 86400000);
+  return diasUteisEntre(todayISO(), dataNecessaria);
+}
+function diasGastosUteis(a){
+  if(a.data_entrega && a.data_inicio) return diasUteisEntre(a.data_inicio, a.data_entrega);
+  return (a.dias_gastos!==null && a.dias_gastos!==undefined) ? a.dias_gastos : null;
 }
 function calcFarol(status, dias, dataNecessaria, dataEntrega){
   if(status === 'Concluído'){
@@ -325,6 +371,40 @@ function friendlyErrorMsg(error){
   }
   return msg;
 }
+
+/* ============== anexos (bucket privado anexos-plano-acao) ============== */
+function anexosChips(anexos){
+  if(!anexos || !anexos.length) return '<span class="muted">—</span>';
+  return `<div class="anexo-wrap">${anexos.map(a=>`<span class="anexo-chip" onclick="abrirAnexo('${escAttr(a.path)}')" title="${escAttr(a.nome)}">📎 ${esc(a.nome.length>18 ? a.nome.slice(0,16)+'…' : a.nome)}</span>`).join('')}</div>`;
+}
+window.abrirAnexo = async function(path){
+  const { data, error } = await sb.storage.from('anexos-plano-acao').createSignedUrl(path, 120);
+  if(error){ toast('Erro ao abrir anexo: ' + error.message, true); return; }
+  window.open(data.signedUrl, '_blank');
+};
+async function uploadAnexosPlano(files, obra){
+  const out = [];
+  for(const f of files){
+    const ext = (f.name.split('.').pop() || 'bin').toLowerCase();
+    const safeObra = obra.replace(/[^a-zA-Z0-9]+/g,'-');
+    const path = `${safeObra}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const { error } = await sb.storage.from('anexos-plano-acao').upload(path, f, { contentType: f.type || undefined, upsert:false });
+    if(error) throw error;
+    out.push({ path, nome: f.name });
+  }
+  return out;
+}
+let anexosEmEdicao = [];
+function renderAnexosAtuais(){
+  const box = document.getElementById('m-anexos-atuais');
+  if(!anexosEmEdicao.length){ box.innerHTML = ''; return; }
+  box.innerHTML = anexosEmEdicao.map((a,i)=>`<span class="anexo-chip" style="margin:2px 4px 2px 0;"><span onclick="abrirAnexo('${escAttr(a.path)}')" title="${escAttr(a.nome)}">📎 ${esc(a.nome)}</span> <span onclick="removerAnexoEdicao(${i})" title="Remover" style="color:var(--red); font-weight:800; margin-left:4px;">✕</span></span>`).join('');
+}
+window.removerAnexoEdicao = function(i){
+  if(!confirm('Remover este anexo da ação?')) return;
+  anexosEmEdicao.splice(i,1);
+  renderAnexosAtuais();
+};
 
 /* ============== auth ============== */
 async function initAuthGate(){
@@ -401,10 +481,10 @@ document.getElementById('obra-select').addEventListener('change', async (e)=>{
 /* ============== dados ============== */
 async function loadAcoes(){
   const tbody = document.getElementById('tbody');
-  tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:24px; color:var(--text-3);">Carregando…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:24px; color:var(--text-3);">Carregando…</td></tr>`;
   const { data, error } = await sb.from('plano_acoes').select('*').eq('obra', STATE.obraAtual).order('id', { ascending:false });
   if(error){
-    tbody.innerHTML = `<tr><td colspan="13" class="empty-obra">Erro ao carregar: ${esc(friendlyErrorMsg(error))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14" class="empty-obra">Erro ao carregar: ${esc(friendlyErrorMsg(error))}</td></tr>`;
     return;
   }
   STATE.acoes = data || [];
@@ -499,7 +579,7 @@ function render(){
   const lista = getFiltered();
   const tbody = document.getElementById('tbody');
   if(STATE.acoes.length === 0){
-    tbody.innerHTML = `<tr><td colspan="13" class="empty-obra">Nenhuma ação cadastrada ainda para ${esc(STATE.obraAtual)}. Clique em "+ Nova Ação" para começar.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14" class="empty-obra">Nenhuma ação cadastrada ainda para ${esc(STATE.obraAtual)}. Clique em "+ Nova Ação" para começar.</td></tr>`;
     document.getElementById('contagem').textContent = '';
     renderKpis();
     return;
@@ -512,6 +592,7 @@ function render(){
     return `<tr>
       <td>${badgeArea(a.area)}</td>
       <td class="desc-cell"><div class="desc-main">${esc(a.descricao)}</div>${a.obs ? `<div class="obs-note" onclick="this.classList.toggle('expanded')">${esc(a.obs)}</div>` : ''}</td>
+      <td>${anexosChips(a.anexos)}</td>
       <td class="qtd-cell">${esc(a.quantidade)||'—'} ${esc(a.unidade)||''}</td>
       <td>${esc(a.responsavel)||'—'}</td>
       <td>${fmtDate(a.data_inicio)}</td>
@@ -521,13 +602,13 @@ function render(){
       <td>${badgeStatus(a.status)}</td>
       <td>${badgeFarol(farol)}</td>
       <td>${fmtDate(a.data_entrega)}</td>
-      <td>${a.dias_gastos!==null && a.dias_gastos!==undefined ? a.dias_gastos+'d' : '—'}</td>
+      <td>${(()=>{ const dg = diasGastosUteis(a); return dg===null ? '—' : dg+'d'; })()}</td>
       <td class="acoes-cell">
         <button class="btn btn-sm btn-secondary" onclick="abrirEdicao(${a.id})">✏️</button>
         ${IS_GESTOR ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirAcao(${a.id})">🗑</button>` : ''}
       </td>
     </tr>`;
-  }).join('') || `<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-3);">${totalAba===0 ? 'Nenhuma ação nesta aba.' : 'Nenhuma ação encontrada com esses filtros.'}</td></tr>`;
+  }).join('') || `<tr><td colspan="14" style="text-align:center; padding:30px; color:var(--text-3);">${totalAba===0 ? 'Nenhuma ação nesta aba.' : 'Nenhuma ação encontrada com esses filtros.'}</td></tr>`;
   document.getElementById('contagem').textContent = `${lista.length} de ${totalAba} ações nesta aba`;
   renderKpis();
 }
@@ -560,6 +641,8 @@ document.getElementById('btn-nova-acao').addEventListener('click', ()=>{
   fillSelectPlain('m-status', STATUS_LIST, '');
   document.getElementById('m-status').value = 'Não iniciado';
   document.getElementById('m-data-inicio').value = todayISO();
+  anexosEmEdicao = []; renderAnexosAtuais();
+  document.getElementById('m-anexos').value = '';
   abrirModal();
 });
 
@@ -581,6 +664,8 @@ window.abrirEdicao = function(id){
   document.getElementById('m-status').value = a.status;
   document.getElementById('m-data-entrega').value = a.data_entrega || '';
   document.getElementById('m-obs').value = a.obs || '';
+  anexosEmEdicao = Array.isArray(a.anexos) ? a.anexos.slice() : []; renderAnexosAtuais();
+  document.getElementById('m-anexos').value = '';
   abrirModal();
 };
 
@@ -600,7 +685,7 @@ document.getElementById('form-acao').addEventListener('submit', async e=>{
   const dataEntrega = document.getElementById('m-data-entrega').value || null;
   let diasGastos = null;
   if(dataEntrega && dataInicio){
-    diasGastos = Math.round((new Date(dataEntrega+'T00:00:00') - new Date(dataInicio+'T00:00:00')) / 86400000);
+    diasGastos = diasUteisEntre(dataInicio, dataEntrega);
   }
   const existente = editandoId ? STATE.acoes.find(x=>x.id===editandoId) : null;
   const rec = {
@@ -620,6 +705,13 @@ document.getElementById('form-acao').addEventListener('submit', async e=>{
   };
   btn.disabled = true; btn.textContent = 'Salvando…';
   let error;
+  const arquivos = [...(document.getElementById('m-anexos').files || [])];
+  let novos = [];
+  if(arquivos.length){
+    try{ novos = await uploadAnexosPlano(arquivos, STATE.obraAtual); }
+    catch(upErr){ btn.disabled = false; btn.textContent = 'Salvar'; toast('Erro ao enviar anexo(s): ' + friendlyErrorMsg(upErr), true); return; }
+  }
+  rec.anexos = [...anexosEmEdicao, ...novos];
   if(editandoId){
     ({ error } = await sb.from('plano_acoes').update(rec).eq('id', editandoId));
   }else{
