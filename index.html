@@ -423,6 +423,7 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="nav-item" data-page="almoxarifado"><span class="nav-icon">🚜</span>Almoxarifado Geral<span class="nav-badge" id="badge-almox">0</span></div>
     <div class="nav-item" data-page="almoxarifado-manutencao"><span class="nav-icon">🔧</span>Manutenção<span class="nav-badge" id="badge-almox-manutencao">0</span></div>
     <div class="nav-item" data-page="almoxarifado-eletrico"><span class="nav-icon">⚡</span>Almoxarifado Elétrico<span class="nav-badge" id="badge-almox-eletrico">0</span></div>
+    <div class="nav-item" data-page="almoxarifado-controle"><span class="nav-icon">🛏️</span>Itens de Controle<span class="nav-badge" id="badge-almox-controle">0</span></div>
     <div class="nav-item" data-page="epi-estoque"><span class="nav-icon">🧰</span>Almoxarifado de EPI<span class="nav-badge" id="badge-epi-estoque">0</span></div>
     <div class="nav-item" data-page="funcionarios"><span class="nav-icon">👷</span>Funcionários<span class="nav-badge" id="badge-funcionarios">0</span></div>
     <div class="nav-item" data-page="fornecedores"><span class="nav-icon">🏭</span>Fornecedores<span class="nav-badge" id="badge-fornecedores">0</span></div>
@@ -871,6 +872,28 @@ tbody tr:last-child td{border-bottom:none;}
               <th data-key="recebido_por">Recebido por</th><th>Ações</th>
             </tr></thead>
             <tbody id="almox-eletrico-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ITENS DE CONTROLE (sem tag: travesseiro, coberta, cortina, espelho...) -->
+      <div class="page" id="page-almoxarifado-controle">
+        <div class="toolbar">
+          <button class="btn btn-primary" id="btn-novo-almox-controle">+ Novo Item</button>
+          <input class="search-input" id="almox-controle-search" placeholder="Buscar por item, local ou responsável...">
+          <select class="filter-select" id="almox-controle-obra"><option value="">Todas as obras</option></select>
+          <select class="filter-select" id="almox-controle-categoria"><option value="">Todas as categorias</option></select>
+          <select class="filter-select" id="almox-controle-status"><option value="">Todos os status</option></select>
+        </div>
+        <div class="hint" style="margin:-4px 0 10px;">Itens do dia a dia que não levam tag/patrimônio, mas precisam de controle (enxoval, alojamento, copa...). Controle por quantidade, local e responsável; use "Baixa" para registrar perda, dano ou descarte.</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th data-key="descricao">Item</th><th data-key="categoria">Categoria</th><th data-key="qtde" class="num">Qtde</th>
+              <th data-key="local">Local / Alojamento</th><th data-key="obra">Obra</th><th data-key="responsavel">Responsável</th>
+              <th data-key="status">Status</th><th data-key="data_entrada">Entrada</th><th data-key="recebido_por">Recebido por</th><th>Ações</th>
+            </tr></thead>
+            <tbody id="almox-controle-body"></tbody>
           </table>
         </div>
       </div>
@@ -1839,6 +1862,7 @@ window.excluirRegistro = async function(tabela, id){
     reembolsos:['reembolsos',()=>STATE.reembolsos,renderReembolsos],
     almoxarifado:['almoxarifado',()=>STATE.almoxarifado,renderAlmoxarifado],
     almoxarifado_eletrico:['almoxarifado_eletrico',()=>STATE.almoxarifadoEletrico,renderAlmoxarifadoEletrico],
+    almoxarifado_controle:['almoxarifado_controle',()=>STATE.almoxarifadoControle,renderAlmoxarifadoControle],
     epi_requisicoes:['epi',()=>STATE.epi,renderEpi],
     epi_estoque:['epi_estoque',()=>STATE.epiEstoque,renderEpiEstoque],
     funcionarios:['funcionarios',()=>STATE.funcionarios,renderFuncionarios],
@@ -1907,6 +1931,7 @@ let STATE = {
   contasPagar: [],
   almoxarifado: [],
   almoxarifadoEletrico: [],
+  almoxarifadoControle: [],
   epiEstoque: [],
   epiSaidas: [],
   funcionarios: [],
@@ -1957,6 +1982,7 @@ const PAGINAS_NAV_CATALOGO = [
   {grupo:'Compartilhado entre obras', key:'almoxarifado', label:'Almoxarifado Geral'},
   {grupo:'Compartilhado entre obras', key:'almoxarifado-manutencao', label:'Manutenção'},
   {grupo:'Compartilhado entre obras', key:'almoxarifado-eletrico', label:'Almoxarifado Elétrico'},
+  {grupo:'Compartilhado entre obras', key:'almoxarifado-controle', label:'Itens de Controle'},
   {grupo:'Compartilhado entre obras', key:'epi-estoque', label:'Almoxarifado de EPI'},
   {grupo:'Compartilhado entre obras', key:'funcionarios', label:'Funcionários'},
   {grupo:'Compartilhado entre obras', key:'fornecedores', label:'Fornecedores'},
@@ -1978,7 +2004,7 @@ const PAGINAS_NAV_CATALOGO = [
 const TABELA_PARA_PAGINA = {
   compras:'compras', servicos:'servicos', epi_requisicoes:'epi', reembolsos:'reembolsos',
   historico_compras:'historico', cotacoes:'cotacoes', contratos:'contratos',
-  almoxarifado:'almoxarifado', almoxarifado_eletrico:'almoxarifado-eletrico',
+  almoxarifado:'almoxarifado', almoxarifado_eletrico:'almoxarifado-eletrico', almoxarifado_controle:'almoxarifado-controle',
   epi_estoque:'epi-estoque', funcionarios:'funcionarios', fornecedores:'fornecedores',
   cadastro_extra:'cadastro', locacoes_equipamentos:'locacoes-equip', contas_pagar:'contas-pagar',
 };
@@ -2092,7 +2118,7 @@ async function enterApp(session){
   document.getElementById('app-root').classList.remove('hidden');
 
   initObraSwitch();
-  initCompras(); initServicos(); initEpi(); initReembolsos(); initCancelados(); initHistorico(); initHistoricoReembolso(); initHistoricoServico(); initReverterConclusoes(); initCotacoes(); initAlmoxarifado(); initAlmoxarifadoManutencao(); initAlmoxarifadoEletrico(); initEpiEstoque(); initFuncionarios(); initFornecedores(); initCadastro(); initSinapi();
+  initCompras(); initServicos(); initEpi(); initReembolsos(); initCancelados(); initHistorico(); initHistoricoReembolso(); initHistoricoServico(); initReverterConclusoes(); initCotacoes(); initAlmoxarifado(); initAlmoxarifadoManutencao(); initAlmoxarifadoEletrico(); initAlmoxarifadoControle(); initEpiEstoque(); initFuncionarios(); initFornecedores(); initCadastro(); initSinapi();
   initPassSolic(); initPassFinanceiro(); initPassHistorico(); initPassConferidos();
   initAlimNova(); initAlimTickets();
   wireNav();
@@ -2318,6 +2344,7 @@ async function loadAllForObra(){
     STATE.contratos = contratosRes.data || [];
     STATE.recebimentosLog = recebLogRes.data || [];
     if(!clausulasModeloRes.error) STATE.contratoClausulasModelo = clausulasModeloRes.data || [];
+    { const ctrlRes = await fetchAllRows('almoxarifado_controle'); if(!ctrlRes.error) STATE.almoxarifadoControle = ctrlRes.data || []; }
     if(!locacoesEquipRes.error) STATE.locacoesEquip = locacoesEquipRes.data || [];
     if(!contasPagarRes.error) STATE.contasPagar = contasPagarRes.data || [];
     renderAllForObra();
@@ -2375,6 +2402,12 @@ function setupRealtime(){
   const chAlmoxEletrico = sb.channel('rt-almoxarifado-eletrico')
     .on('postgres_changes', {event:'*', schema:'public', table:'almoxarifado_eletrico'}, async ()=>{
       await refetchTable('almoxarifado_eletrico'); renderAlmoxarifadoEletrico(); refreshBadges();
+    }).subscribe();
+
+  // itens de controle: compartilhado entre obras - sem filtro
+  const chAlmoxControle = sb.channel('rt-almoxarifado-controle')
+    .on('postgres_changes', {event:'*', schema:'public', table:'almoxarifado_controle'}, async ()=>{
+      await refetchTable('almoxarifado_controle'); renderAlmoxarifadoControle(); refreshBadges(); refreshFilterOptions();
     }).subscribe();
 
   const chEpi = sb.channel('rt-epi-'+obra)
@@ -2459,6 +2492,9 @@ async function refetchTable(which){
     }else if(which==='almoxarifado_eletrico'){
       const { data, error } = await fetchAllRows('almoxarifado_eletrico');
       if(!error) STATE.almoxarifadoEletrico = data || [];
+    }else if(which==='almoxarifado_controle'){
+      const { data, error } = await fetchAllRows('almoxarifado_controle');
+      if(!error) STATE.almoxarifadoControle = data || [];
     }else if(which==='epi'){
       const { data, error } = await sb.from('epi_requisicoes').select('*').eq('obra', obra).order('numero');
       if(!error) STATE.epi = data || [];
@@ -3100,6 +3136,7 @@ function receberCompraModal(numero){
         <label>Enviar para</label>
         <div class="radio-group">
           <label><input type="radio" name="destino" value="almoxarifado" checked> Almoxarifado (equipamento)</label>
+          <label><input type="radio" name="destino" value="controle"> Itens de Controle (sem tag: enxoval, copa, alojamento...)</label>
           <label><input type="radio" name="destino" value="historico"> Histórico de Compras (gasto de obra)</label>
         </div>
       </div>
@@ -3119,6 +3156,16 @@ function receberCompraModal(numero){
           <div class="modal-sub" style="margin-top:2px;">Use apenas para equipamento patrimoniável. Desmarque para itens a granel (ex.: cabo por metro, parafusos).</div>
         </div>
       </div>
+      <div id="rc-controle-fields" style="display:none;">
+        <div class="form-grid2">
+          <div class="form-row"><label>Categoria</label><select id="rc-ctrl-categoria"><option value="">—</option>${CONTROLE_CATEGORIAS.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>
+          <div class="form-row"><label>Local / Alojamento</label><input type="text" id="rc-ctrl-local" placeholder="Ex.: Alojamento 2"></div>
+        </div>
+        <div class="form-grid2">
+          <div class="form-row"><label>Responsável</label><input type="text" id="rc-ctrl-resp"></div>
+          <div class="form-row"><label>Obra de destino</label><select id="rc-ctrl-obra">${OBRAS.map(o=>`<option value="${esc(o)}" ${o===STATE.currentObra?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
+        </div>
+      </div>
       <div class="form-row"><label>Observação (opcional)</label><textarea id="rc-obs-receb" rows="2" placeholder="Ex.: embalagem avariada, quantidade divergente, etc."></textarea></div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
@@ -3129,7 +3176,9 @@ function receberCompraModal(numero){
   const radios = document.querySelectorAll('input[name="destino"]');
   const almoxFields = document.getElementById('rc-almox-fields');
   radios.forEach(r=> r.addEventListener('change', ()=>{
-    almoxFields.style.display = document.querySelector('input[name="destino"]:checked').value==='almoxarifado' ? 'block':'none';
+    const dv = document.querySelector('input[name="destino"]:checked').value;
+    almoxFields.style.display = dv==='almoxarifado' ? 'block':'none';
+    document.getElementById('rc-controle-fields').style.display = dv==='controle' ? 'block':'none';
   }));
   wireFornecedorField('rc');
   document.getElementById('form-receber').addEventListener('submit', async e=>{
@@ -3143,15 +3192,24 @@ function receberCompraModal(numero){
     const dataConc = document.getElementById('rc-data').value || todayISO();
     const numSerie = destino==='almoxarifado' ? (document.getElementById('rc-serie').value.trim() || null) : null;
     const responsavel = destino==='almoxarifado' ? (document.getElementById('rc-responsavel').value.trim() || null) : null;
-    const obraDestino = destino==='almoxarifado' ? document.getElementById('rc-obra').value : null;
+    let obraDestino = destino==='almoxarifado' ? document.getElementById('rc-obra').value : null;
+    let respFinal = responsavel;
+    let localCtrl = null, categoriaCtrl = null;
+    if(destino==='controle'){
+      obraDestino = document.getElementById('rc-ctrl-obra').value;
+      respFinal = document.getElementById('rc-ctrl-resp').value.trim() || null;
+      localCtrl = document.getElementById('rc-ctrl-local').value.trim() || null;
+      categoriaCtrl = document.getElementById('rc-ctrl-categoria').value || null;
+    }
     const observacao = document.getElementById('rc-obs-receb').value.trim() || null;
     const patrimoniar = destino==='almoxarifado' ? document.getElementById('rc-patrimoniar').checked : false;
 
     const { error } = await sb.rpc('compras_receber', {
       p_compra_id: item.id, p_destino: destino, p_preco_total: preco,
       p_fornecedor: fornecedor, p_data: dataConc,
-      p_num_serie: numSerie, p_responsavel: responsavel, p_obra_destino: obraDestino,
+      p_num_serie: numSerie, p_responsavel: respFinal, p_obra_destino: obraDestino,
       p_observacao: observacao, p_patrimoniar: patrimoniar,
+      p_local: localCtrl, p_categoria: categoriaCtrl,
     });
     if(error){
       btn.disabled = false; btn.textContent = 'Confirmar recebimento';
@@ -3159,10 +3217,10 @@ function receberCompraModal(numero){
       return;
     }
     closeModal();
-    toast(destino==='historico' ? 'Item enviado para o Histórico de Compras.' : 'Item enviado para o Almoxarifado.');
+    toast(destino==='historico' ? 'Item enviado para o Histórico de Compras.' : (destino==='controle' ? 'Item enviado para Itens de Controle.' : 'Item enviado para o Almoxarifado.'));
     await refetchTable('compras');
-    if(destino==='historico') await refetchTable('historico'); else await refetchTable('almoxarifado');
-    renderCompras(); renderHistorico(); renderAlmoxarifado(); renderDashboard(); refreshBadges(); refreshFilterOptions();
+    if(destino==='historico') await refetchTable('historico'); else if(destino==='controle') await refetchTable('almoxarifado_controle'); else await refetchTable('almoxarifado');
+    renderCompras(); renderHistorico(); renderAlmoxarifado(); renderAlmoxarifadoControle(); renderDashboard(); refreshBadges(); refreshFilterOptions();
   });
 }
 
@@ -4616,6 +4674,192 @@ function initAlmoxarifadoEletrico(){
     </tr>`
   });
 }
+
+/* ============== ITENS DE CONTROLE (sem tag/patrimônio) ============== */
+const CONTROLE_CATEGORIAS = ['Cama e banho','Móveis','Decoração','Copa e cozinha','Limpeza','Eletroportátil','Ferramenta manual','Outros'];
+const CONTROLE_STATUS = ['EM USO','EM ESTOQUE','DANIFICADO','PERDIDO','BAIXADO'];
+function statusBadgeControle(st){
+  const m = {'EM USO':'b-blue','EM ESTOQUE':'b-purple','DANIFICADO':'b-amber','PERDIDO':'b-red','BAIXADO':'b-gray'};
+  return `<span class="badge ${m[st]||'b-gray'}">${esc(st||'—')}</span>`;
+}
+let renderAlmoxarifadoControle;
+function initAlmoxarifadoControle(){
+  document.getElementById('almox-controle-obra').dataset.placeholder = "Todas as obras";
+  document.getElementById('almox-controle-categoria').dataset.placeholder = "Todas as categorias";
+  document.getElementById('almox-controle-status').dataset.placeholder = "Todos os status";
+  renderAlmoxarifadoControle = makeTable({
+    getData: ()=> STATE.almoxarifadoControle,
+    tbodyId:'almox-controle-body', searchInput:'almox-controle-search',
+    filters:[{selectId:'almox-controle-obra',field:'obra'},{selectId:'almox-controle-categoria',field:'categoria'},{selectId:'almox-controle-status',field:'status'}],
+    searchFn:(r,q)=> [r.descricao,r.local,r.responsavel,r.categoria,r.fornecedor].some(v=>String(v||"").toLowerCase().includes(q)),
+    rowFn:r=>`<tr>
+      <td class="desc-cell">${descTrunc(r.descricao)}${obsIcon(r.observacoes)}${anexoIcon(r.anexo_path, r.anexo_nome)}</td>
+      <td>${esc(r.categoria)||'<span class="muted">—</span>'}</td>
+      <td class="num">${fmtNum(r.qtde)} ${esc(r.unidade)||''}</td>
+      <td>${esc(r.local)||'<span class="muted">—</span>'}</td><td>${esc(r.obra)||'<span class="muted">—</span>'}</td>
+      <td>${esc(r.responsavel)||'<span class="muted">—</span>'}</td>
+      <td>${statusBadgeControle(r.status)}</td><td>${fmtDate(r.data_entrada)}</td>
+      <td>${esc(r.recebido_por)||'<span class="muted">—</span>'}${r.recebido_em?`<div class="rastro-sub">${fmtDateHora(r.recebido_em)}</div>`:''}</td>
+      <td>
+        ${podeGerir('almoxarifado-controle') ? `<button class="btn btn-sm btn-secondary" onclick="baixaControleModal(${r.id})">📉 Baixa</button>` : ''}
+        ${podeGerir('almoxarifado-controle') ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoControleModal(${r.id})">✏️ Editar</button>` : ''}
+        ${podeGerir('almoxarifado-controle') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado_controle',${r.id})">🗑 Excluir</button>` : ''}
+      </td>
+    </tr>`
+  });
+}
+function controleFormHtml(p, item){
+  const v = item || {};
+  const opt = (arr, sel)=> arr.map(x=>`<option value="${esc(x)}" ${x===sel?'selected':''}>${esc(x)}</option>`).join('');
+  return `
+      <div class="form-row"><label>Item *</label><input type="text" id="${p}-descricao" required value="${esc(v.descricao)||''}" placeholder="Ex.: Travesseiro, coberta, cortina, espelho"></div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Categoria</label><select id="${p}-categoria"><option value="">—</option>${opt(CONTROLE_CATEGORIAS, v.categoria)}</select></div>
+        <div class="form-row"><label>Status</label><select id="${p}-status">${opt(CONTROLE_STATUS, v.status||'EM USO')}</select></div>
+      </div>
+      <div class="form-grid3">
+        <div class="form-row"><label>Quantidade *</label><input type="number" id="${p}-qtde" min="0" step="any" required value="${v.qtde??1}"></div>
+        <div class="form-row"><label>Unidade</label><input type="text" id="${p}-unidade" value="${esc(v.unidade)||'UN'}"></div>
+        <div class="form-row"><label>Obra</label><select id="${p}-obra">${OBRAS.map(o=>`<option value="${esc(o)}" ${o===(v.obra||STATE.currentObra)?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Local / Alojamento / Quarto</label><input type="text" id="${p}-local" value="${esc(v.local)||''}" placeholder="Ex.: Alojamento 2 - Quarto 5"></div>
+        <div class="form-row"><label>Responsável</label><input type="text" id="${p}-responsavel" value="${esc(v.responsavel)||''}" placeholder="Quem responde por esses itens"></div>
+      </div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Fornecedor</label><input type="text" id="${p}-fornecedor" value="${esc(v.fornecedor)||''}"></div>
+        <div class="form-row"><label>Data de entrada</label><input type="date" id="${p}-data" value="${v.data_entrada||todayISO()}"></div>
+      </div>
+      <div class="form-row"><label>Observações</label><textarea id="${p}-obs" rows="2">${esc(v.observacoes)||''}</textarea></div>`;
+}
+function controleLerForm(p){
+  return {
+    descricao: document.getElementById(p+'-descricao').value.trim(),
+    categoria: document.getElementById(p+'-categoria').value || null,
+    status: document.getElementById(p+'-status').value,
+    qtde: Number(document.getElementById(p+'-qtde').value) || 0,
+    unidade: document.getElementById(p+'-unidade').value.trim() || 'UN',
+    obra: document.getElementById(p+'-obra').value || null,
+    local: document.getElementById(p+'-local').value.trim() || null,
+    responsavel: document.getElementById(p+'-responsavel').value.trim() || null,
+    fornecedor: document.getElementById(p+'-fornecedor').value.trim() || null,
+    data_entrada: document.getElementById(p+'-data').value || null,
+    observacoes: document.getElementById(p+'-obs').value.trim() || null,
+  };
+}
+function novoAlmoxarifadoControleModal(){
+  openModal(`
+    <h3>Novo Item — Itens de Controle</h3>
+    <div class="modal-sub">Item sem tag/patrimônio, controlado por quantidade, local e responsável.</div>
+    <form id="form-novo-controle">
+      ${controleFormHtml('nc')}
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-salvar-novo-controle">Salvar item</button>
+      </div>
+    </form>
+  `);
+  document.getElementById('form-novo-controle').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const btn = document.getElementById('btn-salvar-novo-controle');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    const rec = controleLerForm('nc');
+    rec.recebido_por = (CURRENT_PROFILE && CURRENT_PROFILE.nome) || (CURRENT_USER && CURRENT_USER.email) || null;
+    rec.recebido_em = new Date().toISOString();
+    const { error } = await sb.from('almoxarifado_controle').insert(rec);
+    btn.disabled = false; btn.textContent = 'Salvar item';
+    if(error){ toast('Erro ao salvar item: ' + error.message, true); return; }
+    closeModal();
+    toast('Item cadastrado em Itens de Controle.');
+    await refetchTable('almoxarifado_controle');
+    renderAlmoxarifadoControle(); refreshBadges(); refreshFilterOptions();
+  });
+}
+function editarAlmoxarifadoControleModal(id){
+  const item = STATE.almoxarifadoControle.find(r=>r.id===id);
+  if(!item) return;
+  openModal(`
+    <h3>Editar Item — Itens de Controle</h3>
+    <div class="modal-sub">${esc(item.descricao)}</div>
+    <form id="form-editar-controle">
+      ${controleFormHtml('ec', item)}
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-salvar-editar-controle">Salvar alterações</button>
+      </div>
+    </form>
+  `);
+  document.getElementById('form-editar-controle').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const btn = document.getElementById('btn-salvar-editar-controle');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    const rec = controleLerForm('ec');
+    rec.updated_at = new Date().toISOString();
+    const { error } = await sb.from('almoxarifado_controle').update(rec).eq('id', item.id);
+    btn.disabled = false; btn.textContent = 'Salvar alterações';
+    if(error){ toast('Erro ao salvar alterações: ' + error.message, true); return; }
+    closeModal();
+    toast('Item atualizado.');
+    await refetchTable('almoxarifado_controle');
+    renderAlmoxarifadoControle(); refreshBadges(); refreshFilterOptions();
+  });
+}
+/* Baixa: registra perda/dano/descarte de parte (ou de tudo) da quantidade, com motivo,
+   quem registrou e quando — fica no histórico das observações do item. */
+function baixaControleModal(id){
+  const item = STATE.almoxarifadoControle.find(r=>r.id===id);
+  if(!item) return;
+  openModal(`
+    <h3>Registrar baixa</h3>
+    <div class="modal-sub">${esc(item.descricao)} — em controle: ${fmtNum(item.qtde)} ${esc(item.unidade)||''}</div>
+    <form id="form-baixa-controle">
+      <div class="form-grid2">
+        <div class="form-row"><label>Quantidade baixada *</label><input type="number" id="bc-qtde" min="0.01" max="${Number(item.qtde)||0}" step="any" required value="1"></div>
+        <div class="form-row"><label>Motivo *</label>
+          <select id="bc-motivo" required>
+            <option value="Perdido / extraviado">Perdido / extraviado</option>
+            <option value="Danificado">Danificado</option>
+            <option value="Furtado">Furtado</option>
+            <option value="Descarte por desgaste">Descarte por desgaste</option>
+            <option value="Devolvido / transferido">Devolvido / transferido</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row"><label>Detalhes (quem estava com o item, o que aconteceu)</label><textarea id="bc-det" rows="2"></textarea></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-salvar-baixa">Confirmar baixa</button>
+      </div>
+    </form>
+  `);
+  document.getElementById('form-baixa-controle').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const q = Number(document.getElementById('bc-qtde').value) || 0;
+    if(q<=0 || q>Number(item.qtde)){ toast('Quantidade inválida (máximo '+fmtNum(item.qtde)+').', true); return; }
+    const motivo = document.getElementById('bc-motivo').value;
+    const det = document.getElementById('bc-det').value.trim();
+    const quem = (CURRENT_PROFILE && CURRENT_PROFILE.nome) || (CURRENT_USER && CURRENT_USER.email) || '—';
+    const novaQtde = Math.round((Number(item.qtde)-q)*1000)/1000;
+    const linha = `[${fmtDate(todayISO())}] Baixa de ${fmtNum(q)} (${motivo})${det?': '+det:''} — por ${quem}`;
+    const rec = {
+      qtde: novaQtde,
+      observacoes: (item.observacoes ? item.observacoes+'\n' : '') + linha,
+      status: novaQtde===0 ? 'BAIXADO' : item.status,
+      updated_at: new Date().toISOString(),
+    };
+    const btn = document.getElementById('btn-salvar-baixa');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    const { error } = await sb.from('almoxarifado_controle').update(rec).eq('id', item.id);
+    btn.disabled = false; btn.textContent = 'Confirmar baixa';
+    if(error){ toast('Erro ao registrar baixa: ' + error.message, true); return; }
+    closeModal();
+    toast('Baixa registrada.');
+    await refetchTable('almoxarifado_controle');
+    renderAlmoxarifadoControle(); refreshBadges(); refreshFilterOptions();
+  });
+}
+window.baixaControleModal = baixaControleModal;
+window.editarAlmoxarifadoControleModal = editarAlmoxarifadoControleModal;
 
 /* ============== render: ALMOXARIFADO DE EPI ============== */
 let renderEpiEstoque;
@@ -7191,6 +7435,7 @@ function refreshBadges(){
   const badgeManut = document.getElementById('badge-almox-manutencao');
   if(badgeManut) badgeManut.textContent = STATE.almoxarifado.filter(r=>r.status==='MANUTENÇÃO').length;
   document.getElementById('badge-almox-eletrico').textContent = STATE.almoxarifadoEletrico.length;
+  document.getElementById('badge-almox-controle').textContent = STATE.almoxarifadoControle.length;
   document.getElementById('badge-epi-estoque').textContent = STATE.epiEstoque.length;
   document.getElementById('badge-cadastro').textContent = STATE.cadastro.length;
   document.getElementById('badge-funcionarios').textContent = STATE.funcionarios.length;
@@ -7230,10 +7475,13 @@ function refreshFilterOptions(){
   fillSelect('almox-eletrico-obra', STATE.almoxarifadoEletrico.map(r=>r.obra));
   fillSelect('almox-eletrico-status', STATE.almoxarifadoEletrico.map(r=>r.status));
   fillSelect('epi-estoque-obra', STATE.epiEstoque.map(r=>r.obra));
+  fillSelect('almox-controle-obra', STATE.almoxarifadoControle.map(r=>r.obra));
+  fillSelect('almox-controle-categoria', STATE.almoxarifadoControle.map(r=>r.categoria));
+  fillSelect('almox-controle-status', STATE.almoxarifadoControle.map(r=>r.status));
 }
 function renderAllForObra(){
   refreshFilterOptions();
-  renderCompras(); renderServicos(); renderEpi(); renderReembolsos(); renderCancelados(); renderHistorico(); renderHistoricoReembolso(); renderHistoricoServico(); renderReverterConclusoes(); renderCotacoes(); renderAlmoxarifado(); renderAlmoxarifadoManutencao(); renderAlmoxarifadoEletrico(); renderEpiEstoque(); renderEpiSaidas(); renderFuncionarios(); renderContratos(); renderLocacoesEquip(); renderContasPagar(); renderDashboard(); refreshBadges();
+  renderCompras(); renderServicos(); renderEpi(); renderReembolsos(); renderCancelados(); renderHistorico(); renderHistoricoReembolso(); renderHistoricoServico(); renderReverterConclusoes(); renderCotacoes(); renderAlmoxarifado(); renderAlmoxarifadoManutencao(); renderAlmoxarifadoEletrico(); renderAlmoxarifadoControle(); renderEpiEstoque(); renderEpiSaidas(); renderFuncionarios(); renderContratos(); renderLocacoesEquip(); renderContasPagar(); renderDashboard(); refreshBadges();
 }
 
 function initObraSwitch(){
@@ -7322,6 +7570,7 @@ function wireExtras(){
   document.getElementById('btn-novo-cadastro').addEventListener('click', ()=> novoCadastroExtraModal());
   document.getElementById('btn-novo-almox').addEventListener('click', ()=> novoAlmoxarifadoModal());
   document.getElementById('btn-novo-almox-eletrico').addEventListener('click', ()=> novoAlmoxarifadoEletricoModal());
+  document.getElementById('btn-novo-almox-controle').addEventListener('click', ()=> novoAlmoxarifadoControleModal());
   document.getElementById('btn-novo-historico').addEventListener('click', ()=> novoHistoricoModal());
   document.getElementById('btn-nova-cotacao').addEventListener('click', ()=> cotacaoModal());
   document.getElementById('btn-novo-reembolso').addEventListener('click', ()=> novoReembolsoModal());
