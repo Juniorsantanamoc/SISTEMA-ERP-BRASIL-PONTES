@@ -9439,6 +9439,7 @@ function initPassFinanceiro(){
         <div style="display:flex; flex-direction:column; gap:4px;">
           <button class="btn btn-sm btn-secondary" onclick="passVerReciboModal(${r.id})">🧾 Recibo</button>
           <button class="btn btn-sm btn-secondary" onclick="passAnexarComprovanteModal(${r.id})">📎 Comprovante</button>
+          ${podeGerir('pass-financeiro') ? `<button class="btn btn-sm btn-secondary" onclick="passEditarHorarioModal(${r.id})">⏰ Editar horário</button>` : ''}
           <button class="btn btn-sm btn-primary" onclick="passMarcarPago(${r.id})">💰 Marcar como pago</button>
           ${passExclusaoCell(r)}
           ${podeGerir('pass-financeiro') ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
@@ -9904,6 +9905,68 @@ function editarPassagemModal(id){
   });
 }
 window.editarPassagemModal = editarPassagemModal;
+
+/* ---------- editar datas/horários no Financeiro (recalcula as refeições e o total do colaborador) ---------- */
+function passEditarHorarioModal(id){
+  const r = STATE.passagens.find(x=>x.id===id);
+  if(!r) return;
+  openModal(`
+    <h3>Editar horário da passagem</h3>
+    <div class="modal-sub">Nº ${esc(r.numero)} — ${esc(r.nome)} · ${esc(r.origem)} → ${esc(r.destino)}<br>As refeições e o total do colaborador são recalculados com as novas datas/horários.</div>
+    <form id="form-pass-horario">
+      <div class="form-grid4">
+        <div class="form-row"><label>Data Saída *</label><input type="date" id="ph-data-saida" required value="${r.data_saida||''}"></div>
+        <div class="form-row"><label>Hora Saída *</label><input type="time" id="ph-hora-saida" required value="${passHHMM(r.hora_saida)}"></div>
+        <div class="form-row"><label>Data Chegada *</label><input type="date" id="ph-data-chegada" required value="${r.data_chegada||''}"></div>
+        <div class="form-row"><label>Hora Chegada *</label><input type="time" id="ph-hora-chegada" required value="${passHHMM(r.hora_chegada)}"></div>
+      </div>
+      <div class="form-row"><label>Antes → Depois</label><div id="ph-preview" class="hint" style="font-size:12.5px;"></div></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-salvar-pass-horario">Salvar horário</button>
+      </div>
+    </form>
+  `);
+  const uber = Number(r.uber)||0;
+  function calc(){
+    const ds = document.getElementById('ph-data-saida').value, hs = document.getElementById('ph-hora-saida').value;
+    const dc = document.getElementById('ph-data-chegada').value, hc = document.getElementById('ph-hora-chegada').value;
+    const sDT = passParseDataHora(ds, hs), cDT = passParseDataHora(dc, hc);
+    if(!sDT || !cDT || cDT < sDT) return null;
+    const qtds = passCalcularRefeicoes(ds, hs, dc, hc);
+    const valorRef = passValorRefeicoes(qtds);
+    return { ds, hs, dc, hc, qtds, valorRef, total: valorRef + uber };
+  }
+  function atualizar(){
+    const c = calc();
+    const box = document.getElementById('ph-preview');
+    if(!c){ box.textContent = 'Verifique as datas e horários (chegada não pode ser antes da saída).'; return; }
+    box.innerHTML = (STATE.passagensConfig.refeicoes||[]).map(rf=>`${rf.nome}: <strong>${c.qtds[rf.key]||0}</strong>`).join(' &nbsp;·&nbsp; ')
+      + `<br>Total colaborador: ${fmtBRL(r.total_colaborador)} → <strong>${fmtBRL(c.total)}</strong>`;
+  }
+  ['ph-data-saida','ph-hora-saida','ph-data-chegada','ph-hora-chegada'].forEach(i=> document.getElementById(i).addEventListener('change', atualizar));
+  atualizar();
+  document.getElementById('form-pass-horario').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const c = calc();
+    if(!c){ toast('A data/hora de chegada não pode ser antes da saída.', true); return; }
+    const btn = document.getElementById('btn-salvar-pass-horario');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    const rec = {
+      data_saida: c.ds, hora_saida: c.hs, data_chegada: c.dc, hora_chegada: c.hc,
+      qtd_cafe_m: c.qtds.cafeM||0, qtd_almoco: c.qtds.almoco||0, qtd_cafe_t: c.qtds.cafeT||0, qtd_janta: c.qtds.janta||0,
+      valor_refeicoes: c.valorRef, total_colaborador: c.total,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await sb.from('passagens').update(rec).eq('id', r.id);
+    btn.disabled = false; btn.textContent = 'Salvar horário';
+    if(error){ toast('Erro ao salvar horário: ' + friendlyErrorMsg(error), true); return; }
+    closeModal();
+    toast('Horário atualizado e despesa recalculada.');
+    await refetchPassagens(); renderPassAll();
+  });
+}
+window.passEditarHorarioModal = passEditarHorarioModal;
 
 /* ---------- registrar compra (Pendente → Comprado, anexa passagem) ---------- */
 function passRegistrarCompraModal(id){
