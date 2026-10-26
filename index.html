@@ -3136,6 +3136,7 @@ function receberCompraModal(numero){
         <label>Enviar para</label>
         <div class="radio-group">
           <label><input type="radio" name="destino" value="almoxarifado" checked> Almoxarifado (equipamento)</label>
+          <label><input type="radio" name="destino" value="eletrico"> Almoxarifado Elétrico (equipamento elétrico)</label>
           <label><input type="radio" name="destino" value="controle"> Itens de Controle (sem tag: enxoval, copa, alojamento...)</label>
           <label><input type="radio" name="destino" value="historico"> Histórico de Compras (gasto de obra)</label>
         </div>
@@ -3177,7 +3178,7 @@ function receberCompraModal(numero){
   const almoxFields = document.getElementById('rc-almox-fields');
   radios.forEach(r=> r.addEventListener('change', ()=>{
     const dv = document.querySelector('input[name="destino"]:checked').value;
-    almoxFields.style.display = dv==='almoxarifado' ? 'block':'none';
+    almoxFields.style.display = (dv==='almoxarifado'||dv==='eletrico') ? 'block':'none';
     document.getElementById('rc-controle-fields').style.display = dv==='controle' ? 'block':'none';
   }));
   wireFornecedorField('rc');
@@ -3190,9 +3191,10 @@ function receberCompraModal(numero){
     const destino = document.querySelector('input[name="destino"]:checked').value;
     const preco = Number(document.getElementById('rc-preco').value) || 0;
     const dataConc = document.getElementById('rc-data').value || todayISO();
-    const numSerie = destino==='almoxarifado' ? (document.getElementById('rc-serie').value.trim() || null) : null;
-    const responsavel = destino==='almoxarifado' ? (document.getElementById('rc-responsavel').value.trim() || null) : null;
-    let obraDestino = destino==='almoxarifado' ? document.getElementById('rc-obra').value : null;
+    const ehAlmox = (destino==='almoxarifado' || destino==='eletrico');
+    const numSerie = ehAlmox ? (document.getElementById('rc-serie').value.trim() || null) : null;
+    const responsavel = ehAlmox ? (document.getElementById('rc-responsavel').value.trim() || null) : null;
+    let obraDestino = ehAlmox ? document.getElementById('rc-obra').value : null;
     let respFinal = responsavel;
     let localCtrl = null, categoriaCtrl = null;
     if(destino==='controle'){
@@ -3202,7 +3204,7 @@ function receberCompraModal(numero){
       categoriaCtrl = document.getElementById('rc-ctrl-categoria').value || null;
     }
     const observacao = document.getElementById('rc-obs-receb').value.trim() || null;
-    const patrimoniar = destino==='almoxarifado' ? document.getElementById('rc-patrimoniar').checked : false;
+    const patrimoniar = ehAlmox ? document.getElementById('rc-patrimoniar').checked : false;
 
     const { error } = await sb.rpc('compras_receber', {
       p_compra_id: item.id, p_destino: destino, p_preco_total: preco,
@@ -3217,10 +3219,10 @@ function receberCompraModal(numero){
       return;
     }
     closeModal();
-    toast(destino==='historico' ? 'Item enviado para o Histórico de Compras.' : (destino==='controle' ? 'Item enviado para Itens de Controle.' : 'Item enviado para o Almoxarifado.'));
+    toast(destino==='historico' ? 'Item enviado para o Histórico de Compras.' : (destino==='controle' ? 'Item enviado para Itens de Controle.' : (destino==='eletrico' ? 'Item enviado para o Almoxarifado Elétrico.' : 'Item enviado para o Almoxarifado.')));
     await refetchTable('compras');
-    if(destino==='historico') await refetchTable('historico'); else if(destino==='controle') await refetchTable('almoxarifado_controle'); else await refetchTable('almoxarifado');
-    renderCompras(); renderHistorico(); renderAlmoxarifado(); renderAlmoxarifadoControle(); renderDashboard(); refreshBadges(); refreshFilterOptions();
+    if(destino==='historico') await refetchTable('historico'); else if(destino==='controle') await refetchTable('almoxarifado_controle'); else if(destino==='eletrico') await refetchTable('almoxarifado_eletrico'); else await refetchTable('almoxarifado');
+    renderCompras(); renderHistorico(); renderAlmoxarifado(); renderAlmoxarifadoEletrico(); renderAlmoxarifadoControle(); renderDashboard(); refreshBadges(); refreshFilterOptions();
   });
 }
 
