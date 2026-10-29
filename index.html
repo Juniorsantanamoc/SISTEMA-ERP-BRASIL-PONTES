@@ -439,6 +439,7 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="nav-item" data-page="alim-tickets"><span class="nav-icon">🎟️</span>Tickets Gerados<span class="nav-badge" id="badge-alim-tickets">0</span></div>
     <div class="nav-group-label">Ajuda</div>
     <div class="nav-item" data-page="regras"><span class="nav-icon">📖</span>Regras Gerais</div>
+    <div class="nav-item" id="nav-aprovacoes" data-page="aprovacoes"><span class="nav-icon">✅</span>Aprovações<span class="nav-badge" id="badge-aprov">0</span></div>
     <div class="nav-group-label" id="nav-group-admin" style="display:none;">Administração</div>
     <div class="nav-item" id="nav-usuarios" data-page="usuarios" style="display:none;"><span class="nav-icon">👤</span>Usuários</div>
     <div class="nav-item" id="nav-reverter" data-page="reverter-conclusoes" style="display:none;"><span class="nav-icon">↩️</span>Reverter Conclusões<span class="nav-badge" id="badge-reverter">0</span></div>
@@ -1170,6 +1171,7 @@ tbody tr:last-child td{border-bottom:none;}
 
       <!-- REGRAS -->
       <div class="page" id="page-regras"><div id="regras-body"></div></div>
+      <div class="page" id="page-aprovacoes"><div id="aprov-body"></div></div>
 
       <!-- USUÁRIOS -->
       <div class="page" id="page-usuarios">
@@ -1853,7 +1855,7 @@ window.reativarItemCancelado = async function(tabela, id){
   await refetchAndRenderTabela(tabela);
 };
 window.excluirRegistro = async function(tabela, id){
-  if(!podeGerir(TABELA_PARA_PAGINA[tabela]||tabela)) return;
+  if(!podeGerir(TABELA_PARA_PAGINA[tabela]||tabela)) return solicitarExclusaoGenerica(tabela, id);
   const map = {
     compras:['compras',()=>STATE.compras,renderCompras],
     servicos:['servicos',()=>STATE.servicos,renderServicos],
@@ -2036,6 +2038,7 @@ function aplicarPermissoesNav(){
   let ativaEscondida = false;
   document.querySelectorAll('.nav-item[data-page]').forEach(item=>{
     const key = item.dataset.page;
+    if(key==='aprovacoes') return; // todos veem (gestor aprova, os demais acompanham os próprios pedidos)
     if((key==='usuarios' || key==='reverter-conclusoes') && !IS_GESTOR) return; // nunca pra quem não é gestor
     const pode = permitido.has(key);
     item.style.display = pode ? '' : 'none';
@@ -2132,6 +2135,7 @@ async function enterApp(session){
   wirePassagensExtras();
   wireAlimentacaoExtras();
   wireNotificacoes();
+  initAprovacoes();
 
   await loadLookupData(); // sinapi + cadastro_extra, once
   await loadRegras();
@@ -3704,8 +3708,8 @@ function initCompras(){
           : `<span class="muted" style="font-size:11px;">Aguardando confirmação de entrega</span>`) : ''}
         <button class="btn btn-sm btn-secondary" onclick="abrirCotacaoDaRequisicao(${r.id})">💬 Cotação</button>
         ${podeGerir('compras') ? statusControlCell('compras', r) : ''}
-        ${podeGerir('compras') ? `<button class="btn btn-sm btn-secondary" onclick="editarComprasModal(${r.id})">✏️</button>` : ''}
-        ${podeGerir('compras') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('compras',${r.id})">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarComprasModal(${r.id})">✏️</button>`}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('compras',${r.id})">🗑</button>`}
       </td>
     </tr>`
   });
@@ -3797,8 +3801,8 @@ function initServicos(){
           ? `<button class="btn btn-sm btn-primary" onclick="concluirServicoModal(${r.numero})">✅ Concluir</button>`
           : '<span class="muted" style="font-size:11px;">Aguardando confirmação de realização</span>') : ''}
         ${podeGerir('servicos') ? statusControlCell('servicos', r) : ''}
-        ${podeGerir('servicos') ? `<button class="btn btn-sm btn-secondary" onclick="editarServicoModal(${r.id})">✏️</button>` : ''}
-        ${podeGerir('servicos') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('servicos',${r.id})">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarServicoModal(${r.id})">✏️</button>`}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('servicos',${r.id})">🗑</button>`}
       </td>
     </tr>`
   });
@@ -3844,8 +3848,8 @@ function initEpi(){
           ? `<button class="btn btn-sm btn-primary" onclick="receberEpiModal(${r.numero})">✅ Receber</button>`
           : '<span class="muted" style="font-size:11px;">Aguardando confirmação de entrega</span>') : ''}
         ${podeGerir('epi') ? statusControlCell('epi_requisicoes', r) : ''}
-        ${podeGerir('epi') ? `<button class="btn btn-sm btn-secondary" onclick="editarEpiModal(${r.id})">✏️</button>` : ''}
-        ${podeGerir('epi') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('epi_requisicoes',${r.id})">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarEpiModal(${r.id})">✏️</button>`}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('epi_requisicoes',${r.id})">🗑</button>`}
       </td>
     </tr>`
   });
@@ -3913,7 +3917,7 @@ function initReembolsos(){
           : '<span class="muted" style="font-size:11px;">Aguardando confirmação de pagamento</span>') : ''}
         ${podeGerir('reembolsos') ? statusControlCell('reembolsos', r) : ''}
         ${podeGerir('reembolsos') ? `<button class="btn btn-sm btn-secondary" onclick="editarReembolsoModal(${r.id})">✏️</button>` : ''}
-        ${podeGerir('reembolsos') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('reembolsos',${r.id})">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('reembolsos',${r.id})">🗑</button>`}
       </td>
     </tr>`;
     }
@@ -4263,7 +4267,7 @@ function initHistorico(){
       <td>${esc(r.aprovacao_por)||'<span class="muted">—</span>'}${r.aprovacao_em?`<div class="rastro-sub">${fmtDateHora(r.aprovacao_em)}</div>`:''}</td>
       <td>${fmtDate(r.data_conclusao)}</td>
       <td>${esc(r.recebido_por)||'<span class="muted">—</span>'}${r.recebido_em?`<div class="rastro-sub">${fmtDateHora(r.recebido_em)}</div>`:''}</td>
-      <td>${podeGerir('historico') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('historico_compras',${r.id})">🗑 Excluir</button>` : ''}</td>
+      <td>${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('historico_compras',${r.id})">🗑 Excluir</button>`}</td>
     </tr>`
   });
 }
@@ -4442,7 +4446,7 @@ function initCotacoes(){
         <td colspan="2" style="padding-left:26px;">↳ ${esc(r.fornecedor)||'<span class="muted">fornecedor não informado</span>'}${anexoIcon(r.anexo_path, r.anexo_nome)}</td>
         <td class="num" colspan="2">${isNum(r.preco)?fmtBRL(r.preco):'<span class="muted">—</span>'}</td>
         <td colspan="2">${r.vencedor ? '<span class="badge b-green">🏆 Vencedora</span>' : (rows.length>1 ? `<button class="btn btn-sm btn-secondary" onclick="marcarCotacaoVencedora(${r.id})">Marcar vencedora</button>` : '<span class="muted">única cotação</span>')}</td>
-        <td>${podeGerir('cotacoes') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('cotacoes',${r.id})">🗑</button>` : ''}</td>
+        <td>${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('cotacoes',${r.id})">🗑</button>`}</td>
       </tr>`).join('');
       return header + sub;
     }).join('');
@@ -4564,8 +4568,8 @@ function initAlmoxarifado(){
       <td>${fmtDate(r.data_envio)}</td><td>${statusBadge(r.status)}</td><td>${esc(r.responsavel)}</td>
       <td>${esc(r.recebido_por)||'<span class="muted">—</span>'}${r.recebido_em?`<div class="rastro-sub">${fmtDateHora(r.recebido_em)}</div>`:''}</td>
       <td>
-        ${podeGerir('almoxarifado') ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoModal(${r.id})">✏️ Editar</button>` : ''}
-        ${podeGerir('almoxarifado') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado',${r.id})">🗑 Excluir</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoModal(${r.id})">✏️ Editar</button>`}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado',${r.id})">🗑 Excluir</button>`}
       </td>
     </tr>`
   });
@@ -4594,7 +4598,7 @@ function initAlmoxarifadoManutencao(){
       <td class="num">${dias===null?'—':dias}</td>
       <td>
         <button class="btn btn-sm btn-primary" onclick="darBaixaManutencaoModal(${r.id})">✅ Dar baixa</button>
-        ${podeGerir('almoxarifado-manutencao') ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoModal(${r.id})">✏️ Editar</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoModal(${r.id})">✏️ Editar</button>`}
       </td>
     </tr>`;
     }
@@ -4670,8 +4674,8 @@ function initAlmoxarifadoEletrico(){
       <td>${fmtDate(r.data_envio)}</td><td>${statusBadge(r.status)}</td><td>${esc(r.responsavel)}</td>
       <td>${esc(r.recebido_por)||'<span class="muted">—</span>'}${r.recebido_em?`<div class="rastro-sub">${fmtDateHora(r.recebido_em)}</div>`:''}</td>
       <td>
-        ${podeGerir('almoxarifado-eletrico') ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoEletricoModal(${r.id})">✏️ Editar</button>` : ''}
-        ${podeGerir('almoxarifado-eletrico') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado_eletrico',${r.id})">🗑 Excluir</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoEletricoModal(${r.id})">✏️ Editar</button>`}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado_eletrico',${r.id})">🗑 Excluir</button>`}
       </td>
     </tr>`
   });
@@ -4704,8 +4708,8 @@ function initAlmoxarifadoControle(){
       <td>${esc(r.recebido_por)||'<span class="muted">—</span>'}${r.recebido_em?`<div class="rastro-sub">${fmtDateHora(r.recebido_em)}</div>`:''}</td>
       <td>
         ${podeGerir('almoxarifado-controle') ? `<button class="btn btn-sm btn-secondary" onclick="baixaControleModal(${r.id})">📉 Baixa</button>` : ''}
-        ${podeGerir('almoxarifado-controle') ? `<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoControleModal(${r.id})">✏️ Editar</button>` : ''}
-        ${podeGerir('almoxarifado-controle') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado_controle',${r.id})">🗑 Excluir</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarAlmoxarifadoControleModal(${r.id})">✏️ Editar</button>`}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('almoxarifado_controle',${r.id})">🗑 Excluir</button>`}
       </td>
     </tr>`
   });
@@ -4797,7 +4801,7 @@ function editarAlmoxarifadoControleModal(id){
     btn.disabled = true; btn.textContent = 'Salvando…';
     const rec = controleLerForm('ec');
     rec.updated_at = new Date().toISOString();
-    const { error } = await sb.from('almoxarifado_controle').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('almoxarifado_controle', rec, item.id); if(solicitado) return;
     btn.disabled = false; btn.textContent = 'Salvar alterações';
     if(error){ toast('Erro ao salvar alterações: ' + error.message, true); return; }
     closeModal();
@@ -4878,8 +4882,8 @@ function initEpiEstoque(){
       <td class="num">${fmtNum(r.qtde)}</td><td>${esc(r.obra)}</td>
       <td>
         <button class="btn btn-sm btn-primary" onclick="darBaixaEpiModal(${r.id})">📤 Dar baixa</button>
-        ${podeGerir('epi-estoque') ? `<button class="btn btn-sm btn-secondary" onclick="editarEpiEstoqueModal(${r.id})">✏️</button>` : ''}
-        ${podeGerir('epi-estoque') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('epi_estoque',${r.id})">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarEpiEstoqueModal(${r.id})">✏️</button>`}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('epi_estoque',${r.id})">🗑</button>`}
       </td>
     </tr>`
   });
@@ -4947,8 +4951,8 @@ function initFuncionarios(){
       <td>${r.ativo===false?'<span class="badge b-gray">Desativado</span>':'<span class="badge b-green">Ativo</span>'}</td>
       <td>
         ${podeGerir('funcionarios') ? `<button class="btn btn-sm btn-secondary" onclick="toggleAtivoFuncionario(${r.id})">${r.ativo===false?'🔓 Reativar':'🔒 Desativar'}</button>` : ''}
-        ${podeGerir('funcionarios') ? `<button class="btn btn-sm btn-secondary" onclick="editarFuncionarioModal(${r.id})">✏️</button>` : ''}
-        ${podeGerir('funcionarios') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('funcionarios',${r.id})">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarFuncionarioModal(${r.id})">✏️</button>`}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('funcionarios',${r.id})">🗑</button>`}
       </td>
     </tr>`
   });
@@ -4978,8 +4982,8 @@ function initFornecedores(){
       <td>${esc(r.telefone_fixo)||'<span class="muted">—</span>'}</td><td>${esc(r.telefone_comercial)||'<span class="muted">—</span>'}</td>
       <td>${esc(r.contato_nome)||'<span class="muted">—</span>'}</td><td>${esc(r.email)||'<span class="muted">—</span>'}</td>
       <td>
-        ${podeGerir('fornecedores') ? `<button class="btn btn-sm btn-secondary" onclick="editarFornecedorModal(${r.id})">✏️</button>` : ''}
-        ${podeGerir('fornecedores') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('fornecedores',${r.id})">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarFornecedorModal(${r.id})">✏️</button>`}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirRegistro('fornecedores',${r.id})">🗑</button>`}
       </td>
     </tr>`
   });
@@ -4993,7 +4997,7 @@ function initCadastro(){
     searchFn:(r,q)=> String(r.descricao||"").toLowerCase().includes(q) || String(r.codigo||"").toLowerCase().includes(q),
     rowFn:r=>`<tr><td>${esc(r.codigo)}</td><td class="desc-cell">${descTrunc(r.descricao)}</td><td>${esc(r.unidade)}</td>
       <td class="num">${fmtBRL(r.preco_ref)}</td><td>${esc(r.fonte_preco)}</td><td>${fmtDate(r.cadastrado_em)}</td>
-      <td>${podeGerir('cadastro') ? `<button class="btn btn-sm btn-secondary" onclick="editarCadastroExtraModal(${r.id})">✏️ Editar</button>` : ''}</td></tr>`
+      <td>${`<button class="btn btn-sm btn-secondary" onclick="editarCadastroExtraModal(${r.id})">✏️ Editar</button>`}</td></tr>`
   });
 }
 
@@ -5613,9 +5617,9 @@ function renderContratos(){
       <td>${badgeStatusContrato(statusEfetivoContrato(c))}</td>
       <td>
         <button class="btn btn-sm btn-secondary" onclick="verContratoModal('${c.id}')">📄 Ver</button>
-        ${podeGerir('contratos') ? `<button class="btn btn-sm btn-secondary" onclick="editarContratoModal('${c.id}')">✏️</button>` : ''}
+        ${`<button class="btn btn-sm btn-secondary" onclick="editarContratoModal('${c.id}')">✏️</button>`}
         ${podeGerir('contratos') && controla ? `<button class="btn btn-sm btn-secondary" onclick="renovarContratoModal('${c.id}')">🔁 Renovar</button>` : ''}
-        ${podeGerir('contratos') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirContratoItem('${c.id}')">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirContratoItem('${c.id}')">🗑</button>`}
       </td>
     </tr>`;
   }).join('');
@@ -5800,7 +5804,7 @@ async function abrirFormContratoModal(c){
         rec.anexo_path = up.path; rec.anexo_nome = up.nome;
       }
       if(editando){
-        const { error } = await sb.from('contratos').update(rec).eq('id', c.id);
+        const { error, solicitado } = await atualizarOuSolicitar('contratos', rec, c.id); if(solicitado) return;
         if(error) throw error;
         toast('Contrato atualizado.');
       }else{
@@ -5908,6 +5912,7 @@ function importarContratoModal(){
   });
 }
 window.excluirContratoItem = async function(id){
+  if(!podeGerir('contratos')) return solicitarExclusaoGenerica('contratos', id);
   if(!confirm('Excluir este contrato? Essa ação não pode ser desfeita.')) return;
   const { error } = await sb.from('contratos').delete().eq('id', id);
   if(error){ toast('Erro ao excluir: ' + error.message, true); return; }
@@ -6766,7 +6771,7 @@ function renderLocacoesEquip(){
           ? `<button class="btn btn-sm btn-secondary" onclick="renovarLocequip('${e.id}')">🔄 Renovar</button>
              <button class="btn btn-sm btn-secondary" onclick="encerrarLocequip('${e.id}')">🔚 Encerrar</button>`
           : `<button class="btn btn-sm btn-secondary" onclick="reativarLocequip('${e.id}')">↩️ Reativar</button>`}
-        ${podeGerir('locacoes-equip') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirLocequip('${e.id}')">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirLocequip('${e.id}')">🗑</button>`}
       </td>
     </tr>`;
   }).join('');
@@ -6858,7 +6863,7 @@ function abrirFormLocequipModal(e){
         observacoes: document.getElementById('le-obs').value.trim(),
       };
       if(editando){
-        const { error } = await sb.from('locacoes_equipamentos').update(rec).eq('id', e.id);
+        const { error, solicitado } = await atualizarOuSolicitar('locacoes_equipamentos', rec, e.id); if(solicitado) return;
         if(error) throw error;
         toast('Locação atualizada.');
       }else{
@@ -6933,6 +6938,7 @@ window.reativarLocequip = async function(id){
   toast('Locação reativada.');
 };
 window.excluirLocequip = async function(id){
+  if(!podeGerir('locacoes-equip')) return solicitarExclusaoGenerica('locacoes_equipamentos', id);
   if(!confirm('Excluir esta locação de equipamento? Essa ação não pode ser desfeita.')) return;
   const { error } = await sb.from('locacoes_equipamentos').delete().eq('id', id);
   if(error){ toast('Erro ao excluir: ' + error.message, true); return; }
@@ -7076,7 +7082,7 @@ function renderContasPagar(){
       <td>${c.status==='pago' ? fmtDate(c.data_pagamento) : statusBadgeConta(c)}</td>
       <td>
         ${c.status==='a_pagar' ? `<button class="btn btn-sm btn-secondary" onclick="marcarContaPaga('${c.id}')">💰 Marcar pago</button>` : ''}
-        ${podeGerir('contas-pagar') ? `<button class="btn btn-sm btn-danger-outline" onclick="excluirContaPagar('${c.id}')">🗑</button>` : ''}
+        ${`<button class="btn btn-sm btn-danger-outline" onclick="excluirContaPagar('${c.id}')">🗑</button>`}
       </td>
     </tr>`).join('');
   renderContasPagarTimelines();
@@ -7408,6 +7414,7 @@ window.marcarContaPaga = async function(id){
   toast('Conta marcada como paga.');
 };
 window.excluirContaPagar = async function(id){
+  if(!podeGerir('contas-pagar')) return solicitarExclusaoGenerica('contas_pagar', id);
   if(!confirm('Excluir esta conta? Essa ação não pode ser desfeita.')) return;
   const { error } = await sb.from('contas_pagar').delete().eq('id', id);
   if(error){ toast('Erro ao excluir: ' + error.message, true); return; }
@@ -7560,6 +7567,7 @@ function wireNav(){
       document.getElementById('page-'+page).classList.add('active');
       document.getElementById('page-title').textContent = item.textContent.trim().replace(/\d+$/,'').trim();
       if(page==='painel-geral') carregarPainelGeral();
+      if(page==='aprovacoes') carregarSolicitacoes().then(renderAprovacoes);
       if(window.innerWidth<=860) fecharSidebarMobile();
     });
   });
@@ -8347,7 +8355,7 @@ function editarComprasModal(id){
       observacoes: document.getElementById('ec-obs').value.trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await sb.from('compras').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('compras', rec, item.id); if(solicitado) return;
     if(error){ btn.disabled = false; btn.textContent = 'Salvar alterações'; toast('Erro ao salvar alterações: ' + error.message, true); return; }
     const arquivos = [...(document.getElementById('ec-anexos').files||[])];
     if(arquivos.length){
@@ -8414,7 +8422,7 @@ function editarServicoModal(id){
       observacoes: document.getElementById('es-obs').value.trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await sb.from('servicos').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('servicos', rec, item.id); if(solicitado) return;
     if(error){ btn.disabled = false; btn.textContent = 'Salvar alterações'; toast('Erro ao salvar alterações: ' + error.message, true); return; }
     const arquivos = [...(document.getElementById('es-anexos').files||[])];
     if(arquivos.length){
@@ -8505,7 +8513,7 @@ function editarAlmoxarifadoModal(id){
     };
     if(!validarECompletarManutencao('ea', rec)) return;
     btn.disabled = true; btn.textContent = 'Salvando…';
-    const { error } = await sb.from('almoxarifado').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('almoxarifado', rec, item.id); if(solicitado) return;
     btn.disabled = false; btn.textContent = 'Salvar alterações';
     if(error){ toast('Erro ao salvar alterações: ' + error.message, true); return; }
     closeModal();
@@ -8674,7 +8682,7 @@ function editarAlmoxarifadoEletricoModal(id){
       observacoes: document.getElementById('eae-obs').value.trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await sb.from('almoxarifado_eletrico').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('almoxarifado_eletrico', rec, item.id); if(solicitado) return;
     btn.disabled = false; btn.textContent = 'Salvar alterações';
     if(error){ toast('Erro ao salvar alterações: ' + error.message, true); return; }
     closeModal();
@@ -8718,7 +8726,7 @@ function editarCadastroExtraModal(id){
       preco_ref: document.getElementById('ecx-preco').value ? Number(document.getElementById('ecx-preco').value) : null,
       fonte_preco: document.getElementById('ecx-fonte').value.trim() || null,
     };
-    const { error } = await sb.from('cadastro_extra').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('cadastro_extra', rec, item.id); if(solicitado) return;
     btn.disabled = false; btn.textContent = 'Salvar alterações';
     if(error){ toast('Erro ao salvar alterações: ' + error.message, true); return; }
     closeModal();
@@ -8778,7 +8786,7 @@ function editarEpiModal(id){
       observacoes: document.getElementById('ee-obs').value.trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await sb.from('epi_requisicoes').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('epi_requisicoes', rec, item.id); if(solicitado) return;
     if(error){ btn.disabled = false; btn.textContent = 'Salvar alterações'; toast('Erro ao salvar alterações: ' + error.message, true); return; }
     const arquivos = [...(document.getElementById('ee-anexos').files||[])];
     if(arquivos.length){
@@ -8885,7 +8893,7 @@ function editarEpiEstoqueModal(id){
       numero_ca: document.getElementById('eee-ca').value.trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await sb.from('epi_estoque').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('epi_estoque', rec, item.id); if(solicitado) return;
     btn.disabled = false; btn.textContent = 'Salvar alterações';
     if(error){ toast('Erro ao salvar alterações: ' + error.message, true); return; }
     closeModal();
@@ -9108,7 +9116,7 @@ function editarFuncionarioModal(id){
       obra: document.getElementById('ef-obra').value || null,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await sb.from('funcionarios').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('funcionarios', rec, item.id); if(solicitado) return;
     btn.disabled = false; btn.textContent = 'Salvar alterações';
     if(error){ toast('Erro ao salvar alterações: ' + error.message, true); return; }
     closeModal();
@@ -9197,7 +9205,7 @@ function editarFornecedorModal(id){
       email: document.getElementById('efo-email').value.trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await sb.from('fornecedores').update(rec).eq('id', item.id);
+    const { error, solicitado } = await atualizarOuSolicitar('fornecedores', rec, item.id); if(solicitado) return;
     btn.disabled = false; btn.textContent = 'Salvar alterações';
     if(error){ toast('Erro ao salvar alterações: ' + error.message, true); return; }
     closeModal();
@@ -9407,10 +9415,10 @@ function initPassSolic(){
       <td>
         <div style="display:flex; flex-direction:column; gap:4px;">
           <button class="btn btn-sm btn-secondary" onclick="passVerReciboModal(${r.id})">🧾 Recibo</button>
-          ${podeGerir('pass-solic') ? `<button class="btn btn-sm btn-secondary" onclick="editarPassagemModal(${r.id})">✏️ Editar</button>` : ''}
+          ${`<button class="btn btn-sm btn-secondary" onclick="editarPassagemModal(${r.id})">✏️ Editar</button>`}
           <button class="btn btn-sm btn-primary" onclick="passRegistrarCompraModal(${r.id})">✅ Comprado</button>
           ${passExclusaoCell(r)}
-          ${podeGerir('pass-solic') ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
+          ${`<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>`}
         </div>
       </td>
     </tr>`
@@ -9444,7 +9452,7 @@ function initPassFinanceiro(){
           ${podeGerir('pass-financeiro') ? `<button class="btn btn-sm btn-secondary" onclick="passEditarHorarioModal(${r.id})">⏰ Editar horário</button>` : ''}
           <button class="btn btn-sm btn-primary" onclick="passMarcarPago(${r.id})">💰 Marcar como pago</button>
           ${passExclusaoCell(r)}
-          ${podeGerir('pass-financeiro') ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
+          ${`<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>`}
         </div>
       </td>
     </tr>`
@@ -9474,7 +9482,7 @@ function initPassHistorico(){
       <td>
         <div style="display:flex; flex-direction:column; gap:4px;">
           <button class="btn btn-sm btn-secondary" onclick="passVerReciboModal(${r.id})">🧾 Recibo</button>
-          ${podeGerir('pass-historico') ? `<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>` : ''}
+          ${`<button class="btn btn-sm btn-danger-outline" onclick="passExcluir(${r.id})">🗑 Excluir</button>`}
         </div>
       </td>
     </tr>`
@@ -9898,7 +9906,7 @@ function editarPassagemModal(id){
       valor_refeicoes: valorRef, total_colaborador: valorRef + uber,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await sb.from('passagens').update(rec).eq('id', r.id);
+    const { error, solicitado } = await atualizarOuSolicitar('passagens', rec, r.id); if(solicitado) return;
     btn.disabled = false; btn.textContent = 'Salvar alterações';
     if(error){ toast('Erro ao salvar alterações: ' + friendlyErrorMsg(error), true); return; }
     closeModal();
@@ -10078,7 +10086,7 @@ window.passMarcarPago = async function(id){
   await refetchPassagens(); renderPassAll();
 };
 window.passExcluir = async function(id){
-  if(!IS_GESTOR) return;
+  if(!IS_GESTOR){ const rr = STATE.passagens.find(x=>x.id===id); if(rr) passSolicitarExclusaoModal(rr.numero); return; }
   const r = STATE.passagens.find(x=>x.id===id);
   if(!r) return;
   if(!confirm(`Excluir a solicitação de ${r.nome}? Essa ação não pode ser desfeita.`)) return;
@@ -10550,7 +10558,7 @@ window.alimMarcarEntregue = async function(id){
   await refetchAlimentacaoTickets(); renderAlimAll();
 };
 window.alimExcluirTicket = async function(id){
-  if(!podeGerir('alim-tickets')) return;
+  if(!podeGerir('alim-tickets')) return solicitarExclusaoGenerica('alimentacao_tickets', id);
   const t = STATE.alimentacaoTickets.find(x=>x.id===id);
   if(!t) return;
   if(!confirm(`Excluir o ticket #${String(t.numero).padStart(4,'0')}? Essa ação não pode ser desfeita.`)) return;
@@ -10583,7 +10591,7 @@ function initAlimTickets(){
           <button class="btn btn-sm btn-secondary" onclick="alimVerTicketModal(${t.id})">🎫 Ver / Imprimir</button>
           <button class="btn btn-sm btn-secondary" onclick="alimDuplicarTicket(${t.id})">📋 Duplicar p/ hoje</button>
           ${t.status!=='entregue' ? `<button class="btn btn-sm btn-primary" onclick="alimMarcarEntregue(${t.id})">✅ Marcar entregue</button>` : ''}
-          ${podeGerir('alim-tickets') ? `<button class="btn btn-sm btn-danger-outline" onclick="alimExcluirTicket(${t.id})">🗑 Excluir</button>` : ''}
+          ${`<button class="btn btn-sm btn-danger-outline" onclick="alimExcluirTicket(${t.id})">🗑 Excluir</button>`}
         </div>
       </td>
     </tr>`
@@ -10751,6 +10759,216 @@ document.addEventListener('visibilitychange', async ()=>{
     try{ await sb.auth.getSession(); }catch(e){ console.warn('Falha ao renovar sessão:', e); }
   }
 });
+
+/* ============== Solicitações de alteração (editar / excluir com motivo → gestor aprova) ==============
+   Quem não é gestor (ou não tem a página liberada) continua vendo os botões de editar e excluir.
+   Em vez de bloquear, o sistema pede o MOTIVO e cria uma solicitação. O gestor aprova ou nega na
+   página "Aprovações"; ao aprovar, o próprio banco aplica a mudança (RPC decidir_alteracao). */
+const SOLIC_LABEL = {
+  compras:'Compras', servicos:'Serviços', epi_requisicoes:'EPI', almoxarifado:'Almoxarifado Geral', almoxarifado_eletrico:'Almoxarifado Elétrico',
+  almoxarifado_controle:'Itens de Controle', epi_estoque:'Almoxarifado de EPI', funcionarios:'Funcionários', fornecedores:'Fornecedores',
+  cadastro_extra:'Cadastro Extra', contratos:'Contratos', locacoes_equipamentos:'Locação de Equipamentos', contas_pagar:'Contas a Pagar',
+  passagens:'Passagens', historico_compras:'Histórico de Compras', cotacoes:'Cotações', alimentacao_tickets:'Tickets de Alimentação', reembolsos:'Reembolsos'
+};
+const SOLIC_PAGINA = Object.assign({}, TABELA_PARA_PAGINA, { passagens:'pass-solic', alimentacao_tickets:'alim-tickets' });
+function paginaDaTabela(t){ return SOLIC_PAGINA[t] || t; }
+function podeGerirTabela(t){ return podeGerir(paginaDaTabela(t)); }
+function itensDaTabela(t){
+  const m = {
+    compras:STATE.compras, servicos:STATE.servicos, epi_requisicoes:STATE.epi, almoxarifado:STATE.almoxarifado, almoxarifado_eletrico:STATE.almoxarifadoEletrico,
+    almoxarifado_controle:STATE.almoxarifadoControle, epi_estoque:STATE.epiEstoque, funcionarios:STATE.funcionarios, fornecedores:STATE.fornecedores,
+    cadastro_extra:STATE.cadastro, contratos:STATE.contratos, locacoes_equipamentos:STATE.locacoesEquip, contas_pagar:STATE.contasPagar,
+    passagens:STATE.passagens, historico_compras:STATE.historico, cotacoes:STATE.cotacoes, alimentacao_tickets:STATE.alimentacaoTickets, reembolsos:STATE.reembolsos
+  };
+  return m[t] || [];
+}
+const igualValor = (a,b)=>{
+  const n = v=> (v===null||v===undefined) ? '' : (typeof v==='object' ? JSON.stringify(v) : String(v));
+  return n(a)===n(b);
+};
+/* Usado pelos formulários de edição no lugar de sb.from(t).update(rec).eq('id', id). Gestor com a página
+   liberada: grava direto (como sempre foi). Demais: monta a solicitação só com o que mudou + motivo. */
+async function atualizarOuSolicitar(tabela, rec, id){
+  if(podeGerirTabela(tabela)) return await sb.from(tabela).update(rec).eq('id', id);
+  const el = document.getElementById('motivo-solicitacao');
+  const motivo = el ? el.value.trim() : '';
+  if(!motivo){ toast('Informe o motivo da alteração.', true); return { error:{ message:'Informe o motivo da alteração.' } }; }
+  const atual = itensDaTabela(tabela).find(r=>String(r.id)===String(id)) || {};
+  const diff = {};
+  Object.keys(rec).forEach(k=>{ if(k==='updated_at') return; if(!igualValor(rec[k], atual[k])) diff[k] = rec[k]; });
+  if(!Object.keys(diff).length){ toast('Nenhuma alteração foi feita nos campos.', true); return { error:{ message:'Nenhuma alteração foi feita nos campos.' } }; }
+  const { error } = await sb.rpc('solicitar_alteracao', { p_tabela:tabela, p_registro:String(id), p_tipo:'editar', p_motivo:motivo, p_dados:diff });
+  if(error) return { error:{ message: friendlyErrorMsg(error) } };
+  closeModal();
+  toast('Solicitação de edição enviada ao gestor. Acompanhe em "Minhas solicitações".');
+  await carregarSolicitacoes(); renderAprovacoes();
+  return { error:null, solicitado:true };
+}
+function injetarMotivoSolicitacao(){
+  const m = document.getElementById('modal-content'); if(!m) return;
+  const form = m.querySelector('form'); if(!form || form.querySelector('#motivo-solicitacao')) return;
+  const act = form.querySelector('.form-actions');
+  const aviso = document.createElement('div');
+  aviso.style.cssText = 'background:#fff4d6;border:1px solid #f0c36d;padding:8px 10px;border-radius:6px;margin:10px 0;font-size:13px;';
+  aviso.innerHTML = '🔒 Você não tem permissão para alterar direto. O que você mudar aqui vai como <b>solicitação</b> e só vale depois que o gestor aprovar. Informe o motivo.';
+  const row = document.createElement('div'); row.className = 'form-row';
+  row.innerHTML = '<label>Motivo da alteração *</label><textarea id="motivo-solicitacao" rows="2" required placeholder="Explique por que este item precisa ser alterado"></textarea>';
+  if(act && act.parentNode){ act.parentNode.insertBefore(aviso, act); act.parentNode.insertBefore(row, act); } else { form.appendChild(aviso); form.appendChild(row); }
+  form.querySelectorAll('input[type=file]').forEach(i=>{ i.disabled = true; i.title = 'Novos anexos só depois da aprovação'; });
+  const h3 = m.querySelector('h3'); if(h3) h3.textContent = h3.textContent + ' (solicitação)';
+  const sbm = form.querySelector('button[type=submit]'); if(sbm) sbm.textContent = 'Enviar solicitação';
+}
+/* Exclusão: motivo obrigatório → solicitação. */
+function solicitarExclusaoGenerica(tabela, id){
+  if(['compras','servicos','epi_requisicoes','reembolsos'].includes(tabela)){
+    const it = itensDaTabela(tabela).find(r=>String(r.id)===String(id));
+    if(it) return solicitarExclusaoModal(tabela, it.numero);
+  }
+  const it = itensDaTabela(tabela).find(r=>String(r.id)===String(id));
+  const nome = it ? (it.descricao || it.nome || it.titulo || it.numero || '') : '';
+  openModal(`
+    <h3>Solicitar exclusão</h3>
+    <div class="modal-sub">${esc(SOLIC_LABEL[tabela]||tabela)} — ${esc(nome)}</div>
+    <form id="form-solic-excluir-gen">
+      <div class="form-row"><label>Motivo *</label><textarea id="sg-motivo" rows="3" required placeholder="Explique por que este item deve ser excluído"></textarea></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-sg-enviar">Enviar solicitação</button>
+      </div>
+    </form>`);
+  document.getElementById('form-solic-excluir-gen').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const btn = document.getElementById('btn-sg-enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
+    const { error } = await sb.rpc('solicitar_alteracao', { p_tabela:tabela, p_registro:String(id), p_tipo:'excluir', p_motivo:document.getElementById('sg-motivo').value.trim(), p_dados:null });
+    if(error){ btn.disabled = false; btn.textContent = 'Enviar solicitação'; toast('Erro ao solicitar exclusão: ' + friendlyErrorMsg(error), true); return; }
+    closeModal(); toast('Solicitação de exclusão enviada ao gestor.');
+    await carregarSolicitacoes(); renderAprovacoes();
+  });
+}
+window.solicitarExclusaoGenerica = solicitarExclusaoGenerica;
+
+/* ---------- página Aprovações / Minhas solicitações ---------- */
+STATE.solicitacoes = [];
+let aprovFiltro = 'pendente';
+async function carregarSolicitacoes(){
+  try{
+    const { data, error } = await sb.from('solicitacoes_alteracao').select('*').order('criado_em', {ascending:false}).limit(300);
+    if(!error) STATE.solicitacoes = data || [];
+  }catch(e){ console.warn('solicitações:', e); }
+  atualizarBadgeAprov();
+}
+function atualizarBadgeAprov(){
+  const b = document.getElementById('badge-aprov'); if(!b) return;
+  b.textContent = STATE.solicitacoes.filter(s=>s.status==='pendente').length;
+}
+function campoBonito(k){ return String(k).replace(/_/g,' ').replace(/^./, c=>c.toUpperCase()); }
+function valorBonito(v){
+  if(v===null||v===undefined||v==='') return '—';
+  if(typeof v==='object') return Array.isArray(v) ? (v.length+' item(ns)') : 'dados';
+  if(/^\d{4}-\d{2}-\d{2}/.test(String(v))) return fmtDate(String(v).slice(0,10));
+  return String(v);
+}
+function renderAprovacoes(){
+  const root = document.getElementById('aprov-body'); if(!root) return;
+  const todas = STATE.solicitacoes;
+  const lista = todas.filter(s=> aprovFiltro==='todas' ? true : (aprovFiltro==='pendente' ? s.status==='pendente' : s.status!=='pendente'));
+  const nPend = todas.filter(s=>s.status==='pendente').length;
+  const stBadge = s => ({pendente:'<span class="badge b-yellow">⏳ Pendente</span>', aprovada:'<span class="badge b-green">✔ Aprovada</span>', negada:'<span class="badge b-red">✖ Negada</span>', erro:'<span class="badge b-gray">⚠ Não aplicada</span>'}[s]||s);
+  root.innerHTML = `
+    <p class="hint" style="margin-bottom:12px;">${IS_GESTOR
+      ? 'Pedidos de edição e exclusão feitos por quem não tem permissão direta. Ao aprovar, a mudança é aplicada automaticamente; ao negar, o item continua como está.'
+      : 'Aqui ficam os seus pedidos de edição e exclusão. O gestor aprova ou nega, e você vê o resultado nesta lista.'}</p>
+    <div class="toolbar">
+      <button class="btn btn-sm ${aprovFiltro==='pendente'?'btn-primary':'btn-secondary'}" onclick="aprovSetFiltro('pendente')">Pendentes (${nPend})</button>
+      <button class="btn btn-sm ${aprovFiltro==='decididas'?'btn-primary':'btn-secondary'}" onclick="aprovSetFiltro('decididas')">Decididas</button>
+      <button class="btn btn-sm ${aprovFiltro==='todas'?'btn-primary':'btn-secondary'}" onclick="aprovSetFiltro('todas')">Todas</button>
+    </div>
+    ${lista.length ? lista.map(s=>{
+      const edit = s.tipo==='editar';
+      const dn = s.dados_novos||{}, da = s.dados_antigos||{};
+      const diff = edit ? `<table class="mini-table" style="margin-top:6px;width:100%;font-size:13px;"><thead><tr><th style="text-align:left">Campo</th><th style="text-align:left">Atual</th><th style="text-align:left">Proposto</th></tr></thead><tbody>${Object.keys(dn).filter(k=>k!=='updated_at').map(k=>`<tr><td>${esc(campoBonito(k))}</td><td>${esc(valorBonito(da[k]))}</td><td><b>${esc(valorBonito(dn[k]))}</b></td></tr>`).join('')}</tbody></table>` : '';
+      const pode = IS_GESTOR && s.status==='pendente' && podeGerirTabela(s.tabela);
+      return `<div class="card" style="border:1px solid #e1e6ec;border-radius:8px;padding:12px 14px;margin:10px 0;background:#fff;">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;">
+          <div><span class="badge ${edit?'b-blue':'b-red'}">${edit?'✏️ Edição':'🗑 Exclusão'}</span> <b>${esc(SOLIC_LABEL[s.tabela]||s.tabela)}</b> · ${esc(s.resumo||'')}${s.obra?` <span class="hint">· ${esc(s.obra)}</span>`:''}</div>
+          <div>${stBadge(s.status)}</div>
+        </div>
+        <div class="hint" style="margin-top:4px;">Solicitado por <b>${esc(s.solicitante_nome||'—')}</b> em ${fmtDateHora(s.criado_em)}</div>
+        <div style="margin-top:6px;"><b>Motivo:</b> ${esc(s.motivo)}</div>
+        ${diff}
+        ${s.status!=='pendente' ? `<div class="hint" style="margin-top:6px;">Decidido por <b>${esc(s.decidido_por||'—')}</b> em ${fmtDateHora(s.decidido_em)}${s.decisao_obs?` · ${esc(s.decisao_obs)}`:''}</div>` : ''}
+        ${pode ? `<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-sm btn-primary" onclick="aprovDecidir(${s.id},true)">✔ Aprovar</button><button class="btn btn-sm btn-danger-outline" onclick="aprovNegarModal(${s.id})">✖ Negar</button></div>` : ''}
+      </div>`;
+    }).join('') : '<div class="empty-state" style="padding:20px;color:#6b7a8c;">Nenhuma solicitação aqui.</div>'}`;
+  atualizarBadgeAprov();
+}
+window.aprovSetFiltro = f=>{ aprovFiltro = f; renderAprovacoes(); };
+async function aprovRefetchAfter(tabela){
+  const keys = { compras:'compras', servicos:'servicos', epi_requisicoes:'epi', historico_compras:'historico', cotacoes:'cotacoes', reembolsos:'reembolsos',
+    almoxarifado:'almoxarifado', almoxarifado_eletrico:'almoxarifado_eletrico', almoxarifado_controle:'almoxarifado_controle', epi_estoque:'epi_estoque',
+    funcionarios:'funcionarios', fornecedores:'fornecedores', contratos:'contratos', locacoes_equipamentos:'locacoes_equipamentos', contas_pagar:'contas_pagar' };
+  try{
+    if(keys[tabela]) await refetchTable(keys[tabela]);
+    else if(tabela==='passagens' && typeof refetchPassagens==='function') await refetchPassagens();
+    else if(tabela==='alimentacao_tickets' && typeof refetchAlimentacaoTickets==='function') await refetchAlimentacaoTickets();
+  }catch(e){ console.warn(e); }
+  try{ renderAllForObra(); if(typeof renderPassAll==='function') renderPassAll(); if(typeof renderAlimAll==='function') renderAlimAll(); refreshBadges(); }catch(e){ console.warn(e); }
+}
+window.aprovDecidir = async function(id, aprovar, obs){
+  const s = STATE.solicitacoes.find(x=>x.id===id); if(!s) return;
+  if(aprovar && !confirm(s.tipo==='excluir' ? 'Aprovar e EXCLUIR este item definitivamente?' : 'Aprovar e aplicar esta alteração?')) return;
+  const { data, error } = await sb.rpc('decidir_alteracao', { p_id:id, p_aprovar:!!aprovar, p_obs:obs||null });
+  if(error){ toast('Erro: ' + friendlyErrorMsg(error), true); return; }
+  toast(data==='aprovada' ? 'Aprovada e aplicada.' : data==='negada' ? 'Solicitação negada.' : 'O item não existe mais; nada foi aplicado.');
+  await carregarSolicitacoes(); renderAprovacoes();
+  if(data==='aprovada') await aprovRefetchAfter(s.tabela);
+};
+window.aprovNegarModal = function(id){
+  openModal(`
+    <h3>Negar solicitação</h3>
+    <form id="form-aprov-negar">
+      <div class="form-row"><label>Motivo da negativa (opcional)</label><textarea id="an-obs" rows="3" placeholder="Explique para quem solicitou"></textarea></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-danger-outline">Negar</button>
+      </div>
+    </form>`);
+  document.getElementById('form-aprov-negar').addEventListener('submit', async e=>{
+    e.preventDefault(); const obs = document.getElementById('an-obs').value.trim(); closeModal();
+    await aprovDecidir(id, false, obs);
+  });
+};
+async function initAprovacoes(){
+  const nav = document.getElementById('nav-aprovacoes');
+  if(nav && !IS_GESTOR){ nav.firstChild && (nav.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent = 'Minhas solicitações'; })); }
+  await carregarSolicitacoes(); renderAprovacoes();
+  try{ if(window.__chAprov) sb.removeChannel(window.__chAprov); }catch(e){}
+  window.__chAprov = sb.channel('rt-solicitacoes')
+    .on('postgres_changes', {event:'*', schema:'public', table:'solicitacoes_alteracao'}, async payload=>{
+      await carregarSolicitacoes(); renderAprovacoes();
+      if(IS_GESTOR && payload.eventType==='INSERT') toast('📝 Nova solicitação de alteração aguardando aprovação.');
+    }).subscribe();
+}
+/* Botões de editar liberam a solicitação quando a pessoa não é gestor: injeta o campo de motivo no formulário. */
+(function(){
+  const lista = [
+    ['editarComprasModal', editarComprasModal, 'compras'], ['editarServicoModal', editarServicoModal, 'servicos'], ['editarEpiModal', editarEpiModal, 'epi'],
+    ['editarAlmoxarifadoModal', editarAlmoxarifadoModal, 'almoxarifado'], ['editarAlmoxarifadoEletricoModal', editarAlmoxarifadoEletricoModal, 'almoxarifado-eletrico'],
+    ['editarAlmoxarifadoControleModal', editarAlmoxarifadoControleModal, 'almoxarifado-controle'], ['editarEpiEstoqueModal', editarEpiEstoqueModal, 'epi-estoque'],
+    ['editarFuncionarioModal', editarFuncionarioModal, 'funcionarios'], ['editarFornecedorModal', editarFornecedorModal, 'fornecedores'],
+    ['editarCadastroExtraModal', editarCadastroExtraModal, 'cadastro'], ['editarContratoModal', window.editarContratoModal, 'contratos'],
+    ['editarLocequipModal', window.editarLocequipModal, 'locacoes-equip'], ['editarPassagemModal', editarPassagemModal, 'pass-solic']
+  ];
+  lista.forEach(([nome, fn, pagina])=>{
+    if(typeof fn!=='function') return;
+    window[nome] = async function(...args){
+      const r = await fn.apply(this, args);
+      if(!podeGerir(pagina)) setTimeout(injetarMotivoSolicitacao, 0);
+      return r;
+    };
+  });
+})();
+
 
 /* ============== bootstrap ============== */
 initAuthGate();
