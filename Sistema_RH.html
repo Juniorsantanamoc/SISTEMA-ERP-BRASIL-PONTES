@@ -177,6 +177,7 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
   <section id="v-audit" hidden></section>
   <section id="v-folha" hidden></section>
   <section id="v-contratos" hidden></section>
+  <section id="v-usuarios" hidden></section>
   <section id="v-acessos" hidden>
     <div class="card"><h2>Quem enxerga o quê</h2><table class="matriz" id="matriz"></table></div>
     <div class="card" style="margin-top:16px"><h2>O que o RH envia para os outros módulos</h2>
@@ -350,7 +351,7 @@ function render(){
     pmo:'Módulo PMO: cria e edita contratos e CDs na aba Contratos, anexa o cronograma oficial e monitora a mobilização feita por RH, Saúde e Segurança e Compras.',
     dir:'Vê o painel (quadro de colaboradores) e o andamento da mobilização dos contratos. Não acessa dados pessoais nem salários.'}[perfil]}`;
   if(CHAT.abrir)renderChat();
-  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();
+  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();
   if(abertoId)renderModal();
   agendarSync();
 }
@@ -538,7 +539,7 @@ const MODS=[
  {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['wpp','WhatsApp do colaborador',['rh','grh']]]},
  {id:'pmo',nome:'PMO',ico:'🏗',abas:[['painel','Alertas',['pmo','grh']],['mob','Mobilização',['pmo','grh']],['colab','Colaboradores · baixada e férias',['pmo']]]},
  {id:'contratos',nome:'Contratos',ico:'📑',abas:[['contratos','Contratos',['pmo','grh','dir','rh']]]},
- {id:'admin',nome:'Administração',ico:'⚙️',abas:[['audit','Auditoria',['grh','rh']],['acessos','Acessos',['grh']]]}
+ {id:'admin',nome:'Administração',ico:'⚙️',abas:[['usuarios','Usuários e acessos',['grh']],['audit','Auditoria',['grh','rh']],['acessos','Matriz de perfis',['grh']]]}
 ];
 const ABAS=[...new Set(MODS.flatMap(m=>m.abas.map(a=>a[0])))].map(x=>[x]);
 let mod='rh';
@@ -546,8 +547,9 @@ const MODROLES={wpp:['rh'],rh:['rh','grh','dir'],fin:['fin'],sst:['sst'],compras
 const MODNOME_={wpp:'WhatsApp',rh:'RH',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',contratos:'Contratos',admin:'Administração'};
 const alertasMod=()=>gerarAlertas().filter(a=>roleOk(a.roles)&&a.roles.some(r=>(MODROLES[mod]||[]).includes(r)));
 const modLiberado=m=>m.id!=='admin'||!!(usuario&&usuario.mestre);
-const modsOk=()=>MODS.filter(m=>modLiberado(m)&&m.abas.some(a=>a[2].includes(perfil)));
-const abasOk=m=>modLiberado(m)?m.abas.filter(a=>a[2].includes(perfil)):[];
+const rhPag=()=>usuario&&!usuario.mestre&&Array.isArray(usuario.paginas)?new Set(usuario.paginas):null;
+const abasOk=m=>{if(!modLiberado(m))return [];const pg=rhPag();return m.abas.filter(a=>a[2].includes(perfil)&&(!pg||pg.has(m.id+':'+a[0])))};
+const modsOk=()=>MODS.filter(m=>abasOk(m).length>0);
 function irPara(tabId){const ms=modsOk();const m=ms.find(x=>x.id===mod&&abasOk(x).some(a=>a[0]===tabId))||ms.find(x=>abasOk(x).some(a=>a[0]===tabId));if(m){mod=m.id;tab=tabId}}
 const toast=m=>{const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',4500)};
 function abrirCustom(html){abertoId=null;$('modal').innerHTML=html;$('ov').classList.add('on')}
@@ -1058,6 +1060,9 @@ function acoesGlobais(t){
   if(t.id==='tr-ok'){salvarTrein(Number(sd.emp));return true}
   if(sd.cron){abrirCron(Number(sd.cron));return true}
   if(t.id==='co-read'){lerCron();return true}
+  if(t.id==='usr-recarregar'){USR.lista=null;renderUsuarios();return true}
+  if(sd.usrpag){abrirPaginasUsuario(sd.usrpag);return true}
+  if(t.id==='usrp-ok'){salvarPaginasUsuario(sd.uid);return true}
   if(t.id==='co-ok'){salvarCron(Number(sd.proj));return true}
   if(t.id==='ah-ok'){const n=$('ah-nome').value.trim();if(!n){alert('Informe o nome.');return true}const P=PROJ.find(x=>x.id===Number(sd.proj));P.pessoas.push(mkP(n,$('ah-func').value,$('ah-data').value||fmtISO(HOJE)));enviarEPI(P,P.pessoas[P.pessoas.length-1]);auditar({acao:'Registrou contratação',alvo:n+' · '+P.nome,alvoId:'proj'+P.id,sec:'proj',campo:$('ah-func').value});fecharModal();render();toast(n+' entrou na lista de alimentação da Compras.');return true}
   if(t.id==='ae-ok'){const P=PROJ.find(x=>x.id===Number(sd.proj)),id=Number($('ae-emp').value);if(!id){return true}P.pessoas.push(mkE(id,addDays(P.assinatura,Number($('ae-dias').value)||20)));auditar({acao:'Alocou colaborador existente',alvo:EMP.find(x=>x.id===id).nome+' · '+P.nome,alvoId:'proj'+P.id,sec:'proj',depois:'prazo de '+(Number($('ae-dias').value)||20)+' dias'});fecharModal();render();return true}
@@ -1286,7 +1291,7 @@ async function abrirAnexo(path){
 function renderHeader(){const hd=document.querySelector('header');if(hd)document.documentElement.style.setProperty('--hh',hd.offsetHeight+'px');$('usr').innerHTML=usuario?`<b>${esc(usuario.nome)}</b><br><span>${PERFIS[usuario.perfil]} · ${esc(usuario.email)}</span>`:''}
 function renderLogin(){$('login-logo').src=$('h-logo').src='data:image/png;base64,'+LOGO_BP_B64}
 async function entrarSessao(session){
-  const r=await sb.from('profiles').select('nome,mestre').eq('id',session.user.id).maybeSingle();
+  const r=await sb.from('profiles').select('nome,mestre,rh_paginas').eq('id',session.user.id).maybeSingle();
   const rp=await sb.rpc('rh_perfil');
   let pf=rp&&rp.data;if(pf==='cons')pf='dir';
   if(!pf||!PERFIS[pf]){
@@ -1296,8 +1301,12 @@ async function entrarSessao(session){
     $('login-erro').textContent='Seu acesso ao sistema do RH está bloqueado. Fale com o gestor.';
     return;
   }
-  usuario={id:session.user.id,nome:(r.data.nome||session.user.email.split('@')[0]),email:session.user.email,perfil:pf,mestre:!!(r.data&&r.data.mestre)};
+  usuario={id:session.user.id,nome:(r.data.nome||session.user.email.split('@')[0]),email:session.user.email,perfil:pf,mestre:!!(r.data&&r.data.mestre),paginas:(r.data&&r.data.rh_paginas)||null};
   perfil=pf;
+  if(!modsOk().length){
+    usuario=null;await sb.auth.signOut();document.body.classList.add('out');
+    $('login-erro').textContent='Nenhuma página do RH foi liberada para você. Fale com o gestor.';return;
+  }
   try{await carregarTudo()}catch(e){
     console.error(e);usuario=null;await sb.auth.signOut();
     $('login-erro').textContent='Não consegui carregar os dados do RH. Tente de novo em instantes.';return;
@@ -1437,6 +1446,75 @@ async function excluirContrato(id){
   PROJ.splice(PROJ.indexOf(P),1);SNAP.proj.delete(id);
   auditar({acao:'Excluiu contrato',alvo:P.nome,alvoId:'proj'+id,sec:'proj'});
   render();toast('Contrato excluído.');
+}
+
+
+/* ---------- Administração · Usuários e acessos (por e-mail, só Mestre) ---------- */
+const USR={lista:null,carregando:false,q:''};
+const RH_PERFIS_OPC=[['grh','Gestor do RH'],['rh','RH'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['dir','Diretoria'],['nenhum','Bloquear acesso ao RH']];
+async function carregarUsuarios(){
+  USR.carregando=true;
+  const r=await sb.rpc('rh_listar_usuarios');
+  USR.carregando=false;
+  if(r.error){toast('Não consegui listar os usuários: '+r.error.message);USR.lista=[]}else USR.lista=r.data||[];
+  renderUsuarios();
+}
+const catalogoPaginas=()=>MODS.filter(m=>m.id!=='admin').flatMap(m=>m.abas.map(a=>({grupo:m.nome,key:m.id+':'+a[0],label:a[1]})));
+function acessoEfetivo(u){
+  if(u.rh_perfil==='nenhum')return['Bloqueado','r'];
+  const pf=u.rh_perfil||(u.mestre?'grh':'cons');
+  const nome=pf==='cons'?'Só consulta':PERFIS[pf];
+  if(u.mestre)return[nome+' · todas as páginas','ok'];
+  const pg=Array.isArray(u.rh_paginas)?u.rh_paginas.length+' página(s)':'todas as páginas do perfil';
+  return[nome+' · '+pg,pf==='cons'?'g':''];
+}
+function renderUsuarios(){
+  const el=$('v-usuarios');if(!el)return;
+  if(!usuario||!usuario.mestre||tab!=='usuarios'){if(tab!=='usuarios')return;el.innerHTML='';return}
+  if(USR.lista===null&&!USR.carregando&&tab==='usuarios'){carregarUsuarios();}
+  el.innerHTML=`<div class="card"><h2>Usuários e acessos do RH</h2><div class="ro" style="margin-bottom:8px">São as mesmas pessoas do sistema de Compras (mesmo e-mail e senha). Aqui você define, por e-mail, o <b>perfil</b> (quais dados a pessoa lê) e as <b>páginas</b> que aparecem no menu dela. Quem não tem perfil definido entra só para consulta; o Gestor Mestre entra como Gestor do RH.</div>
+   <div class="tools"><input id="usr-q" placeholder="Buscar por e-mail ou nome..." value="${esc(USR.q)}"><button class="btn sec" id="usr-recarregar">↻ Atualizar lista</button></div><div id="usr-lista" style="overflow:auto"></div></div>`;
+  renderUsuariosLista();
+}
+function renderUsuariosLista(){
+  const box=$('usr-lista');if(!box)return;
+  if(USR.lista===null){box.innerHTML='<div class="empty">Carregando usuários...</div>';return}
+  const q=norm(USR.q),L=USR.lista.filter(u=>!q||norm((u.email||'')+' '+(u.nome||'')).includes(q));
+  box.innerHTML=`<table><thead><tr><th>E-mail</th><th>Nome</th><th>Papel no Compras</th><th>Perfil no RH</th><th>Páginas do RH</th><th>Acesso efetivo</th></tr></thead><tbody>${L.map(u=>{
+    const ef=acessoEfetivo(u),trava=u.mestre;
+    const opts=RH_PERFIS_OPC.map(([v,l])=>`<option value="${v}" ${u.rh_perfil===v?'selected':''}>${l}</option>`).join('');
+    return `<tr><td><b>${esc(u.email)}</b>${u.id===usuario.id?' <span class="badge">Você</span>':''}</td><td>${esc(u.nome||'')}</td><td>${u.mestre?'<span class="badge">👑 Mestre</span>':esc(u.papel||'')}</td>
+     <td>${trava?'<span class="ro">Gestor do RH (Mestre)</span>':`<select data-usrperfil="${u.id}"><option value="" ${!u.rh_perfil?'selected':''}>Padrão (só consulta)</option>${opts}</select>`}</td>
+     <td>${trava?'<span class="ro">todas</span>':`<button class="btn sec" data-usrpag="${u.id}">🔒 ${Array.isArray(u.rh_paginas)?u.rh_paginas.length+' liberada(s)':'Sem restrição'}</button>`}</td>
+     <td><span class="badge ${ef[1]}">${esc(ef[0])}</span></td></tr>`}).join('')||'<tr><td colspan="6" class="empty">Nenhum usuário encontrado.</td></tr>'}</tbody></table><div class="ro" style="margin-top:4px">${L.length} de ${USR.lista.length} usuário(s)</div>`;
+}
+async function alterarPerfilUsuario(id,valor){
+  const u=USR.lista.find(x=>x.id===id);if(!u)return;
+  const r=await sb.from('profiles').update({rh_perfil:valor||null}).eq('id',id);
+  if(r.error){toast('Não consegui alterar: '+r.error.message);await carregarUsuarios();return}
+  auditar({acao:'Alterou perfil de acesso',alvo:u.email,sec:'acesso',campo:'Perfil no RH',antes:u.rh_perfil||'padrão',depois:valor||'padrão'});
+  toast('Perfil de '+u.email+' atualizado.');await carregarUsuarios();
+}
+function abrirPaginasUsuario(id){
+  const u=USR.lista.find(x=>x.id===id);if(!u)return;
+  const tem=Array.isArray(u.rh_paginas),set=new Set(tem?u.rh_paginas:[]);let html='',g=null;
+  catalogoPaginas().forEach(p=>{
+    if(p.grupo!==g){if(g!==null)html+='</div>';g=p.grupo;html+=`<div style="margin-bottom:10px"><div class="ro" style="font-weight:700;margin-bottom:4px">${esc(p.grupo)}</div>`}
+    html+=`<label style="display:flex;gap:8px;align-items:center;padding:3px 0;font-size:13px"><input type="checkbox" class="usrp-chk" value="${p.key}" ${set.has(p.key)?'checked':''}> ${esc(p.label)}</label>`});
+  html+='</div>';
+  abrirCustom(`<div class="mh"><div><h2>Páginas do RH</h2><div class="ro">${esc(u.email)}</div></div><button class="x" data-close="1">×</button></div>
+   <div class="sec"><label style="display:flex;gap:8px;align-items:center;margin-bottom:10px;padding:8px;background:var(--lb);border-radius:8px"><input type="checkbox" id="usrp-sem" ${!tem?'checked':''}> <b>Sem restrição (vê todas as páginas que o perfil permite)</b></label>
+   <div id="usrp-lista" style="max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px;${!tem?'display:none':''}">${html}</div></div>
+   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-close="1">Cancelar</button><button class="btn" id="usrp-ok" data-uid="${u.id}">Salvar</button></div>`);
+}
+async function salvarPaginasUsuario(id){
+  const u=USR.lista.find(x=>x.id===id);if(!u)return;
+  let v=null;
+  if(!$('usrp-sem').checked){v=[...document.querySelectorAll('.usrp-chk:checked')].map(c=>c.value);if(!v.length){alert('Marque pelo menos uma página, ou deixe "Sem restrição".');return}}
+  const r=await sb.from('profiles').update({rh_paginas:v}).eq('id',id);
+  if(r.error){alert('Não consegui salvar: '+r.error.message);return}
+  auditar({acao:'Alterou páginas do RH',alvo:u.email,sec:'acesso',campo:'Páginas liberadas',antes:Array.isArray(u.rh_paginas)?u.rh_paginas.length+' página(s)':'sem restrição',depois:v?v.length+' página(s)':'sem restrição'});
+  fecharModal();toast('Páginas de '+u.email+' salvas.');await carregarUsuarios();
 }
 
 const diffDias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
@@ -1811,6 +1889,8 @@ document.addEventListener('click',async ev=>{
 document.addEventListener('change',async ev=>{
   const t=ev.target;
   if(t.id==='mob-sel'){mobSel=Number(t.value);renderMob();return}
+  if(t.dataset.usrperfil&&usuario&&usuario.mestre){alterarPerfilUsuario(t.dataset.usrperfil,t.value);return}
+  if(t.id==='usrp-sem'){$('usrp-lista').style.display=t.checked?'none':'';return}
   if(t.id==='pgr-file'&&t.files[0]&&podeEditPgr()){anexarPgr(t.files[0]);return}
   if(t.dataset.pgr&&podeEditPgr()){const fn=t.dataset.pgr,ant=epiDe(fn).join(', '),nv=t.value.split(/[,;]/).map(s=>s.trim()).filter(Boolean);PGR.epis[fn]=nv;auditar({acao:'Alterou EPIs do PGR',alvo:'PGR da empresa',campo:fn,antes:ant,depois:nv.join(', ')});render();return}
   if(t.dataset.acc&&perfil==='grh'){const [sid,pf]=t.dataset.acc.split('|'),s=SECOES.find(x=>x.id===sid),n=Number(t.value);
@@ -1838,7 +1918,7 @@ document.addEventListener('change',async ev=>{
   auditar({acao:'Editou',alvo:e.nome,alvoId:e.id,sec:ci.sec,campo:ci.label,antes:fmtV(old),depois:fmtV(nv)});
   render();
 });
-document.addEventListener('input',ev=>{if(ev.target.id==='mob-busca'){mobBusca=ev.target.value;renderMobLista()}ncDur(ev.target);if(ev.target.id==='au-q'){auQ=ev.target.value;renderAuditLista()}});
+document.addEventListener('input',ev=>{if(ev.target.id==='usr-q'){USR.q=ev.target.value;renderUsuariosLista()}if(ev.target.id==='mob-busca'){mobBusca=ev.target.value;renderMobLista()}ncDur(ev.target);if(ev.target.id==='au-q'){auQ=ev.target.value;renderAuditLista()}});
 document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.id==='wpp-in'){wppEnviar(ev.target.value);return}if(ev.key==='Enter'&&ev.target.id==='chat-in'){enviarChat(ev.target.value);return}
   if(ev.key==='Escape'&&abertoId){abertoId=null;$('ov').classList.remove('on')}});
 
