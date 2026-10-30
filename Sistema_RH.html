@@ -531,21 +531,23 @@ const GLOB={id:0,nome:'Geral',done:{}};
 const MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 let tab='painel';
 const MODS=[
- {id:'rh',nome:'RH',ico:'👥',abas:[['painel','Painel',['rh','grh','dir']],['colab','Colaboradores',['rh','grh']],['mob','Mobilização de contratos',['rh','grh','dir']],['imp','Impostos e encargos',['rh','grh']],['audit','Auditoria',['grh','rh']],['acessos','Acessos',['grh']]]},
+ {id:'rh',nome:'RH',ico:'👥',abas:[['painel','Painel',['rh','grh','dir']],['colab','Colaboradores',['rh','grh']],['mob','Mobilização de contratos',['rh','grh','dir']],['imp','Impostos e encargos',['rh','grh']]]},
  {id:'fin',nome:'Financeiro',ico:'💲',abas:[['painel','Alertas',['fin','grh']],['colab','Colaboradores · salário e HE',['fin']],['folha','Folha de pagamento',['fin','grh']],['imp','Impostos e encargos',['fin','grh']]]},
  {id:'sst',nome:'Saúde e Segurança',ico:'🦺',abas:[['painel','Alertas',['sst','grh']],['colab','Colaboradores · ASO e documentos',['sst']],['trein','Treinamentos',['sst','grh']],['mob','Mobilização · treinamentos e EPI',['sst']],['pgr','PGR / EPIs',['sst','rh','grh']]]},
  {id:'compras',nome:'Compras',ico:'🛒',abas:[['painel','Alertas',['cmp','grh']],['colab','Colaboradores · baixada e férias',['cmp']],['mob','Mobilização · passagens e chegada',['cmp']],['passagens','Passagens',['cmp','grh','dir']],['alim','Alimentação',['cmp','grh','dir']],['pgr','EPIs a comprar',['cmp','grh','dir']]]},
  {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['wpp','WhatsApp do colaborador',['rh','grh']]]},
  {id:'pmo',nome:'PMO',ico:'🏗',abas:[['painel','Alertas',['pmo','grh']],['mob','Mobilização',['pmo','grh']],['colab','Colaboradores · baixada e férias',['pmo']]]},
- {id:'contratos',nome:'Contratos',ico:'📑',abas:[['contratos','Contratos',['pmo','grh','dir','rh']]]}
+ {id:'contratos',nome:'Contratos',ico:'📑',abas:[['contratos','Contratos',['pmo','grh','dir','rh']]]},
+ {id:'admin',nome:'Administração',ico:'⚙️',abas:[['audit','Auditoria',['grh','rh']],['acessos','Acessos',['grh']]]}
 ];
 const ABAS=[...new Set(MODS.flatMap(m=>m.abas.map(a=>a[0])))].map(x=>[x]);
 let mod='rh';
 const MODROLES={wpp:['rh'],rh:['rh','grh','dir'],fin:['fin'],sst:['sst'],compras:['cmp'],pmo:['pmo'],contratos:['pmo','dir']};
-const MODNOME_={wpp:'WhatsApp',rh:'RH',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',contratos:'Contratos'};
+const MODNOME_={wpp:'WhatsApp',rh:'RH',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',contratos:'Contratos',admin:'Administração'};
 const alertasMod=()=>gerarAlertas().filter(a=>roleOk(a.roles)&&a.roles.some(r=>(MODROLES[mod]||[]).includes(r)));
-const modsOk=()=>MODS.filter(m=>m.abas.some(a=>a[2].includes(perfil)));
-const abasOk=m=>m.abas.filter(a=>a[2].includes(perfil));
+const modLiberado=m=>m.id!=='admin'||!!(usuario&&usuario.mestre);
+const modsOk=()=>MODS.filter(m=>modLiberado(m)&&m.abas.some(a=>a[2].includes(perfil)));
+const abasOk=m=>modLiberado(m)?m.abas.filter(a=>a[2].includes(perfil)):[];
 function irPara(tabId){const ms=modsOk();const m=ms.find(x=>x.id===mod&&abasOk(x).some(a=>a[0]===tabId))||ms.find(x=>abasOk(x).some(a=>a[0]===tabId));if(m){mod=m.id;tab=tabId}}
 const toast=m=>{const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',4500)};
 function abrirCustom(html){abertoId=null;$('modal').innerHTML=html;$('ov').classList.add('on')}
@@ -580,7 +582,7 @@ function renderTabs(){
   const ms=modsOk();if(!ms.some(m=>m.id===mod))mod=ms[0].id;
   const M=MODS.find(m=>m.id===mod),ok=abasOk(M);
   if(!ok.some(a=>a[0]===tab))tab=ok[0][0];
-  $('side').innerHTML=ms.map(m=>`<button class="mbtn ${m.id===mod?'on':''}" data-mod="${m.id}" title="${m.nome}"><span class="i">${m.ico}</span>${m.nome}</button>`).join('');
+  $('side').innerHTML=ms.map(m=>`<button class="mbtn ${m.id===mod?'on':''}" data-mod="${m.id}" title="${m.nome}"${m.id==='admin'?' style="margin-top:auto"':''}><span class="i">${m.ico}</span>${m.nome}</button>`).join('');
   $('h-titulo').textContent='ERP Brasil Pontes · '+M.nome;
   $('tabs').innerHTML=ok.map(a=>`<button class="tab ${a[0]===tab?'on':''}" data-tab="${a[0]}">${a[1]}</button>`).join('');
   ABAS.forEach(a=>{$('v-'+a[0]).hidden=a[0]!==tab});
@@ -1284,7 +1286,7 @@ async function abrirAnexo(path){
 function renderHeader(){const hd=document.querySelector('header');if(hd)document.documentElement.style.setProperty('--hh',hd.offsetHeight+'px');$('usr').innerHTML=usuario?`<b>${esc(usuario.nome)}</b><br><span>${PERFIS[usuario.perfil]} · ${esc(usuario.email)}</span>`:''}
 function renderLogin(){$('login-logo').src=$('h-logo').src='data:image/png;base64,'+LOGO_BP_B64}
 async function entrarSessao(session){
-  const r=await sb.from('profiles').select('nome,rh_perfil').eq('id',session.user.id).maybeSingle();
+  const r=await sb.from('profiles').select('nome,rh_perfil,mestre').eq('id',session.user.id).maybeSingle();
   const pf=r.data&&r.data.rh_perfil;
   if(!pf||!PERFIS[pf]){
     await sb.auth.signOut();
@@ -1293,7 +1295,7 @@ async function entrarSessao(session){
     $('login-erro').textContent='Seu login existe, mas ainda não tem acesso ao sistema do RH. Peça ao gestor para liberar em Usuários → Acesso ao RH.';
     return;
   }
-  usuario={id:session.user.id,nome:(r.data.nome||session.user.email.split('@')[0]),email:session.user.email,perfil:pf};
+  usuario={id:session.user.id,nome:(r.data.nome||session.user.email.split('@')[0]),email:session.user.email,perfil:pf,mestre:!!(r.data&&r.data.mestre)};
   perfil=pf;
   try{await carregarTudo()}catch(e){
     console.error(e);usuario=null;await sb.auth.signOut();
