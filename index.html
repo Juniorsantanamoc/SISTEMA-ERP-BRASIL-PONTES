@@ -7691,14 +7691,14 @@ async function loadAndRenderUsuarios(){
     <td>${mestreCell}</td>
     <td>${permCell}</td>
     <td><select class="status-select" onchange="alterarRhPerfil('${u.id}', this.value)" ${(u.rh_perfil==='grh' && !IS_MESTRE) ? 'disabled title="Só o Gestor Mestre altera o Gestor do RH"' : ''}>
-      <option value="">Sem acesso ao RH</option>
+      <option value="">Padrão (consulta; Mestre = Gestor do RH)</option>
       ${RH_PERFIS.map(([v,l])=>`<option value="${v}" ${u.rh_perfil===v?'selected':''} ${(v==='grh' && !IS_MESTRE)?'disabled':''}>${l}</option>`).join('')}
     </select></td>
   </tr>`;
   }).join('') : `<tr class="empty-row"><td colspan="6">Nenhum usuário encontrado.</td></tr>`;
   renderPedidosAcesso();
 }
-const RH_PERFIS = [['grh','Gestor do RH (mestre do RH)'],['rh','RH'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['dir','Diretoria']];
+const RH_PERFIS = [['grh','Gestor do RH (mestre do RH)'],['rh','RH'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['dir','Diretoria'],['nenhum','Bloquear acesso ao RH']];
 window.alterarRhPerfil = async function(id, valor){
   const { error } = await sb.from('profiles').update({ rh_perfil: valor || null }).eq('id', id);
   if(error){ toast('Erro ao alterar acesso ao RH: ' + friendlyErrorMsg(error), true); await loadAndRenderUsuarios(); return; }
@@ -7738,7 +7738,7 @@ window.revisarPedidoAcesso = function(id){
     <div class="form-row"><label>Papel no sistema de Compras</label>
       <select id="pa-papel"><option value="engenheiro">Engenheiro (solicita, não aprova)</option>${IS_MESTRE?'<option value="gestor">Gestor (aprova/exclui)</option>':''}</select></div>
     <div class="form-row"><label>Acesso ao sistema do RH</label>
-      <select id="pa-rh"><option value="">Sem acesso ao RH</option>${RH_PERFIS.filter(r=>IS_MESTRE||r[0]!=='grh').map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div>
+      <select id="pa-rh"><option value="">Padrão (consulta)</option>${RH_PERFIS.filter(r=>IS_MESTRE||r[0]!=='grh').map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div>
     <label style="display:flex;align-items:center;gap:8px;margin:10px 0;padding:8px;background:#f8f9fb;border-radius:8px;">
       <input type="checkbox" id="pa-sem" onchange="document.getElementById('pa-lista').style.display=this.checked?'none':''"> <strong>Sem restrição (vê tudo que o papel permite)</strong></label>
     <div id="pa-lista" style="max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">${lista}</div>
