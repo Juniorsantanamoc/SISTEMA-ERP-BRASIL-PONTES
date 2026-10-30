@@ -368,6 +368,25 @@ tbody tr:last-child td{border-bottom:none;}
   .notif-panel{width:88vw; max-width:320px; right:-52px;}
   .panel{padding:14px 14px;}
 }
+/* colunas ajustáveis + menu de duplo clique */
+.col-rz{position:absolute;right:0;top:0;bottom:0;width:7px;cursor:col-resize;user-select:none;z-index:2}
+.col-rz:hover,.col-rz.on{background:rgba(26,86,160,.35)}
+.colbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 6px}
+.colbar-hint{font-size:11.5px;color:#6b7a90}
+.colpanel{position:fixed;z-index:9000;background:#fff;border:1px solid #cfd8e3;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:10px;width:280px;max-height:70vh;overflow:auto;font-size:13px}
+.colpanel .cp-h{font-weight:700;margin-bottom:6px}
+.colpanel .cp-r{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #f0f3f7}
+.colpanel .cp-r label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.colpanel .cp-r button{border:1px solid #cfd8e3;background:#fff;border-radius:4px;cursor:pointer;font-size:11px;padding:1px 6px}
+.colpanel .cp-f{display:flex;justify-content:space-between;gap:6px;margin-top:8px}
+tbody tr[data-menu]{cursor:context-menu}
+.rowmenu{position:fixed;z-index:9500;background:#fff;border:1px solid #cfd8e3;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.22);padding:6px;min-width:240px;max-width:330px;max-height:80vh;overflow:auto}
+.rowmenu .rm-h{font-size:12px;color:#51627a;padding:6px 10px 8px;border-bottom:1px solid #eef1f5;margin-bottom:4px;font-weight:600}
+.rowmenu .rm-sep{height:1px;background:#eef1f5;margin:4px 0}
+.rowmenu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:6px;font-size:13px;cursor:pointer;color:#1d2b3f}
+.rowmenu button:hover{background:#eef3fa}
+.rowmenu button.danger{color:#b3261e}
+.rowmenu .rm-empty{padding:8px 10px;color:#6b7a90;font-size:12.5px}
 </style>
 </head>
 <body>
@@ -10969,6 +10988,205 @@ async function initAprovacoes(){
   });
 })();
 
+
+/* ============== colunas ajustáveis (por usuário) + menu de duplo clique ============== */
+(function(){
+  const uid = ()=> (typeof CURRENT_USER!=='undefined' && CURRENT_USER && CURRENT_USER.id) || 'anon';
+  const keyOf = tb => 'bpcols:' + uid() + ':' + tb.id;
+  function load(tb){ try{ return JSON.parse(localStorage.getItem(keyOf(tb))||'null') || {}; }catch(e){ return {}; } }
+  function save(tb,p){ try{ localStorage.setItem(keyOf(tb), JSON.stringify(p)); }catch(e){} }
+  const MENU_TABS = {'compras-body':'compras','servicos-body':'servicos','epi-body':'epi','reembolsos-body':'reembolsos'};
+
+  function headRow(table){ return table.querySelector('thead tr'); }
+  function prep(table){
+    const ths = [...headRow(table).children];
+    ths.forEach((th,i)=>{
+      if(th.dataset.ci!==undefined) return;
+      th.dataset.ci = i;
+      th.dataset.lbl = (th.textContent||'').replace(/[▲▼]/g,'').trim();
+      th.style.position = 'relative';
+      const h = document.createElement('span'); h.className = 'col-rz';
+      h.addEventListener('click', e=>e.stopPropagation());
+      h.addEventListener('mousedown', e=>startResize(e, table, th, h));
+      th.appendChild(h);
+    });
+    return ths;
+  }
+  function setW(table, ci, w){
+    table.querySelectorAll('[data-ci="'+ci+'"]').forEach(c=>{
+      c.style.width = c.style.minWidth = c.style.maxWidth = w+'px';
+      if(c.tagName==='TD'){ c.style.overflow='hidden'; c.style.textOverflow='ellipsis'; }
+    });
+  }
+  function startResize(e, table, th, h){
+    e.preventDefault(); e.stopPropagation();
+    const x0 = e.clientX, w0 = th.getBoundingClientRect().width, ci = th.dataset.ci;
+    h.classList.add('on'); let w = w0;
+    function mv(ev){ w = Math.max(40, Math.round(w0 + ev.clientX - x0)); setW(table, ci, w); }
+    function up(){
+      document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
+      h.classList.remove('on');
+      const tb = table.tBodies[0], p = load(tb); p.w = p.w || {}; p.w[ci] = w; save(tb, p);
+    }
+    document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+  }
+  function apply(table){
+    const tb = table.tBodies[0]; if(!tb) return;
+    const hr = headRow(table); if(!hr) return;
+    const ths = prep(table), n = ths.length, p = load(tb);
+    const rows = [...tb.rows].filter(r=>r.children.length===n);
+    rows.forEach(r=>[...r.children].forEach((c,i)=>{ if(c.dataset.ci===undefined) c.dataset.ci = i; }));
+    let order = Array.isArray(p.order) && p.order.length===n ? p.order.map(Number) : ths.map((_,i)=>i);
+    if(new Set(order).size!==n || order.some(x=>!(x>=0 && x<n))) order = ths.map((_,i)=>i);
+    [hr, ...rows].forEach(r=>{
+      const cur = [...r.children].map(c=>+c.dataset.ci);
+      if(cur.join()===order.join()) return;
+      const m = {}; [...r.children].forEach(c=>m[c.dataset.ci]=c);
+      order.forEach(ci=>r.appendChild(m[ci]));
+    });
+    const hid = new Set((p.hidden||[]).map(Number)), w = p.w || {};
+    [hr, ...rows].forEach(r=>[...r.children].forEach(c=>{
+      const ci = +c.dataset.ci;
+      c.style.display = hid.has(ci) ? 'none' : '';
+      if(w[ci]){ c.style.width = c.style.minWidth = c.style.maxWidth = w[ci]+'px'; if(c.tagName==='TD'){ c.style.overflow='hidden'; c.style.textOverflow='ellipsis'; } }
+      else if(c.style.width){ c.style.width = c.style.minWidth = c.style.maxWidth = ''; }
+    }));
+    if(MENU_TABS[tb.id]) rows.forEach(r=>r.setAttribute('data-menu','1'));
+  }
+  function closePanel(){ const x = document.getElementById('colpanel'); if(x) x.remove(); }
+  function openPanel(table, anchor){
+    closePanel();
+    const tb = table.tBodies[0], ths = prep(table), n = ths.length;
+    const byCi = {}; ths.forEach(th=>byCi[th.dataset.ci] = th.dataset.lbl);
+    const p = load(tb);
+    let order = Array.isArray(p.order) && p.order.length===n ? p.order.map(Number) : ths.map((_,i)=>+i);
+    if(new Set(order).size!==n) order = ths.map((_,i)=>i);
+    let hid = new Set((p.hidden||[]).map(Number));
+    const box = document.createElement('div'); box.className = 'colpanel'; box.id = 'colpanel';
+    const r = anchor.getBoundingClientRect();
+    box.style.top = Math.min(r.bottom+4, window.innerHeight-200)+'px';
+    box.style.left = Math.max(8, Math.min(r.right-280, window.innerWidth-290))+'px';
+    function persist(){ const q = load(tb); q.order = order.slice(); q.hidden = [...hid]; save(tb, q); apply(table); }
+    function draw(){
+      box.innerHTML = '<div class="cp-h">Colunas desta tabela</div>' +
+        order.filter(ci=>byCi[ci]).map(ci=>
+          `<div class="cp-r"><label><input type="checkbox" data-ci="${ci}" ${hid.has(ci)?'':'checked'} ${byCi[ci]==='Ações'?'disabled':''}> ${esc(byCi[ci])}</label>
+           <span><button type="button" data-mv="-1" data-ci="${ci}">▲</button> <button type="button" data-mv="1" data-ci="${ci}">▼</button></span></div>`).join('') +
+        '<div class="cp-f"><button type="button" class="btn btn-sm btn-secondary" data-reset="1">Restaurar padrão</button><button type="button" class="btn btn-sm btn-primary" data-close="1">Fechar</button></div>';
+    }
+    box.addEventListener('click', e=>{
+      const b = e.target.closest('button'); if(!b) return;
+      if(b.dataset.close){ closePanel(); return; }
+      if(b.dataset.reset){ try{ localStorage.removeItem(keyOf(tb)); }catch(_){} order = ths.map((_,i)=>+i); hid = new Set(); apply(table); draw(); return; }
+      if(b.dataset.mv){
+        const ci = +b.dataset.ci, dir = +b.dataset.mv; let i = order.indexOf(ci), j = i+dir;
+        while(j>=0 && j<n && !byCi[order[j]]) j += dir;
+        if(j>=0 && j<n){ [order[i], order[j]] = [order[j], order[i]]; persist(); draw(); }
+      }
+    });
+    box.addEventListener('change', e=>{
+      const c = e.target; if(c.type!=='checkbox') return;
+      const ci = +c.dataset.ci; if(c.checked) hid.delete(ci); else hid.add(ci);
+      persist();
+    });
+    draw(); document.body.appendChild(box);
+    setTimeout(()=>document.addEventListener('mousedown', function off(ev){
+      if(box.contains(ev.target) || anchor.contains(ev.target)) return;
+      closePanel(); document.removeEventListener('mousedown', off);
+    }), 0);
+  }
+  function addBar(table){
+    const wrap = table.closest('.table-wrap'); if(!wrap) return;
+    if(wrap.previousElementSibling && wrap.previousElementSibling.classList.contains('colbar')) return;
+    const tb = table.tBodies[0];
+    const bar = document.createElement('div'); bar.className = 'colbar';
+    bar.innerHTML = '<span class="colbar-hint">'+(MENU_TABS[tb.id] ? '💡 Dê dois cliques numa linha para abrir o menu de ações · ' : '')+'Arraste a borda de um título para ajustar a largura</span><button type="button" class="btn btn-sm btn-secondary">⚙ Colunas</button>';
+    wrap.parentNode.insertBefore(bar, wrap);
+    bar.querySelector('button').addEventListener('click', e=>{ e.stopPropagation(); openPanel(table, e.currentTarget); });
+  }
+  function init(){
+    document.querySelectorAll('.table-wrap table').forEach(table=>{
+      const tb = table.tBodies[0];
+      if(!tb || !tb.id || !headRow(table) || headRow(table).children.length<4 || table.dataset.colsInit) return;
+      table.dataset.colsInit = '1';
+      prep(table); addBar(table); apply(table);
+      new MutationObserver(()=>apply(table)).observe(tb, {childList:true});
+    });
+  }
+  window.bpColsInit = init;
+  init();
+
+  /* ---------- menu de ações no duplo clique ---------- */
+  function closeMenu(){ const m = document.getElementById('rowmenu'); if(m) m.remove(); }
+  function rank(it){
+    const s = it.label;
+    if(/Aprovar|Rejeitar/.test(s)) return 1;
+    if(/entregue|realizado|pronto/i.test(s)) return 2;
+    if(/Status →/.test(s)) return 3;
+    if(/Receber|Concluir|Cotação|Imprimir|item\(ns\)/.test(s)) return 4;
+    if(/Pausar|Retomar/.test(s)) return 5;
+    if(/Cancelar/.test(s)) return 6;
+    if(/Editar|Solicitar alteração/.test(s)) return 7;
+    if(/Negar/.test(s)) return 8;
+    return 9;
+  }
+  function abrirMenu(tr, page, x, y){
+    closeMenu();
+    const gestor = podeGerir(page), items = [];
+    const temExcluir = !!tr.querySelector('button[onclick*="excluirRegistro"]');
+    tr.querySelectorAll('button').forEach(b=>{
+      if(b.closest('.rowmenu')) return;
+      const oc = b.getAttribute('onclick') || '';
+      let label = b.textContent.trim().replace(/\s+/g,' '), cls = '';
+      if(/excluirRegistro/.test(oc)){ label = gestor ? '🗑 Excluir' : '🚫 Solicitar exclusão'; cls = 'danger'; }
+      else if(/solicitarExclusaoModal/.test(oc)){ if(temExcluir) return; cls = 'danger'; }
+      else if(/editar\w*Modal/.test(oc)){ label = gestor ? '✏️ Editar' : '✏️ Solicitar alteração'; }
+      else if(/rejeitar|cancelar|negar/i.test(oc)){ cls = 'danger'; }
+      items.push({label, cls, el:b});
+    });
+    const sel = tr.querySelector('select.status-select');
+    if(sel && gestor){
+      [...sel.options].filter(o=>o.value!==sel.value).forEach(o=>items.push({
+        label:'📌 Status → '+o.value, cls:'',
+        fn:()=>{ sel.value = o.value; sel.dispatchEvent(new Event('change', {bubbles:true})); }
+      }));
+    }
+    items.sort((a,b)=>rank(a)-rank(b));
+    const numTd = [...tr.children].find(c=>/^\d+$/.test(c.textContent.trim()));
+    const desc = (tr.querySelector('.desc-cell')||{}).textContent || '';
+    const m = document.createElement('div'); m.className = 'rowmenu'; m.id = 'rowmenu';
+    let html = `<div class="rm-h">${numTd?'#'+esc(numTd.textContent.trim())+' — ':''}${esc(desc.trim().slice(0,60))}</div>`;
+    let last = null;
+    items.forEach((it,i)=>{
+      const r = rank(it);
+      if(last!==null && r!==last && (r>=7 || last>=7)) html += '<div class="rm-sep"></div>';
+      last = r;
+      html += `<button type="button" class="${it.cls}" data-i="${i}">${esc(it.label)}</button>`;
+    });
+    if(!items.length) html += '<div class="rm-empty">Nenhuma ação disponível para o seu perfil.</div>';
+    m.innerHTML = html;
+    m.addEventListener('click', e=>{
+      const b = e.target.closest('button[data-i]'); if(!b) return;
+      const it = items[+b.dataset.i]; closeMenu();
+      if(it.fn) it.fn(); else if(it.el) it.el.click();
+    });
+    document.body.appendChild(m);
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(6, Math.min(x, window.innerWidth-w-6))+'px';
+    m.style.top = Math.max(6, Math.min(y, window.innerHeight-h-6))+'px';
+  }
+  document.addEventListener('dblclick', e=>{
+    const tr = e.target.closest && e.target.closest('tbody tr'); if(!tr || tr.classList.contains('empty-row')) return;
+    const page = MENU_TABS[tr.parentElement.id]; if(!page) return;
+    if(e.target.closest('button,select,input,a,textarea,.anexo-chip,.obs-balao')) return;
+    e.preventDefault(); try{ window.getSelection().removeAllRanges(); }catch(_){}
+    abrirMenu(tr, page, e.clientX, e.clientY);
+  });
+  document.addEventListener('mousedown', e=>{ if(!e.target.closest('#rowmenu')) closeMenu(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeMenu(); closePanel(); } });
+  window.addEventListener('scroll', closeMenu, true);
+  window.addEventListener('resize', closeMenu);
+})();
 
 /* ============== bootstrap ============== */
 initAuthGate();
