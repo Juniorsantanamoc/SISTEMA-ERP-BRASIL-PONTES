@@ -406,7 +406,14 @@ tbody tr[data-menu]{cursor:context-menu}
       <div class="form-row"><label>Senha</label><input type="password" id="login-senha" required autocomplete="current-password"></div>
       <button type="submit" class="btn btn-primary" id="btn-login">Entrar</button>
     </form>
-    <div class="login-foot">Acesso restrito. Fale com a coordenação de compras para criar seu usuário.</div>
+    <form id="form-solicitar" style="display:none;">
+      <div class="form-row"><label>Nome completo</label><input type="text" id="sol-nome" required minlength="3" maxlength="80" autocomplete="name"></div>
+      <div class="form-row"><label>E-mail</label><input type="email" id="sol-email" required autocomplete="email"></div>
+      <div class="form-row"><label>Crie uma senha (mín. 8 caracteres)</label><input type="password" id="sol-senha" required minlength="8" maxlength="72" autocomplete="new-password"></div>
+      <div class="form-row"><label>Repita a senha</label><input type="password" id="sol-senha2" required minlength="8" maxlength="72" autocomplete="new-password"></div>
+      <button type="submit" class="btn btn-primary" id="btn-solicitar">Enviar pedido de acesso</button>
+    </form>
+    <div class="login-foot"><a href="#" id="lnk-solicitar" style="color:var(--blue);font-weight:600;">Não tenho login · Solicitar acesso</a><div style="margin-top:8px;" id="login-foot-txt">Quem já tem login entra normalmente. Pedidos novos são analisados pelo gestor, que define o que você poderá ver.</div></div>
   </div>
 </div>
 
@@ -460,7 +467,7 @@ tbody tr[data-menu]{cursor:context-menu}
     <div class="nav-item" data-page="regras"><span class="nav-icon">📖</span>Regras Gerais</div>
     <div class="nav-item" id="nav-aprovacoes" data-page="aprovacoes"><span class="nav-icon">✅</span>Aprovações<span class="nav-badge" id="badge-aprov">0</span></div>
     <div class="nav-group-label" id="nav-group-admin" style="display:none;">Administração</div>
-    <div class="nav-item" id="nav-usuarios" data-page="usuarios" style="display:none;"><span class="nav-icon">👤</span>Usuários</div>
+    <div class="nav-item" id="nav-usuarios" data-page="usuarios" style="display:none;"><span class="nav-icon">👤</span>Usuários<span class="nav-badge" id="badge-pedidos" style="display:none;">0</span></div>
     <div class="nav-item" id="nav-reverter" data-page="reverter-conclusoes" style="display:none;"><span class="nav-icon">↩️</span>Reverter Conclusões<span class="nav-badge" id="badge-reverter">0</span></div>
     <div class="sidebar-foot">
       <div style="font-size:11px;color:#9fb8cf;"><span class="sync-dot"></span>Sincronizado em tempo real</div>
@@ -1194,10 +1201,11 @@ tbody tr[data-menu]{cursor:context-menu}
 
       <!-- USUÁRIOS -->
       <div class="page" id="page-usuarios">
-        <div class="modal-sub" style="margin-bottom:14px;">Controla quem pode aprovar/rejeitar requisições e excluir registros. Usuário novo sempre começa como "Engenheiro".</div>
+        <div id="pedidos-acesso"></div>
+        <div class="modal-sub" style="margin-bottom:14px;">Controla quem pode aprovar/rejeitar requisições e excluir registros. Pessoas novas pedem acesso na tela de login e aparecem aqui para você aprovar, escolhendo o que cada uma poderá ver.</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Nome</th><th>Obra padrão</th><th>Papel</th><th>Gestor Mestre</th><th>Permissões de acesso</th></tr></thead>
+            <thead><tr><th>Nome</th><th>Obra padrão</th><th>Papel</th><th>Gestor Mestre</th><th>Permissões de acesso</th><th>Acesso ao RH</th></tr></thead>
             <tbody id="usuarios-body"></tbody>
           </table>
         </div>
@@ -2099,13 +2107,45 @@ document.getElementById('form-login').addEventListener('submit', async (e)=>{
   const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
   btn.disabled = false; btn.textContent = 'Entrar';
   if(error){
-    errBox.textContent = 'Não foi possível entrar: e-mail ou senha incorretos.';
+    let msg = 'Não foi possível entrar: e-mail ou senha incorretos.';
+    try{
+      const st = await sb.rpc('status_acesso', { p_email: email });
+      if(st && st.data==='pendente') msg = 'Seu pedido de acesso ainda aguarda a aprovação do gestor. Assim que for aprovado, é só entrar com este e-mail e a senha que você criou.';
+      else if(st && st.data==='recusada') msg = 'Seu pedido de acesso foi recusado. Fale com o gestor.';
+    }catch(_){}
+    errBox.textContent = msg;
     errBox.classList.add('show');
     return;
   }
   document.getElementById('login-wrap').classList.add('hidden');
   await enterApp(data.session);
 });
+
+/* ---- pedido de acesso (tela de login) ---- */
+(function(){
+  const fl = document.getElementById('form-login'), fs = document.getElementById('form-solicitar'), lnk = document.getElementById('lnk-solicitar'), err = document.getElementById('login-error');
+  let modoPedido = false;
+  function setModo(p){
+    modoPedido = p; fl.style.display = p ? 'none' : ''; fs.style.display = p ? '' : 'none';
+    lnk.textContent = p ? '← Já tenho login · Entrar' : 'Não tenho login · Solicitar acesso';
+    err.classList.remove('show'); err.style.background=''; err.style.color='';
+  }
+  lnk.addEventListener('click', e=>{ e.preventDefault(); setModo(!modoPedido); });
+  fs.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const nome = document.getElementById('sol-nome').value.trim(), email = document.getElementById('sol-email').value.trim();
+    const s1 = document.getElementById('sol-senha').value, s2 = document.getElementById('sol-senha2').value;
+    err.style.background=''; err.style.color='';
+    if(s1 !== s2){ err.textContent = 'As senhas não conferem.'; err.classList.add('show'); return; }
+    const btn = document.getElementById('btn-solicitar'); btn.disabled = true; btn.textContent = 'Enviando…';
+    const { error } = await sb.rpc('solicitar_acesso', { p_nome: nome, p_email: email, p_senha: s1 });
+    btn.disabled = false; btn.textContent = 'Enviar pedido de acesso';
+    if(error){ err.textContent = error.message.replace(/^.*?:\s*/, ''); err.classList.add('show'); return; }
+    fs.reset(); setModo(false);
+    err.textContent = '✅ Pedido enviado! O gestor vai analisar e liberar o seu acesso. Depois da aprovação, entre com este e-mail e a senha que você criou.';
+    err.style.background = '#e4f3ea'; err.style.color = '#1f6b3f'; err.classList.add('show');
+  });
+})();
 
 document.getElementById('btn-logout').addEventListener('click', async ()=>{
   teardownRealtime();
@@ -2155,6 +2195,7 @@ async function enterApp(session){
   wireAlimentacaoExtras();
   wireNotificacoes();
   initAprovacoes();
+  initPedidosAcesso();
 
   await loadLookupData(); // sinapi + cadastro_extra, once
   await loadRegras();
@@ -7649,8 +7690,89 @@ async function loadAndRenderUsuarios(){
     </td>
     <td>${mestreCell}</td>
     <td>${permCell}</td>
+    <td><select class="status-select" onchange="alterarRhPerfil('${u.id}', this.value)" ${(u.rh_perfil==='grh' && !IS_MESTRE) ? 'disabled title="Só o Gestor Mestre altera o Gestor do RH"' : ''}>
+      <option value="">Sem acesso ao RH</option>
+      ${RH_PERFIS.map(([v,l])=>`<option value="${v}" ${u.rh_perfil===v?'selected':''} ${(v==='grh' && !IS_MESTRE)?'disabled':''}>${l}</option>`).join('')}
+    </select></td>
   </tr>`;
-  }).join('') : `<tr class="empty-row"><td colspan="5">Nenhum usuário encontrado.</td></tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="6">Nenhum usuário encontrado.</td></tr>`;
+  renderPedidosAcesso();
+}
+const RH_PERFIS = [['grh','Gestor do RH (mestre do RH)'],['rh','RH'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['dir','Diretoria']];
+window.alterarRhPerfil = async function(id, valor){
+  const { error } = await sb.from('profiles').update({ rh_perfil: valor || null }).eq('id', id);
+  if(error){ toast('Erro ao alterar acesso ao RH: ' + friendlyErrorMsg(error), true); await loadAndRenderUsuarios(); return; }
+  toast(valor ? 'Acesso ao RH atualizado.' : 'Acesso ao RH removido.');
+};
+
+/* ---- pedidos de acesso (gestor) ---- */
+let PEDIDOS_ACESSO = [];
+async function carregarPedidosAcesso(){
+  if(!IS_GESTOR){ PEDIDOS_ACESSO = []; return; }
+  const { data } = await sb.from('solicitacoes_acesso').select('id,nome,email,status,criado_em').eq('status','pendente').order('criado_em');
+  PEDIDOS_ACESSO = data || [];
+  const b = document.getElementById('badge-pedidos');
+  if(b){ b.textContent = PEDIDOS_ACESSO.length; b.style.display = PEDIDOS_ACESSO.length ? '' : 'none'; }
+}
+function renderPedidosAcesso(){
+  const box = document.getElementById('pedidos-acesso'); if(!box) return;
+  if(!PEDIDOS_ACESSO.length){ box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="panel" style="border:1px solid #f0c987;background:#fff8ea;border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+    <div style="font-weight:700;margin-bottom:8px;">🔔 Pedidos de acesso aguardando você (${PEDIDOS_ACESSO.length})</div>
+    ${PEDIDOS_ACESSO.map(p=>`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid #f3dfb8;">
+      <div style="flex:1;min-width:200px;"><b>${esc(p.nome)}</b><div class="muted" style="font-size:12px;">${esc(p.email)} · pedido em ${fmtDateHora(p.criado_em)}</div></div>
+      <button class="btn btn-sm btn-primary" onclick="revisarPedidoAcesso('${p.id}')">Revisar e liberar</button>
+      <button class="btn btn-sm btn-danger-outline" onclick="recusarPedidoAcesso('${p.id}')">Recusar</button></div>`).join('')}</div>`;
+}
+window.revisarPedidoAcesso = function(id){
+  const p = PEDIDOS_ACESSO.find(x=>x.id===id); if(!p) return;
+  let grupoAtual = null, lista = '';
+  PAGINAS_NAV_CATALOGO.forEach(pg=>{
+    if(pg.grupo !== grupoAtual){ if(grupoAtual!==null) lista += '</div>'; grupoAtual = pg.grupo; lista += `<div style="margin-bottom:8px;"><div class="muted" style="font-size:12px;font-weight:600;">${esc(pg.grupo)}</div>`; }
+    lista += `<label style="display:flex;align-items:center;gap:8px;padding:2px 0;font-size:14px;"><input type="checkbox" class="pa-chk" value="${pg.key}"> ${esc(pg.label)}</label>`;
+  });
+  lista += '</div>';
+  openModal(`
+    <h3>Liberar acesso — ${esc(p.nome)}</h3>
+    <div class="modal-sub">${esc(p.email)}. Defina abaixo exatamente o que esta pessoa vai ver. Ela entra com o e-mail e a senha que criou.</div>
+    <div class="form-row"><label>Papel no sistema de Compras</label>
+      <select id="pa-papel"><option value="engenheiro">Engenheiro (solicita, não aprova)</option>${IS_MESTRE?'<option value="gestor">Gestor (aprova/exclui)</option>':''}</select></div>
+    <div class="form-row"><label>Acesso ao sistema do RH</label>
+      <select id="pa-rh"><option value="">Sem acesso ao RH</option>${RH_PERFIS.filter(r=>IS_MESTRE||r[0]!=='grh').map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div>
+    <label style="display:flex;align-items:center;gap:8px;margin:10px 0;padding:8px;background:#f8f9fb;border-radius:8px;">
+      <input type="checkbox" id="pa-sem" onchange="document.getElementById('pa-lista').style.display=this.checked?'none':''"> <strong>Sem restrição (vê tudo que o papel permite)</strong></label>
+    <div id="pa-lista" style="max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">${lista}</div>
+    <div id="pa-resumo" class="muted" style="font-size:12px;margin-top:6px;"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" id="pa-ok">✅ Aprovar e criar acesso</button></div>`);
+  const resumo = ()=>{ const n = document.querySelectorAll('.pa-chk:checked').length; document.getElementById('pa-resumo').textContent = document.getElementById('pa-sem').checked ? 'Verá todas as páginas liberadas pelo papel.' : (n+' página(s) no menu dela.'); };
+  document.getElementById('pa-lista').addEventListener('change', resumo); document.getElementById('pa-sem').addEventListener('change', resumo); resumo();
+  document.getElementById('pa-ok').addEventListener('click', async ()=>{
+    const sem = document.getElementById('pa-sem').checked;
+    const paginas = sem ? null : [...document.querySelectorAll('.pa-chk:checked')].map(c=>c.value);
+    if(!sem && !paginas.length){ toast('Marque ao menos uma página ou "Sem restrição".', true); return; }
+    const btn = document.getElementById('pa-ok'); btn.disabled = true; btn.textContent = 'Criando…';
+    const { error } = await sb.rpc('aprovar_acesso', { p_id: id, p_papel: document.getElementById('pa-papel').value, p_paginas: paginas, p_rh_perfil: document.getElementById('pa-rh').value || null, p_mestre: false });
+    if(error){ btn.disabled = false; btn.textContent = '✅ Aprovar e criar acesso'; toast('Erro: ' + error.message, true); return; }
+    closeModal(); toast('Acesso liberado. Avise a pessoa para entrar com o e-mail e a senha que ela criou.');
+    await carregarPedidosAcesso(); await loadAndRenderUsuarios();
+  });
+};
+window.recusarPedidoAcesso = async function(id){
+  const obs = prompt('Motivo da recusa (opcional):'); if(obs === null) return;
+  const { error } = await sb.rpc('recusar_acesso', { p_id: id, p_obs: obs || null });
+  if(error){ toast('Erro: ' + error.message, true); return; }
+  toast('Pedido recusado.'); await carregarPedidosAcesso(); renderPedidosAcesso();
+};
+async function initPedidosAcesso(){
+  await carregarPedidosAcesso();
+  try{ if(window.__chPed) sb.removeChannel(window.__chPed); }catch(e){}
+  if(!IS_GESTOR) return;
+  window.__chPed = sb.channel('rt-pedidos-acesso').on('postgres_changes', {event:'*', schema:'public', table:'solicitacoes_acesso'}, async payload=>{
+    await carregarPedidosAcesso(); renderPedidosAcesso();
+    if(payload.eventType==='INSERT') toast('🔔 Novo pedido de acesso aguardando sua aprovação (menu Usuários).');
+  }).subscribe();
 }
 window.alterarMestreUsuario = async function(id, novoMestre){
   if(!IS_MESTRE){ toast('Só o Gestor Mestre pode fazer isso.', true); return; }
