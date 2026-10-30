@@ -11051,7 +11051,24 @@ async function initAprovacoes(){
       if(w[ci]){ c.style.width = c.style.minWidth = c.style.maxWidth = w[ci]+'px'; if(c.tagName==='TD'){ c.style.overflow='hidden'; c.style.textOverflow='ellipsis'; } }
       else if(c.style.width){ c.style.width = c.style.minWidth = c.style.maxWidth = ''; }
     }));
-    if(MENU_TABS[tb.id]) rows.forEach(r=>r.setAttribute('data-menu','1'));
+    if(MENU_TABS[tb.id]){
+      const acTh = ths.find(t=>t.dataset.lbl==='Ações');
+      rows.forEach(r=>{
+        r.setAttribute('data-menu','1');
+        /* botões de uso raro saem da linha (continuam no menu); fica só o essencial + "⋯ Mais" */
+        r.querySelectorAll('button').forEach(b=>{
+          if(/pausarItem|retomarItem|cancelarItemModal|editar\w*Modal|excluirRegistro|solicitarExclusaoModal/.test(b.getAttribute('onclick')||'')) b.style.display='none';
+        });
+        if(acTh && !r.querySelector('.btn-mais')){
+          const cell = r.querySelector('td[data-ci="'+acTh.dataset.ci+'"]');
+          if(cell){
+            const m = document.createElement('button'); m.type='button'; m.className='btn btn-sm btn-secondary btn-mais'; m.textContent='⋯ Mais'; m.title='Todas as ações deste item';
+            m.addEventListener('click', ev=>{ ev.stopPropagation(); const q = m.getBoundingClientRect(); abrirMenu(r, MENU_TABS[tb.id], q.left, q.bottom+4); });
+            cell.appendChild(m);
+          }
+        }
+      });
+    }
   }
   function closePanel(){ const x = document.getElementById('colpanel'); if(x) x.remove(); }
   function openPanel(table, anchor){
@@ -11135,7 +11152,7 @@ async function initAprovacoes(){
     const gestor = podeGerir(page), items = [];
     const temExcluir = !!tr.querySelector('button[onclick*="excluirRegistro"]');
     tr.querySelectorAll('button').forEach(b=>{
-      if(b.closest('.rowmenu')) return;
+      if(b.closest('.rowmenu') || b.classList.contains('btn-mais')) return;
       const oc = b.getAttribute('onclick') || '';
       let label = b.textContent.trim().replace(/\s+/g,' '), cls = '';
       if(/excluirRegistro/.test(oc)){ label = gestor ? '🗑 Excluir' : '🚫 Solicitar exclusão'; cls = 'danger'; }
