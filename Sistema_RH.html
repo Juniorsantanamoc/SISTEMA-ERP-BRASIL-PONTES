@@ -178,6 +178,8 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
   <section id="v-folha" hidden></section>
   <section id="v-contratos" hidden></section>
   <section id="v-usuarios" hidden></section>
+  <section id="v-fat" hidden></section>
+  <section id="v-fatdash" hidden></section>
   <section id="v-acessos" hidden>
     <div class="card"><h2>Quem enxerga o quê</h2><table class="matriz" id="matriz"></table></div>
     <div class="card" style="margin-top:16px"><h2>O que o RH envia para os outros módulos</h2>
@@ -189,7 +191,7 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
 <div id="form-solicitar" style="display:none"><label for="sol-nome">Nome completo</label><input id="sol-nome" autocomplete="name"><label for="sol-email">E-mail</label><input id="sol-email" type="email" autocomplete="email"><label for="sol-senha">Crie uma senha (mínimo 6 caracteres)</label><input id="sol-senha" type="password" autocomplete="new-password"><label for="sol-senha2">Repita a senha</label><input id="sol-senha2" type="password" autocomplete="new-password"><button class="btn" id="btn-solicitar" type="button" style="width:100%;padding:10px;margin-top:10px">Enviar pedido de acesso</button><div class="ro" style="margin-top:6px">O gestor recebe o pedido, define o que você poderá ver e libera o acesso.</div></div>
 <div class="err" id="login-erro"></div>
 <div style="margin-top:12px"><a href="#" id="lnk-solicitar" style="color:var(--blue);font-size:13px">Não tenho login · Solicitar acesso</a></div></div></div></div>
-<button class="fab" id="chat-fab" title="Assistente do RH">💬</button>
+<button class="fab" id="chat-fab" title="Assistente do RH">✨</button>
 <div class="chat" id="chat"><header><span>✨ Assistente do RH</span><span class="sub" id="chat-perfil"></span><button class="x" id="chat-x">×</button></header>
   <div class="msgs" id="msgs"></div><div class="sug" id="sug"></div>
   <div class="chatin"><input id="chat-in" placeholder="Escreva o que precisa..." autocomplete="off"><button class="btn" id="chat-send">Enviar</button></div></div>
@@ -351,7 +353,7 @@ function render(){
     pmo:'Módulo PMO: cria e edita contratos e CDs na aba Contratos, anexa o cronograma oficial e monitora a mobilização feita por RH, Saúde e Segurança e Compras.',
     dir:'Vê o painel (quadro de colaboradores) e o andamento da mobilização dos contratos. Não acessa dados pessoais nem salários.'}[perfil]}`;
   if(CHAT.abrir)renderChat();
-  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();
+  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();renderFat();renderFatDash();
   if(abertoId)renderModal();
   agendarSync();
 }
@@ -533,7 +535,7 @@ const MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','
 let tab='painel';
 const MODS=[
  {id:'rh',nome:'RH',ico:'👥',abas:[['painel','Painel',['rh','grh','dir']],['colab','Colaboradores',['rh','grh']],['mob','Mobilização de contratos',['rh','grh','dir']],['imp','Impostos e encargos',['rh','grh']]]},
- {id:'fin',nome:'Financeiro',ico:'💲',abas:[['painel','Alertas',['fin','grh']],['colab','Colaboradores · salário e HE',['fin']],['folha','Folha de pagamento',['fin','grh']],['imp','Impostos e encargos',['fin','grh']]]},
+ {id:'fin',nome:'Financeiro',ico:'💲',abas:[['painel','Alertas',['fin','grh']],['fatdash','Faturamento · Dashboard',['fin','grh','dir']],['fat','Medições e NFs',['fin','grh','dir']],['colab','Colaboradores · salário e HE',['fin']],['folha','Folha de pagamento',['fin','grh']],['imp','Impostos e encargos',['fin','grh']]]},
  {id:'sst',nome:'Saúde e Segurança',ico:'🦺',abas:[['painel','Alertas',['sst','grh']],['colab','Colaboradores · ASO e documentos',['sst']],['trein','Treinamentos',['sst','grh']],['mob','Mobilização · treinamentos e EPI',['sst']],['pgr','PGR / EPIs',['sst','rh','grh']]]},
  {id:'compras',nome:'Compras',ico:'🛒',abas:[['painel','Alertas',['cmp','grh']],['colab','Colaboradores · baixada e férias',['cmp']],['mob','Mobilização · passagens e chegada',['cmp']],['passagens','Passagens',['cmp','grh','dir']],['alim','Alimentação',['cmp','grh','dir']],['pgr','EPIs a comprar',['cmp','grh','dir']]]},
  {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['wpp','WhatsApp do colaborador',['rh','grh']]]},
@@ -981,7 +983,7 @@ function responder(raw){
     const A=gerarAlertas().filter(a=>roleOk(a.roles)&&!a.e.done[a.k]);
     return{txt:A.length?`Você tem <b>${A.length}</b> alerta(s). Os principais:<br>`+linhasLista(A.slice(0,6).map(a=>`• ${a.tipo}: ${esc(a.txt).slice(0,110)}`),6):'Nenhum alerta pendente.'};
   }
-  return{txt:'Posso ajudar com:<br>• <b>Exportar</b> planilhas: <i>exportar baixada e férias da G&L</i><br>• <b>Consultas</b>: <i>quem tem baixada nos próximos 15 dias?</i>, <i>quem sai de férias?</i>, <i>ASO vencendo</i>, <i>quantos PJ?</i>, <i>aniversariantes</i>, <i>quando é o pagamento?</i><br>Só mostro o que o seu perfil pode ver.'};
+  return{fb:1,txt:'Posso ajudar com:<br>• <b>Exportar</b> planilhas: <i>exportar baixada e férias da G&L</i><br>• <b>Consultas</b>: <i>quem tem baixada nos próximos 15 dias?</i>, <i>quem sai de férias?</i>, <i>ASO vencendo</i>, <i>quantos PJ?</i>, <i>aniversariantes</i>, <i>quando é o pagamento?</i><br>Só mostro o que o seu perfil pode ver.'};
 }
 function renderChat(){
   $('chat').classList.toggle('on',CHAT.abrir);$('chat-perfil').textContent='· '+PERFIS[perfil];
@@ -993,7 +995,9 @@ function renderChat(){
 function enviarChat(txt){
   txt=(txt||'').trim();if(!txt)return;
   CHAT.msgs.push({de:'eu',txt});
-  const r=responder(txt);CHAT.msgs.push({de:'ia',txt:r.txt,exp:r.exp||null});
+  const r=responder(txt);
+  if(r.fb){const m={de:'ia',txt:'<i>Pensando...</i>'};CHAT.msgs.push(m);$('chat-in').value='';renderChat();perguntarIA(txt,r.txt).then(h=>{m.txt=h;renderChat()});return}
+  CHAT.msgs.push({de:'ia',txt:r.txt,exp:r.exp||null});
   $('chat-in').value='';renderChat();
 }
 async function baixarDoChat(i,fmt){
@@ -1024,7 +1028,7 @@ function acoesGlobais(t){
   if(t.closest&&t.closest('[data-mod]')){const b=t.closest('[data-mod]');mod=b.dataset.mod;tab=abasOk(MODS.find(m=>m.id===mod))[0][0];render();window.scrollTo(0,0);return true}
   if(sd.tab){tab=sd.tab;render();return true}
   if(sd.goto){irPara(sd.goto);render();window.scrollTo(0,0);return true}
-  if(t.id==='chat-fab'){CHAT.abrir=!CHAT.abrir;if(CHAT.abrir&&!CHAT.msgs.length)CHAT.msgs.push({de:'ia',txt:'Olá! Sou o assistente do RH. Peça uma planilha ou faça uma pergunta, por exemplo: <i>exportar baixada e férias de todos</i>.'});renderChat();if(CHAT.abrir)$('chat-in').focus();return true}
+  if(t.id==='chat-fab'){CHAT.abrir=!CHAT.abrir;if(CHAT.abrir&&!CHAT.msgs.length)CHAT.msgs.push({de:'ia',txt:'Olá! Sou o assistente do RH. Peça uma planilha, consulte seus alertas ou tire dúvidas de como usar o sistema, por exemplo: <i>exportar baixada e férias de todos</i> ou <i>como lanço uma medição?</i>'});renderChat();if(CHAT.abrir)$('chat-in').focus();return true}
   if(t.id==='chat-x'){CHAT.abrir=false;renderChat();return true}
   if(t.id==='chat-send'){enviarChat($('chat-in').value);return true}
   if(sd.sug){enviarChat(sd.sug);return true}
@@ -1061,6 +1065,12 @@ function acoesGlobais(t){
   if(sd.cron){abrirCron(Number(sd.cron));return true}
   if(t.id==='co-read'){lerCron();return true}
   if(t.id==='usr-recarregar'){USR.lista=null;renderUsuarios();return true}
+  if(sd.wrt){atenderTicketReal(Number(sd.wrt));return true}
+  if(t.id==='wpp-real-reload'){WPPR.carregado=false;carregarWppReal();return true}
+  if(t.id==='fat-novo'){abrirFat(0);return true}
+  if(sd.fated){abrirFat(Number(sd.fated));return true}
+  if(sd.fatdel){excluirFat(Number(sd.fatdel));return true}
+  if(t.id==='ft-ok'){salvarFat(sd.id);return true}
   if(sd.usrpag){abrirPaginasUsuario(sd.usrpag);return true}
   if(t.id==='usrp-ok'){salvarPaginasUsuario(sd.uid);return true}
   if(t.id==='co-ok'){salvarCron(Number(sd.proj));return true}
@@ -1144,7 +1154,7 @@ function fatia(t,e){
   const o={};Object.keys(e).forEach(k=>{if(k==='id'||k==='_novo'||PESS_KEYS.includes(k)||REM_KEYS.includes(k))return;o[k]=e[k]});return o;
 }
 const novoId=()=>Date.now()*1000+Math.floor(Math.random()*1000);
-const SNAP={func:new Map(),pess:new Map(),rem:new Map(),proj:new Map(),env:new Map(),cfg:new Map()};
+const SNAP={func:new Map(),pess:new Map(),rem:new Map(),proj:new Map(),env:new Map(),cfg:new Map(),fat:new Map()};
 let CDS_BASE=[],CFG_BASE={},AUD_Q=[];
 const deepSet=(dst,src)=>{Object.keys(src||{}).forEach(k=>{if(src[k]&&typeof src[k]==='object'&&!Array.isArray(src[k])&&dst[k]&&typeof dst[k]==='object'&&!Array.isArray(dst[k]))deepSet(dst[k],src[k]);else dst[k]=src[k]})};
 function addFuncao(f){f=String(f||'').trim();if(!f||FUNCOES.includes(f))return;const i=FUNCOES.indexOf('Outra');if(i>=0)FUNCOES.splice(i,0,f);else FUNCOES.push(f)}
@@ -1156,6 +1166,7 @@ const cfgObj={
  imp:()=>IMP,
  glob:()=>({done:GLOB.done,folha:FOLHA.geradas,tickets:WPP.tickets}),
  cds:()=>({lista:CDS.filter(c=>!CDS_BASE.includes(c))}),
+ wpp:()=>({numero:dig(WPP.numero)}),
  secoes:()=>{const v={},ed={};SECOES.forEach(s=>{v[s.id]=s.ver.slice().sort();ed[s.id]=s.edit.slice().sort()});return{ver:v,edit:ed}}
 };
 const cfgApply={
@@ -1163,9 +1174,10 @@ const cfgApply={
  imp:d=>deepSet(IMP,d),
  glob:d=>{GLOB.done=d.done||{};FOLHA.geradas=d.folha||{};WPP.tickets=(d.tickets||[]).map(x=>Object.assign({},x,{t:new Date(x.t)}))},
  cds:d=>{(d.lista||[]).forEach(c=>{if(!CDS.includes(c))CDS.push(c)})},
+ wpp:d=>{WPP.numero=d.numero||''},
  secoes:d=>{SECOES.forEach(s=>{if(d.ver&&d.ver[s.id])s.ver=d.ver[s.id].slice();if(d.edit&&d.edit[s.id])s.edit=d.edit[s.id].slice();if(!s.ver.includes('grh'))s.ver.push('grh');if(s.edit.length&&!s.edit.includes('grh'))s.edit.push('grh')})}
 };
-const CFG_ESCREVE=k=>k==='glob'?TODOS:k==='secoes'?['grh']:['rh','grh','fin','sst','cmp','pmo'];
+const CFG_ESCREVE=k=>k==='glob'?TODOS:(k==='secoes'||k==='wpp')?['grh']:['rh','grh','fin','sst','cmp','pmo'];
 
 /* ---------- gravação (compara com o que veio do banco e envia só o que mudou) ---------- */
 let syncTimer=null,syncBusy=false,syncAgain=false,syncPromise=null;
@@ -1206,6 +1218,12 @@ async function syncUma(){
     else if(cur!==base){
       if(!['rh','grh','sst','cmp'].includes(perfil)){falhas.push({message:'sem permissão'});return}
       reg('rh_envios','upd',{id:x._id,dados:s},()=>SNAP.env.set(x._id,cur))}});
+  FAT.forEach(r=>{
+    const cur=canon(r),base=SNAP.fat.get(r.id),d=Object.assign({},r);delete d.id;
+    if(base===undefined){if(['fin','grh'].includes(perfil))reg('rh_faturamento','ins',{id:r.id,dados:d},()=>SNAP.fat.set(r.id,cur))}
+    else if(cur!==base){
+      if(!['fin','grh'].includes(perfil)){falhas.push({message:'sem permissão'});return}
+      reg('rh_faturamento','upd',{id:r.id,dados:d},()=>SNAP.fat.set(r.id,cur))}});
   Object.keys(cfgObj).forEach(k=>{
     const cur=canon(cfgObj[k]()),base=SNAP.cfg.has(k)?SNAP.cfg.get(k):CFG_BASE[k];
     if(cur===base||!CFG_ESCREVE(k).includes(perfil))return;
@@ -1232,7 +1250,9 @@ async function carregarTudo(){
   const [F,P,R,C,E,CF]=await Promise.all([sel('rh_funcionarios'),TIERS.pess.ler.includes(perfil)?sel('rh_func_pessoal'):[],TIERS.rem.ler.includes(perfil)?sel('rh_remuneracao'):[],sel('rh_contratos'),sel('rh_envios'),sel('rh_config','chave')]);
   let A=[];
   if(['rh','grh'].includes(perfil)){const r=await sb.from('rh_auditoria').select('*').order('t',{ascending:false}).limit(800);if(!r.error)A=r.data||[]}
+  let FT=[];if(['fin','grh','dir'].includes(perfil)){try{FT=await sel('rh_faturamento')}catch(e){FT=[]}}
   Object.keys(SNAP).forEach(k=>SNAP[k].clear());
+  FAT.splice(0,FAT.length,...FT.map(r=>{const o=Object.assign({},r.dados||{},{id:r.id});SNAP.fat.set(r.id,canon(o));return o}));
   CF.forEach(r=>{if(cfgApply[r.chave]){try{cfgApply[r.chave](r.dados||{});SNAP.cfg.set(r.chave,canon(cfgObj[r.chave]()))}catch(e){console.error(r.chave,e)}}});
   const pm=new Map(P.map(x=>[x.id,x.dados])),rm=new Map(R.map(x=>[x.id,x.dados]));
   const lista=F.map(r=>{
@@ -1258,10 +1278,11 @@ function ligarTempoReal(){
   if(!sb)return;
   if(chan)sb.removeChannel(chan);
   chan=sb.channel('rh-live');
-  ['rh_funcionarios','rh_func_pessoal','rh_remuneracao','rh_contratos','rh_envios','rh_config','rh_auditoria'].forEach(t=>chan.on('postgres_changes',{event:'*',schema:'public',table:t},p=>{
+  ['rh_funcionarios','rh_func_pessoal','rh_remuneracao','rh_contratos','rh_envios','rh_config','rh_auditoria','rh_faturamento'].forEach(t=>chan.on('postgres_changes',{event:'*',schema:'public',table:t},p=>{
     const n=p.new||{};
     if(usuario&&((n.updated_by&&n.updated_by===usuario.id)||(t==='rh_auditoria'&&n.user_id===usuario.id)))return;
     agendarReload()}));
+  chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_tickets'},()=>{WPPR.carregado=false;if(typeof renderWpp==='function'&&tab==='wpp')renderWpp()});
   chan.subscribe();
 }
 function agendarReload(){clearTimeout(reloadT);reloadT=setTimeout(recarregar,700)}
@@ -1517,6 +1538,219 @@ async function salvarPaginasUsuario(id){
   fecharModal();toast('Páginas de '+u.email+' salvas.');await carregarUsuarios();
 }
 
+
+/* =====================================================================
+   FINANCEIRO · Medições e notas fiscais por contrato (rh_faturamento)
+   ===================================================================== */
+const FAT=[];
+const FATQ={q:'',cli:'',st:''};
+const podeFat=()=>perfil==='fin'||perfil==='grh';
+const FAT_ROT={contratoId:'Contrato',cliente:'Cliente',ref:'Medição',medValor:'Valor da medição',medPrev:'Previsão de aprovação',medAprovEm:'Data de aprovação',medPath:'Anexo da medição aprovada',nfNum:'Nº da NF',nfValor:'Valor da NF',nfEmissao:'Emissão da NF',nfPath:'Anexo da NF',nfPrev:'Previsão de pagamento',pagoEm:'Data do pagamento',pagoValor:'Valor recebido',obs:'Observação'};
+const fatMoeda=v=>brl(v);
+function fatStatus(r){
+  const h=fmtISO(HOJE);
+  if(r.pagoEm)return{k:'pago',t:'Pago',c:'ok',valor:Number(r.pagoValor||r.nfValor||0)};
+  if(r.nfNum||r.nfValor){const at=r.nfPrev&&r.nfPrev<h;return{k:at?'atrasada':'receber',t:at?'NF em atraso':'NF a receber',c:at?'r':'w',valor:Number(r.nfValor||0)}}
+  if(r.medAprovEm)return{k:'faturar',t:'Aprovada · emitir NF',c:'',valor:Number(r.medValor||0)};
+  const at=r.medPrev&&r.medPrev<h;
+  return{k:at?'aprovAtraso':'aprov',t:at?'Aprovação atrasada':'Aguardando aprovação',c:at?'r':'w',valor:Number(r.medValor||0)};
+}
+const fatContrato=r=>PROJ.find(p=>p.id===r.contratoId);
+const diasAtraso=d=>d?Math.max(0,Math.round((HOJE-new Date(d+'T00:00:00'))/864e5)):0;
+const mesDe=d=>d?String(d).slice(0,7):'';
+const fmtMes=m=>{if(!m)return 'Sem previsão';const [a,b]=m.split('-');return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][Number(b)-1]+'/'+a};
+const fatLink=(nome,path)=>path?`<button class="btn sec" style="padding:1px 8px" data-abrir="${esc(path)}">📎 ${esc(nome||'abrir')}</button>`:'<span class="ro">—</span>';
+
+function fatFiltrados(){
+  const q=norm(FATQ.q);
+  return FAT.filter(r=>{
+    const st=fatStatus(r),P=fatContrato(r);
+    if(FATQ.cli&&r.cliente!==FATQ.cli)return false;
+    if(FATQ.st&&st.k!==FATQ.st)return false;
+    if(q&&!norm([r.cliente,r.ref,r.nfNum,P?P.nome:'',P?P.obra:''].join(' ')).includes(q))return false;
+    return true}).sort((a,b)=>({atrasada:0,aprovAtraso:1,receber:2,faturar:3,aprov:4,pago:5}[fatStatus(a).k]-{atrasada:0,aprovAtraso:1,receber:2,faturar:3,aprov:4,pago:5}[fatStatus(b).k])||String(a.nfPrev||a.medPrev||'9').localeCompare(String(b.nfPrev||b.medPrev||'9')));
+}
+const fatClientes=()=>[...new Set(FAT.map(r=>r.cliente).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+const STAT_OPC=[['atrasada','NF em atraso'],['aprovAtraso','Aprovação atrasada'],['receber','NF a receber'],['faturar','Aprovada · emitir NF'],['aprov','Aguardando aprovação'],['pago','Pago']];
+
+/* ---------- aba: lista de medições e NFs ---------- */
+function renderFat(){
+  const el=$('v-fat');if(!el||tab!=='fat')return;
+  const ed=podeFat();
+  el.innerHTML=`<div class="card"><h2>Medições e notas fiscais</h2><div class="ro" style="margin-bottom:8px">Cada linha é uma medição de um contrato, com a nota fiscal emitida e o pagamento da contratante. ${ed?'Lance a medição, anexe a medição aprovada quando a contratante aprovar, depois registre a NF e, por fim, o recebimento.':'Somente consulta (edição: Financeiro e Gestor do RH).'}</div>
+   <div class="tools"><input id="fat-q" placeholder="Buscar por cliente, contrato, medição ou nº da NF..." value="${esc(FATQ.q)}"><select id="fat-cli"><option value="">Todos os clientes</option>${fatClientes().map(c=>`<option ${c===FATQ.cli?'selected':''}>${esc(c)}</option>`).join('')}</select><select id="fat-st"><option value="">Todas as situações</option>${STAT_OPC.map(s=>`<option value="${s[0]}" ${s[0]===FATQ.st?'selected':''}>${s[1]}</option>`).join('')}</select>${ed?'<button class="btn" id="fat-novo">➕ Nova medição</button>':''}</div>
+   <div id="fat-lista" style="overflow:auto"></div></div>`;
+  renderFatLista();
+}
+function renderFatLista(){
+  const box=$('fat-lista');if(!box)return;
+  const L=fatFiltrados(),ed=podeFat();
+  box.innerHTML=`<table><thead><tr><th>Contrato / Cliente</th><th>Medição</th><th>Valor medição</th><th>Aprovação</th><th>Nota fiscal</th><th>Previsão de pagamento</th><th>Situação</th><th></th></tr></thead><tbody>${L.map(r=>{
+    const st=fatStatus(r),P=fatContrato(r);
+    const apr=r.medAprovEm?`<span class="badge ok">aprovada ${fmtD(r.medAprovEm)}</span><div class="ro">${fatLink(r.medNome,r.medPath)}</div>`:`<span class="badge ${st.k==='aprovAtraso'?'r':'w'}">pendente</span><div class="ro">previsão ${r.medPrev?fmtD(r.medPrev):'—'}${st.k==='aprovAtraso'?' · '+diasAtraso(r.medPrev)+' dia(s) de atraso':''}</div>`;
+    const nf=(r.nfNum||r.nfValor)?`<b>NF ${esc(r.nfNum||'s/n')}</b> · ${fatMoeda(r.nfValor)}<div class="ro">emitida ${r.nfEmissao?fmtD(r.nfEmissao):'—'} · ${fatLink(r.nfNome,r.nfPath)}</div>`:'<span class="ro">sem NF</span>';
+    const pg=r.pagoEm?`<span class="badge ok">pago ${fmtD(r.pagoEm)}</span><div class="ro">${fatMoeda(r.pagoValor||r.nfValor)}</div>`:(r.nfPrev?fmtD(r.nfPrev)+(st.k==='atrasada'?`<div class="ro" style="color:var(--red)">${diasAtraso(r.nfPrev)} dia(s) de atraso</div>`:''):'<span class="ro">—</span>');
+    return `<tr><td><b>${esc(P?P.nome:'(contrato removido)')}</b><div class="ro">${esc(r.cliente||'')}${P?' · '+esc(P.obra):''}</div></td><td>${esc(r.ref)}</td><td>${fatMoeda(r.medValor)}</td><td>${apr}</td><td>${nf}</td><td>${pg}</td><td><span class="badge ${st.c}">${st.t}</span></td>
+     <td style="white-space:nowrap">${ed?`<button class="btn sec" data-fated="${r.id}">Editar</button> <button class="btn sec" data-fatdel="${r.id}">Excluir</button>`:`<button class="btn sec" data-fated="${r.id}">Ver</button>`}</td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Nenhuma medição lançada ainda.</td></tr>'}</tbody></table><div class="ro" style="margin-top:4px">${L.length} de ${FAT.length} lançamento(s) · total filtrado ${fatMoeda(L.reduce((s,r)=>s+fatStatus(r).valor,0))}</div>`;
+}
+
+/* ---------- cadastro / edição ---------- */
+function abrirFat(id){
+  const r=id?FAT.find(x=>x.id===id):null,ed=podeFat();
+  if(id&&!r)return;
+  if(!id&&!ed)return;
+  if(!PROJ.length){alert('Cadastre um contrato primeiro (módulo Contratos).');return}
+  const v=r||{},dis=ed?'':'disabled';
+  const cli=v.cliente||'';
+  const arq=(n,p)=>p?`<div class="ro" style="margin-top:3px">Atual: ${fatLink(n,p)}</div>`:'';
+  abrirCustom(`<div class="mh"><h2>${r?(ed?'Editar':'Ver')+' medição / NF':'Nova medição'}</h2><button class="x" data-close="1">×</button></div>
+   <div class="sec"><h3>1 · Contrato e medição</h3><div class="f">
+    <div class="full"><label>Contrato vinculado</label><select id="ft-ct" ${dis}>${PROJ.map(P=>`<option value="${P.id}" ${P.id===v.contratoId?'selected':''}>${esc(P.nome)} · ${esc(P.obra)}</option>`).join('')}</select></div>
+    <div><label>Cliente (contratante)</label><input id="ft-cli" list="ft-clis" value="${esc(cli)}" ${dis}><datalist id="ft-clis">${fatClientes().map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div><label>Medição (ex.: Medição 03 · Out/2026)</label><input id="ft-ref" value="${esc(v.ref||'')}" ${dis}></div>
+    <div><label>Valor da medição (R$)</label><input type="number" step="0.01" id="ft-mv" value="${v.medValor===undefined?'':v.medValor}" ${dis}></div>
+    <div><label>Previsão de aprovação da medição</label><input type="date" id="ft-mp" value="${esc(v.medPrev||'')}" ${dis}></div>
+    <div><label>Data em que a medição foi aprovada</label><input type="date" id="ft-ma" value="${esc(v.medAprovEm||'')}" ${dis}></div>
+    <div><label>Anexo da medição aprovada</label>${ed?'<input type="file" id="ft-mf">':''}${arq(v.medNome,v.medPath)}</div></div></div>
+   <div class="sec" style="margin-top:10px"><h3>2 · Nota fiscal</h3><div class="f">
+    <div><label>Nº da NF</label><input id="ft-nn" value="${esc(v.nfNum||'')}" ${dis}></div>
+    <div><label>Valor da NF (R$)</label><input type="number" step="0.01" id="ft-nv" value="${v.nfValor===undefined?'':v.nfValor}" ${dis}></div>
+    <div><label>Data de emissão</label><input type="date" id="ft-ne" value="${esc(v.nfEmissao||'')}" ${dis}></div>
+    <div><label>Previsão de pagamento da contratante</label><input type="date" id="ft-np" value="${esc(v.nfPrev||'')}" ${dis}></div>
+    <div class="full"><label>Anexo da NF</label>${ed?'<input type="file" id="ft-nf">':''}${arq(v.nfNome,v.nfPath)}</div></div></div>
+   <div class="sec" style="margin-top:10px"><h3>3 · Pagamento recebido</h3><div class="f">
+    <div><label>Data do pagamento</label><input type="date" id="ft-pe" value="${esc(v.pagoEm||'')}" ${dis}></div>
+    <div><label>Valor recebido (R$)</label><input type="number" step="0.01" id="ft-pv" value="${v.pagoValor===undefined?'':v.pagoValor}" ${dis}></div>
+    <div class="full"><label>Observação</label><input id="ft-ob" value="${esc(v.obs||'')}" ${dis}></div></div></div>
+   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-close="1">${ed?'Cancelar':'Fechar'}</button>${ed?`<button class="btn" id="ft-ok" data-id="${r?r.id:''}">Salvar</button>`:''}</div>`);
+}
+const numOu=s=>s===''||s==null?undefined:Number(s);
+async function salvarFat(id){
+  if(!podeFat())return;
+  const old=id?FAT.find(x=>x.id===Number(id)):null;
+  const g=k=>$(k).value.trim();
+  const nv={contratoId:Number($('ft-ct').value),cliente:g('ft-cli'),ref:g('ft-ref'),medValor:numOu($('ft-mv').value),medPrev:g('ft-mp'),medAprovEm:g('ft-ma'),
+    nfNum:g('ft-nn'),nfValor:numOu($('ft-nv').value),nfEmissao:g('ft-ne'),nfPrev:g('ft-np'),pagoEm:g('ft-pe'),pagoValor:numOu($('ft-pv').value),obs:g('ft-ob')};
+  if(!nv.contratoId||!nv.cliente||!nv.ref){alert('Informe o contrato, o cliente e a identificação da medição.');return}
+  if(nv.medValor===undefined&&nv.nfValor===undefined){alert('Informe o valor da medição ou da NF.');return}
+  if(nv.pagoEm&&!(nv.nfNum||nv.nfValor!==undefined)){alert('Para registrar pagamento, informe antes a nota fiscal.');return}
+  const fm=$('ft-mf')&&$('ft-mf').files[0],fn=$('ft-nf')&&$('ft-nf').files[0];
+  let am=null,an=null;
+  if(fm){am=await anexar(fm,'fat');if(!am)return}
+  if(fn){an=await anexar(fn,'fat');if(!an)return}
+  nv.medNome=am?am.nome:(old?old.medNome||'':'');nv.medPath=am?am.path:(old?old.medPath||'':'');
+  nv.nfNome=an?an.nome:(old?old.nfNome||'':'');nv.nfPath=an?an.path:(old?old.nfPath||'':'');
+  Object.keys(nv).forEach(k=>{if(nv[k]===undefined)delete nv[k]});
+  const P=PROJ.find(p=>p.id===nv.contratoId);
+  if(!old){
+    FAT.push(Object.assign({id:novoId()},nv));
+    auditar({acao:'Lançou medição',alvo:(P?P.nome:'')+' · '+nv.ref,alvoId:'proj'+nv.contratoId,sec:'proj',campo:nv.cliente});
+  }else{
+    const mud=Object.keys(FAT_ROT).filter(k=>String(old[k]==null?'':old[k])!==String(nv[k]==null?'':nv[k]));
+    if(an||am)mud.push(...(am?['medPath']:[]),...(an?['nfPath']:[]));
+    Object.keys(old).forEach(k=>{if(k!=='id')delete old[k]});Object.assign(old,nv);
+    if(mud.length)auditar({acao:'Editou medição/NF',alvo:(P?P.nome:'')+' · '+nv.ref,alvoId:'proj'+nv.contratoId,sec:'proj',campo:[...new Set(mud)].map(k=>FAT_ROT[k]||k).join(', ')});
+  }
+  fecharModal();render();toast('Medição salva.');
+}
+async function excluirFat(id){
+  const r=FAT.find(x=>x.id===id);if(!r||!podeFat())return;
+  if(!confirm('Excluir a medição "'+r.ref+'" ('+r.cliente+')? Esta ação não pode ser desfeita.'))return;
+  const d=await sb.from('rh_faturamento').delete().eq('id',id).select('id');
+  if(d.error||!d.data||!d.data.length){alert('Não consegui excluir (sem permissão ou sem conexão).');return}
+  const paths=[r.medPath,r.nfPath].filter(Boolean);if(paths.length)sb.storage.from('rh-anexos').remove(paths).catch(()=>{});
+  FAT.splice(FAT.indexOf(r),1);SNAP.fat.delete(id);
+  const P=fatContrato(r);
+  auditar({acao:'Excluiu medição',alvo:(P?P.nome:'')+' · '+r.ref,alvoId:'proj'+r.contratoId,sec:'proj',campo:r.cliente});
+  render();toast('Medição excluída.');
+}
+
+/* ---------- aba: dashboard de faturamento ---------- */
+function renderFatDash(){
+  const el=$('v-fatdash');if(!el||tab!=='fatdash')return;
+  const S=k=>FAT.filter(r=>fatStatus(r).k===k),soma=L=>L.reduce((s,r)=>s+fatStatus(r).valor,0);
+  const atr=S('atrasada'),rec=S('receber'),aprAtr=S('aprovAtraso'),apr=S('aprov'),fat=S('faturar'),pago=S('pago');
+  const mes=fmtISO(HOJE).slice(0,7),pagoMes=pago.filter(r=>mesDe(r.pagoEm)===mes);
+  const kp=(n,l,c,sub)=>`<div class="kpi ${c||''}"><b>${n}</b><span>${l}${sub?'<br>'+sub:''}</span></div>`;
+  const danger=(n,l,sub)=>`<div class="kpi" style="border-color:var(--red)"><b style="color:var(--red)">${n}</b><span>${l}${sub?'<br>'+sub:''}</span></div>`;
+  /* por cliente */
+  const cl={};FAT.forEach(r=>{const c=r.cliente||'(sem cliente)';cl[c]=cl[c]||{med:0,nf:0,pago:0,rec:0,atr:0,apr:0,fat:0};const s=fatStatus(r),o=cl[c];
+    o.med+=Number(r.medValor||0);if(r.nfNum||r.nfValor)o.nf+=Number(r.nfValor||0);
+    if(s.k==='pago')o.pago+=s.valor;else if(s.k==='receber')o.rec+=s.valor;else if(s.k==='atrasada'){o.rec+=s.valor;o.atr+=s.valor}else if(s.k==='faturar')o.fat+=s.valor;else o.apr+=s.valor});
+  const linhasCl=Object.entries(cl).sort((a,b)=>(b[1].rec+b[1].fat+b[1].apr)-(a[1].rec+a[1].fat+a[1].apr));
+  const tot=linhasCl.reduce((t,[,o])=>{Object.keys(o).forEach(k=>t[k]=(t[k]||0)+o[k]);return t},{});
+  /* previsão por mês */
+  const pm={};
+  FAT.forEach(r=>{const s=fatStatus(r);
+    if(s.k==='receber'||s.k==='atrasada'){const m=mesDe(r.nfPrev)||'';pm[m]=pm[m]||{rec:0,apr:0};pm[m].rec+=s.valor}
+    else if(s.k==='aprov'||s.k==='aprovAtraso'){const m=mesDe(r.medPrev)||'';pm[m]=pm[m]||{rec:0,apr:0};pm[m].apr+=s.valor}});
+  const meses=Object.keys(pm).sort((a,b)=>(a||'9').localeCompare(b||'9')),maxM=Math.max(1,...meses.map(m=>pm[m].rec+pm[m].apr));
+  const bar=(v,cor)=>v?`<span style="display:inline-block;height:12px;width:${Math.max(2,Math.round(v/maxM*260))}px;background:${cor};border-radius:3px"></span>`:'';
+  const atrasados=[...atr.map(r=>({r,tipo:'NF não paga',d:diasAtraso(r.nfPrev),prev:r.nfPrev})),...aprAtr.map(r=>({r,tipo:'Medição sem aprovação',d:diasAtraso(r.medPrev),prev:r.medPrev}))].sort((a,b)=>b.d-a.d);
+  el.innerHTML=`<div class="kpis">
+    ${danger(fatMoeda(soma(atr)),'NFs em atraso',atr.length+' nota(s)')}
+    ${kp(fatMoeda(soma(rec)+soma(atr)),'A receber (NFs emitidas)','w',(rec.length+atr.length)+' nota(s)')}
+    ${danger(fatMoeda(soma(aprAtr)),'Medições com aprovação atrasada',aprAtr.length+' medição(ões)')}
+    ${kp(fatMoeda(soma(apr)+soma(aprAtr)),'Aguardando aprovação da contratante','w',(apr.length+aprAtr.length)+' medição(ões)')}
+    ${kp(fatMoeda(soma(fat)),'Aprovadas, falta emitir NF','',fat.length+' medição(ões)')}
+    ${kp(fatMoeda(soma(pagoMes)),'Recebido neste mês','',pagoMes.length+' pagamento(s)')}
+    ${kp(fatMoeda(soma(pago)),'Recebido no total','',pago.length+' pagamento(s)')}</div>
+   <div class="card"><h2>Por cliente</h2><div style="overflow:auto"><table><thead><tr><th>Cliente</th><th>Medido</th><th>Faturado (NF)</th><th>Recebido</th><th>A receber</th><th style="color:var(--red)">Em atraso</th><th>Aguardando aprovação</th><th>A faturar</th></tr></thead><tbody>${linhasCl.map(([c,o])=>`<tr><td><b>${esc(c)}</b></td><td>${fatMoeda(o.med)}</td><td>${fatMoeda(o.nf)}</td><td>${fatMoeda(o.pago)}</td><td>${fatMoeda(o.rec)}</td><td style="color:${o.atr?'var(--red)':'inherit'}">${fatMoeda(o.atr)}</td><td>${fatMoeda(o.apr)}</td><td>${fatMoeda(o.fat)}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">Sem lançamentos.</td></tr>'}${linhasCl.length?`<tr style="font-weight:700"><td>Total</td><td>${fatMoeda(tot.med)}</td><td>${fatMoeda(tot.nf)}</td><td>${fatMoeda(tot.pago)}</td><td>${fatMoeda(tot.rec)}</td><td>${fatMoeda(tot.atr)}</td><td>${fatMoeda(tot.apr)}</td><td>${fatMoeda(tot.fat)}</td></tr>`:''}</tbody></table></div><div class="ro" style="margin-top:4px">"A receber" já inclui o que está em atraso.</div></div>
+   <div class="card" style="margin-top:16px"><h2>Atrasados</h2><div style="overflow:auto"><table><thead><tr><th>Cliente / Contrato</th><th>Situação</th><th>Referência</th><th>Valor</th><th>Previsto para</th><th>Atraso</th></tr></thead><tbody>${atrasados.map(x=>{const P=fatContrato(x.r);return `<tr><td><b>${esc(x.r.cliente)}</b><div class="ro">${esc(P?P.nome:'')}</div></td><td><span class="badge r">${x.tipo}</span></td><td>${esc(x.r.ref)}${x.r.nfNum?'<div class="ro">NF '+esc(x.r.nfNum)+'</div>':''}</td><td>${fatMoeda(fatStatus(x.r).valor)}</td><td>${fmtD(x.prev)}</td><td style="color:var(--red)"><b>${x.d} dia(s)</b></td></tr>`}).join('')||'<tr><td colspan="6" class="empty">Nada em atraso. 👏</td></tr>'}</tbody></table></div></div>
+   <div class="card" style="margin-top:16px"><h2>Previsão por mês</h2><div class="ro" style="margin-bottom:6px"><span style="display:inline-block;width:10px;height:10px;background:#2e7d32;border-radius:2px"></span> a receber (previsão de pagamento das NFs) &nbsp; <span style="display:inline-block;width:10px;height:10px;background:#f0a020;border-radius:2px"></span> a faturar (previsão de aprovação das medições)</div>
+   <table><thead><tr><th>Mês</th><th>A receber</th><th>A faturar</th><th></th></tr></thead><tbody>${meses.map(m=>`<tr><td>${fmtMes(m)}</td><td>${fatMoeda(pm[m].rec)}</td><td>${fatMoeda(pm[m].apr)}</td><td>${bar(pm[m].rec,'#2e7d32')}${bar(pm[m].apr,'#f0a020')}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Sem previsões lançadas.</td></tr>'}</tbody></table></div>`;
+}
+
+
+/* =====================================================================
+   IA de suporte (Gemini/Claude via Edge Function) e WhatsApp real
+   ===================================================================== */
+const iaHtml=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\*(.+?)\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+async function perguntarIA(pergunta,fallback){
+  try{
+    const hist=CHAT.msgs.filter(m=>m.txt&&!/Pensando/.test(m.txt)).slice(-9,-1).map(m=>({de:m.de,txt:String(m.txt).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}));
+    const r=await sb.functions.invoke('assistente-ia',{body:{sistema:'rh',pergunta,historico:hist,perfil:PERFIS[perfil]||perfil,aba:(MODNOME_[mod]||mod)+' › '+tab}});
+    let d=r.data;
+    if(r.error&&r.error.context&&r.error.context.json){try{d=await r.error.context.json()}catch(e){}}
+    if(d&&d.resposta)return iaHtml(d.resposta);
+    return '⚠️ '+esc((d&&d.error)||'A IA não respondeu agora.')+(fallback?'<br><br>'+fallback:'');
+  }catch(e){return '⚠️ A IA não respondeu agora. Tente de novo em instantes.'+(fallback?'<br><br>'+fallback:'')}
+}
+
+/* ---------- WhatsApp real (atendimentos e conversas vindos do número do RH) ---------- */
+const WPPR={tickets:[],log:[],carregado:false,carregando:false};
+const fmtFone=n=>{const d=dig(n).replace(/^55(?=\d{10,11}$)/,'');return d.length===11?`(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`:d.length===10?`(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`:String(n||'')};
+async function carregarWppReal(){
+  if(WPPR.carregando||!['rh','grh'].includes(perfil))return;
+  WPPR.carregando=true;
+  try{
+    const [a,b]=await Promise.all([sb.from('rh_wpp_tickets').select('*').order('t',{ascending:false}).limit(40),sb.from('rh_wpp_log').select('t,telefone,nome,direcao,texto').order('t',{ascending:false}).limit(30)]);
+    WPPR.tickets=a.data||[];WPPR.log=b.data||[];WPPR.carregado=true;
+  }catch(e){console.error(e)}
+  WPPR.carregando=false;
+  if(typeof renderWpp==='function')renderWpp();
+}
+async function atenderTicketReal(id){
+  const r=await sb.from('rh_wpp_tickets').update({atendido:true,atendido_por:usuario?usuario.nome:'',atendido_em:new Date().toISOString()}).eq('id',id).select('id');
+  if(r.error||!r.data||!r.data.length){alert('Não consegui atualizar (sem permissão ou sem conexão).');return}
+  const t=WPPR.tickets.find(x=>x.id===id);if(t)t.atendido=true;
+  auditar({acao:'Atendeu pedido do WhatsApp',alvo:t?t.nome:'',sec:'proj',campo:'WhatsApp'});
+  renderWpp();
+}
+function wppRealHtml(){
+  if(!WPPR.carregado&&!WPPR.carregando&&['rh','grh'].includes(perfil))setTimeout(carregarWppReal,0);
+  const num=dig(WPP.numero),ed=perfil==='grh';
+  const abertos=WPPR.tickets.filter(x=>!x.atendido),feitos=WPPR.tickets.filter(x=>x.atendido).slice(0,6);
+  return `<div class="card" style="border-color:#2e7d32"><h2>📱 WhatsApp real do RH</h2>
+   <div class="f" style="grid-template-columns:1fr auto;align-items:end"><div><label>Número do WhatsApp do RH (com DDD)</label><input id="wpp-numero" placeholder="(38) 99999-0000" value="${esc(fmtFone(WPP.numero))}" ${ed?'':'disabled'}></div>${num?`<a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/55${num.replace(/^55/,'')}?text=oi">Abrir conversa</a>`:''}</div>
+   <div class="ro" style="margin-top:6px;line-height:1.6">Quando o número estiver ligado à Meta, o colaborador cadastrado (telefone na ficha) manda <b>oi</b>, confirma os 4 últimos dígitos do CPF e conversa com a IA sobre os <b>próprios</b> dados. Quem não tem cadastro não recebe nada. Pedidos de atendimento humano caem abaixo. ${ed?'':'(somente o Gestor do RH altera o número)'}</div>
+   <h3 style="margin-top:12px">🙋 Pedidos de atendimento (${abertos.length} aberto${abertos.length===1?'':'s'})</h3>
+   ${abertos.length?`<table class="matriz"><tr><th>Quando</th><th>Colaborador</th><th>Telefone</th><th>Motivo</th><th></th></tr>${abertos.map(x=>`<tr><td>${fmtDH(x.t)}</td><td style="text-align:left">${esc(x.nome||'')}</td><td>${esc(fmtFone(x.telefone))}</td><td style="text-align:left">${esc(x.motivo||'')}</td><td><button class="btn" data-wrt="${x.id}">✔ Atendido</button></td></tr>`).join('')}</table>`:'<div class="empty">Nenhum pedido aberto.</div>'}
+   ${feitos.length?`<div class="ro" style="margin-top:6px">Últimos atendidos: ${feitos.map(x=>esc(x.nome||'')+' ('+fmtDH(x.atendido_em||x.t).slice(0,10)+')').join(' · ')}</div>`:''}
+   <h3 style="margin-top:12px">💬 Últimas mensagens <button class="btn sec" id="wpp-real-reload" style="padding:2px 8px;margin-left:6px">↻</button></h3>
+   ${WPPR.log.length?WPPR.log.map(m=>`<div class="item" style="padding:3px 0;border-bottom:1px solid var(--line);font-size:12px">${fmtDH(m.t).slice(0,16)} · <b>${m.direcao==='in'?esc(m.nome||fmtFone(m.telefone)):'IA → '+esc(m.nome||fmtFone(m.telefone))}</b>: ${esc(String(m.texto||'').slice(0,140))}</div>`).join(''):'<div class="empty">Nenhuma mensagem recebida ainda.</div>'}</div>`;
+}
+
 const diffDias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
 const mesesTxt=n=>{const m=Math.floor(n/30.4375);return m>=1?` (~${m} ${m===1?'mês':'meses'})`:''};
 function refreshCDS(){const v=$('fobra').value;$('fobra').innerHTML='<option value="">Todas as obras</option>'+CDS.map(o=>`<option>${esc(o)}</option>`).join('');$('fobra').value=v}
@@ -1764,7 +1998,7 @@ function renderWpp(foco){
     <div class="ph-msgs" id="wpp-msgs">${M.length?M.map(m=>`<div class="bb ${m.de}">${wFmt(m.txt)}<i class="h">${m.h}${m.de==='me'?' ✓✓':''}</i></div>`).join(''):'<div class="bb bot">Envie <b>oi</b> para começar.</div>'}</div>
     <div class="ph-q">${S&&S.ok?['1|Salário','2|Horas extras','3|Férias','4|Baixada','5|ASO e treinamentos','6|Passagem','7|Falar com o RH','0|Sair'].map(x=>{const [k,l]=x.split('|');return`<button data-wq="${k}">${l}</button>`}).join(''):'<button data-wq="oi">oi</button>'}</div>
     <div class="ph-in"><input id="wpp-in" placeholder="Mensagem" autocomplete="off"><button id="wpp-send">➤</button></div></div></div>
-   <div><div class="alert w"><div class="t">Simulador</div><div class="d">Esta tela simula a conversa para você testar as respostas. O número real do WhatsApp ainda não está conectado.</div></div><div class="card"><h2>Como funciona</h2><div class="ro" style="line-height:1.7">O colaborador chama o número do RH no WhatsApp. O sistema reconhece o telefone pelo cadastro, confirma com os 4 últimos dígitos do CPF e responde com os dados <b>dele mesmo</b>, direto da ficha e da folha: salário do mês, horas extras, férias, baixada, ASO, treinamentos e passagens. Quem não está cadastrado não recebe nada. Três tentativas erradas bloqueiam o acesso. Toda consulta fica registrada na auditoria. A opção 7 abre um atendimento para o RH.</div></div>
+   <div>${wppRealHtml()}<div class="alert w" style="margin-top:16px"><div class="t">Simulador</div><div class="d">Esta área simula a conversa para você testar as respostas sem gastar mensagens (usa os dados do cadastro, sem IA).</div></div><div class="card"><h2>Como funciona</h2><div class="ro" style="line-height:1.7">O colaborador chama o número do RH no WhatsApp. O sistema reconhece o telefone pelo cadastro, confirma com os 4 últimos dígitos do CPF e responde com os dados <b>dele mesmo</b>, direto da ficha e da folha: salário do mês, horas extras, férias, baixada, ASO, treinamentos e passagens. Quem não está cadastrado não recebe nada. Três tentativas erradas bloqueiam o acesso. Toda consulta fica registrada na auditoria. A opção 7 abre um atendimento para o RH.</div></div>
    <div class="card" style="margin-top:16px"><h2>Atendimentos pedidos pelo WhatsApp</h2>${WPP.tickets.length?`<table class="matriz"><tr><th>Quando</th><th>Colaborador</th><th>Telefone</th><th></th></tr>${WPP.tickets.map((x,i)=>`<tr><td>${fmtDH(x.t)}</td><td style="text-align:left">${esc(x.nome)}</td><td>${esc(x.tel)}</td><td>${x.ok?'<span class="badge ok">atendido</span>':`<button class="btn" data-wtk="${i}">✔ Atendido</button>`}</td></tr>`).join('')}</table>`:'<div class="empty">Nenhum pedido.</div>'}</div>
    <div class="card" style="margin-top:16px"><h2>Últimas consultas</h2>${logs.length?logs.map(a=>`<div class="item" style="padding:4px 0;border-bottom:1px solid var(--line)">${fmtDH(a.t)} · <b>${esc(a.alvo)}</b> · ${esc(a.campo)}</div>`).join(''):'<div class="empty">Nenhuma consulta ainda.</div>'}</div></div></div>`;
   const box=$('wpp-msgs');if(box)box.scrollTop=box.scrollHeight;
@@ -1891,6 +2125,9 @@ document.addEventListener('change',async ev=>{
   if(t.id==='mob-sel'){mobSel=Number(t.value);renderMob();return}
   if(t.dataset.usrperfil&&usuario&&usuario.mestre){alterarPerfilUsuario(t.dataset.usrperfil,t.value);return}
   if(t.id==='usrp-sem'){$('usrp-lista').style.display=t.checked?'none':'';return}
+  if(t.id==='wpp-numero'&&perfil==='grh'){const v=dig(t.value);if(v!==dig(WPP.numero)){auditar({acao:'Alterou número do WhatsApp do RH',alvo:'WhatsApp',sec:'proj',campo:'Número',antes:fmtFone(WPP.numero),depois:fmtFone(v)});WPP.numero=v}render();return}
+  if(t.id==='fat-cli'){FATQ.cli=t.value;renderFatLista();return}
+  if(t.id==='fat-st'){FATQ.st=t.value;renderFatLista();return}
   if(t.id==='pgr-file'&&t.files[0]&&podeEditPgr()){anexarPgr(t.files[0]);return}
   if(t.dataset.pgr&&podeEditPgr()){const fn=t.dataset.pgr,ant=epiDe(fn).join(', '),nv=t.value.split(/[,;]/).map(s=>s.trim()).filter(Boolean);PGR.epis[fn]=nv;auditar({acao:'Alterou EPIs do PGR',alvo:'PGR da empresa',campo:fn,antes:ant,depois:nv.join(', ')});render();return}
   if(t.dataset.acc&&perfil==='grh'){const [sid,pf]=t.dataset.acc.split('|'),s=SECOES.find(x=>x.id===sid),n=Number(t.value);
@@ -1918,7 +2155,7 @@ document.addEventListener('change',async ev=>{
   auditar({acao:'Editou',alvo:e.nome,alvoId:e.id,sec:ci.sec,campo:ci.label,antes:fmtV(old),depois:fmtV(nv)});
   render();
 });
-document.addEventListener('input',ev=>{if(ev.target.id==='usr-q'){USR.q=ev.target.value;renderUsuariosLista()}if(ev.target.id==='mob-busca'){mobBusca=ev.target.value;renderMobLista()}ncDur(ev.target);if(ev.target.id==='au-q'){auQ=ev.target.value;renderAuditLista()}});
+document.addEventListener('input',ev=>{if(ev.target.id==='fat-q'){FATQ.q=ev.target.value;renderFatLista()}if(ev.target.id==='usr-q'){USR.q=ev.target.value;renderUsuariosLista()}if(ev.target.id==='mob-busca'){mobBusca=ev.target.value;renderMobLista()}ncDur(ev.target);if(ev.target.id==='au-q'){auQ=ev.target.value;renderAuditLista()}});
 document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.id==='wpp-in'){wppEnviar(ev.target.value);return}if(ev.key==='Enter'&&ev.target.id==='chat-in'){enviarChat(ev.target.value);return}
   if(ev.key==='Escape'&&abertoId){abertoId=null;$('ov').classList.remove('on')}});
 

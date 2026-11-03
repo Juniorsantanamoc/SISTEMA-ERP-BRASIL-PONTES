@@ -7693,12 +7693,51 @@ async function loadAndRenderUsuarios(){
     <td><select class="status-select" onchange="alterarRhPerfil('${u.id}', this.value)" ${(u.rh_perfil==='grh' && !IS_MESTRE) ? 'disabled title="Só o Gestor Mestre altera o Gestor do RH"' : ''}>
       <option value="">Padrão (consulta; Mestre = Gestor do RH)</option>
       ${RH_PERFIS.map(([v,l])=>`<option value="${v}" ${u.rh_perfil===v?'selected':''} ${(v==='grh' && !IS_MESTRE)?'disabled':''}>${l}</option>`).join('')}
-    </select></td>
+    </select>${ehMestre ? '<div class="muted" style="font-size:12px;margin-top:4px;">Mestre vê todo o RH</div>' : (IS_MESTRE ? `<div style="margin-top:6px;"><button class="btn btn-sm" onclick='abrirRhPaginasModal(${JSON.stringify(u.id)}, ${JSON.stringify(u.nome||u.id)}, ${JSON.stringify(Array.isArray(u.rh_paginas)?u.rh_paginas:null)})'>🔒 Páginas do RH${Array.isArray(u.rh_paginas)?` <span class="badge b-amber">${u.rh_paginas.length}</span>`:''}</button></div>` : '')}</td>
   </tr>`;
   }).join('') : `<tr class="empty-row"><td colspan="6">Nenhum usuário encontrado.</td></tr>`;
   renderPedidosAcesso();
 }
 const RH_PERFIS = [['grh','Gestor do RH (mestre do RH)'],['rh','RH'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['dir','Diretoria'],['nenhum','Bloquear acesso ao RH']];
+/* páginas do sistema do RH que cada usuário pode ver (só o Mestre configura; null = sem restrição) */
+const RH_CATALOGO = [
+  {grupo:'RH', key:'rh:painel', label:'Painel'}, {grupo:'RH', key:'rh:colab', label:'Colaboradores'}, {grupo:'RH', key:'rh:mob', label:'Mobilização de contratos'}, {grupo:'RH', key:'rh:imp', label:'Impostos e encargos'},
+  {grupo:'Financeiro', key:'fin:painel', label:'Alertas'}, {grupo:'Financeiro', key:'fin:fatdash', label:'Faturamento · Dashboard'}, {grupo:'Financeiro', key:'fin:fat', label:'Medições e NFs'},{grupo:'Financeiro', key:'fin:colab', label:'Colaboradores · salário e HE'}, {grupo:'Financeiro', key:'fin:folha', label:'Folha de pagamento'}, {grupo:'Financeiro', key:'fin:imp', label:'Impostos e encargos'},
+  {grupo:'Saúde e Segurança', key:'sst:painel', label:'Alertas'}, {grupo:'Saúde e Segurança', key:'sst:colab', label:'Colaboradores · ASO e documentos'}, {grupo:'Saúde e Segurança', key:'sst:trein', label:'Treinamentos'}, {grupo:'Saúde e Segurança', key:'sst:mob', label:'Mobilização · treinamentos e EPI'}, {grupo:'Saúde e Segurança', key:'sst:pgr', label:'PGR / EPIs'},
+  {grupo:'Compras (no RH)', key:'compras:painel', label:'Alertas'}, {grupo:'Compras (no RH)', key:'compras:colab', label:'Colaboradores · baixada e férias'}, {grupo:'Compras (no RH)', key:'compras:mob', label:'Mobilização · passagens e chegada'}, {grupo:'Compras (no RH)', key:'compras:passagens', label:'Passagens'}, {grupo:'Compras (no RH)', key:'compras:alim', label:'Alimentação'}, {grupo:'Compras (no RH)', key:'compras:pgr', label:'EPIs a comprar'},
+  {grupo:'WhatsApp', key:'wpp:wpp', label:'WhatsApp do colaborador'},
+  {grupo:'PMO', key:'pmo:painel', label:'Alertas'}, {grupo:'PMO', key:'pmo:mob', label:'Mobilização'}, {grupo:'PMO', key:'pmo:colab', label:'Colaboradores · baixada e férias'},
+  {grupo:'Contratos', key:'contratos:contratos', label:'Contratos'}
+];
+window.abrirRhPaginasModal = function(userId, nome, atuais){
+  const tem = Array.isArray(atuais), set = new Set(tem ? atuais : []);
+  let html = '', g = null;
+  RH_CATALOGO.forEach(p=>{
+    if(p.grupo !== g){ if(g!==null) html += '</div>'; g = p.grupo; html += `<div style="margin-bottom:10px;"><div class="muted" style="font-size:12px;font-weight:600;margin-bottom:4px;">${esc(p.grupo)}</div>`; }
+    html += `<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:14px;"><input type="checkbox" class="rhp-chk" value="${p.key}" ${set.has(p.key)?'checked':''}> ${esc(p.label)}</label>`;
+  });
+  html += '</div>';
+  openModal(`
+    <h3>Páginas do RH — ${esc(nome)}</h3>
+    <div class="modal-sub" style="margin-bottom:10px;">Marque só as páginas do sistema do RH que esse usuário pode ver no menu. O acesso aos dados (salário, CPF etc.) continua seguindo o perfil escolhido ao lado. Com "Sem restrição" marcado, ele vê todas as páginas que o perfil dele permite.</div>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:8px;background:#f8f9fb;border-radius:8px;">
+      <input type="checkbox" id="rhp-sem" ${!tem?'checked':''} onchange="document.getElementById('rhp-lista').style.display=this.checked?'none':''">
+      <strong>Sem restrição (vê tudo que o perfil dele permite)</strong></label>
+    <div id="rhp-lista" style="display:${!tem?'none':''};max-height:360px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">${html}</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarRhPaginas('${userId}')">Salvar</button></div>`);
+};
+window.salvarRhPaginas = async function(userId){
+  let v = null;
+  if(!document.getElementById('rhp-sem').checked){
+    v = [...document.querySelectorAll('.rhp-chk:checked')].map(c=>c.value);
+    if(!v.length){ toast('Marque pelo menos uma página, ou deixe "Sem restrição" marcado.', true); return; }
+  }
+  const { error } = await sb.from('profiles').update({ rh_paginas: v }).eq('id', userId);
+  if(error){ toast('Erro ao salvar: ' + error.message, true); return; }
+  toast('Páginas do RH salvas.'); closeModal(); await loadAndRenderUsuarios();
+};
 window.alterarRhPerfil = async function(id, valor){
   const { error } = await sb.from('profiles').update({ rh_perfil: valor || null }).eq('id', id);
   if(error){ toast('Erro ao alterar acesso ao RH: ' + friendlyErrorMsg(error), true); await loadAndRenderUsuarios(); return; }
@@ -11335,6 +11374,60 @@ sb.auth.onAuthStateChange((event, session)=>{
     teardownRealtime();
   }
 });
+
+/* ============== Assistente de IA (suporte de uso) ============== */
+(function(){
+  const css = document.createElement('style');
+  css.textContent = `
+  #ia-fab{position:fixed;right:22px;bottom:22px;z-index:9000;width:58px;height:58px;border-radius:50%;border:0;background:var(--accent-2);color:#fff;font-size:26px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none}
+  #ia-box{position:fixed;right:22px;bottom:92px;z-index:9000;width:370px;max-width:calc(100vw - 30px);height:520px;max-height:calc(100vh - 120px);background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.28);display:none;flex-direction:column;overflow:hidden}
+  #ia-box.on{display:flex}
+  #ia-box header{background:var(--accent);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
+  #ia-box header span.s{font-weight:400;font-size:11px;opacity:.85;flex:1}
+  #ia-box header button{background:none;border:0;color:#fff;font-size:20px;cursor:pointer}
+  #ia-msgs{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+  #ia-msgs .m{max-width:88%;padding:8px 10px;border-radius:10px;font-size:13px;line-height:1.45;word-wrap:break-word}
+  #ia-msgs .m.eu{align-self:flex-end;background:var(--accent);color:#fff}
+  #ia-msgs .m.ia{align-self:flex-start;background:#fff;border:1px solid var(--border)}
+  #ia-sug{padding:6px 10px;display:flex;flex-wrap:wrap;gap:6px;background:var(--bg)}
+  #ia-sug button{font-size:11.5px;padding:4px 8px;border:1px solid var(--border-strong);border-radius:12px;background:#fff;cursor:pointer;color:var(--accent)}
+  #ia-in{display:flex;gap:6px;padding:8px;border-top:1px solid var(--border);background:#fff}
+  #ia-in input{flex:1;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;font-size:13px}
+  #ia-in button{padding:8px 12px;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}`;
+  document.head.appendChild(css);
+  const fab = document.createElement('button'); fab.id='ia-fab'; fab.title='Assistente de IA'; fab.textContent='✨';
+  const box = document.createElement('div'); box.id='ia-box';
+  box.innerHTML = `<header><span>✨ Assistente do Compras</span><span class="s"></span><button id="ia-x" title="Fechar">×</button></header>
+    <div id="ia-msgs"></div><div id="ia-sug"></div>
+    <div id="ia-in"><input id="ia-q" placeholder="Pergunte como fazer algo..." autocomplete="off"><button id="ia-go">Enviar</button></div>`;
+  document.body.appendChild(fab); document.body.appendChild(box);
+  const msgs = [], $q = id => document.getElementById(id);
+  const fmt = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\*(.+?)\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+  function draw(){
+    $q('ia-msgs').innerHTML = msgs.map(m=>`<div class="m ${m.de}">${m.html||fmt(m.txt)}</div>`).join('');
+    $q('ia-msgs').scrollTop = $q('ia-msgs').scrollHeight;
+    $q('ia-sug').innerHTML = msgs.length>1 ? '' : ['Como faço uma solicitação de compra?','Como importo uma nota fiscal?','Como peço acesso a uma página?'].map(s=>`<button data-s="${s}">${s}</button>`).join('');
+  }
+  async function ask(txt){
+    txt = (txt||'').trim(); if(!txt) return;
+    const hist = msgs.filter(m=>!m.pend).slice(-8).map(m=>({de:m.de, txt:m.txt}));
+    msgs.push({de:'eu',txt}); const p = {de:'ia',txt:'',html:'<i>Pensando...</i>',pend:true}; msgs.push(p); $q('ia-q').value=''; draw();
+    try{
+      const pag = document.querySelector('.nav-item.active');
+      const r = await sb.functions.invoke('assistente-ia',{ body:{ sistema:'erp', pergunta:txt, historico:hist, perfil: IS_MESTRE?'Gestor Mestre':(IS_GESTOR?'Gestor':'Usuário/Engenheiro'), aba: pag?pag.textContent.replace(/\d+$/,'').trim():'' } });
+      let d = r.data; if(r.error && r.error.context && r.error.context.json){ try{ d = await r.error.context.json(); }catch(_){} }
+      p.pend=false; p.html=null;
+      p.txt = (d && d.resposta) ? d.resposta : '⚠️ ' + ((d && d.error) || 'A IA não respondeu agora. Tente de novo em instantes.');
+    }catch(e){ p.pend=false; p.html=null; p.txt='⚠️ A IA não respondeu agora. Tente de novo em instantes.'; }
+    draw();
+  }
+  fab.addEventListener('click',()=>{ box.classList.toggle('on'); if(box.classList.contains('on')){ if(!msgs.length) msgs.push({de:'ia',txt:'Olá! Sou o assistente do sistema de Compras. Pergunte como fazer algo (ex.: "como cancelo uma requisição?") e eu explico o passo a passo.'}); draw(); $q('ia-q').focus(); } });
+  $q('ia-x').addEventListener('click',()=>box.classList.remove('on'));
+  $q('ia-go').addEventListener('click',()=>ask($q('ia-q').value));
+  $q('ia-q').addEventListener('keydown',e=>{ if(e.key==='Enter') ask(e.target.value); });
+  $q('ia-sug').addEventListener('click',e=>{ if(e.target.dataset.s) ask(e.target.dataset.s); });
+  setInterval(()=>{ const on = !!CURRENT_USER; fab.style.display = on?'block':'none'; if(!on) box.classList.remove('on'); }, 1000);
+})();
 
 /* PWA: registra o service worker (permite "Adicionar à tela inicial" como app) */
 if('serviceWorker' in navigator){
