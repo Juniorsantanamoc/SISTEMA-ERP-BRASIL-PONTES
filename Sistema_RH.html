@@ -494,11 +494,12 @@ function secaoHtml(e,s){
       <button class="btn" id="nf-add">Registrar falta</button></div>`:''}</div>`}
   if(s.especial==='docs'){
     return `<div class="sec docs" style="grid-column:1/-1"><h3>📎 ${s.titulo} ${tag}</h3>
-     ${e.docs.map((d,i)=>{const x=diasAte(d.val);return `<div class="item"><span class="badge ${d.cat==='Treinamento'?'':'g'}">${d.cat}</span><span class="nm">${esc(d.nome)}${d.path?` <button class="btn sec" data-abrir="${esc(d.path)}">abrir</button>`:''}</span><span>${d.val?'validade '+fmtD(d.val):'sem validade'}</span>${x!==null&&x<=30?`<span class="badge ${x<0?'r':'w'}">${x<0?'vencido':'vence em '+x+'d'}</span>`:''}${edit?`<button class="btn sec" data-deldoc="${i}">remover</button>`:''}</div>`}).join('')||'<div class="empty">Nenhum anexo.</div>'}
-     ${edit?`<div class="f" style="margin-top:10px;grid-template-columns:140px 1fr 150px auto;align-items:end">
-      <div><label>Categoria</label><select id="nd-cat"><option>Documento pessoal</option><option>Treinamento</option></select></div>
+     ${e.docs.map((d,i)=>{if(d.cat==='Contracheque'&&!['rh','grh'].includes(perfil))return '';const x=diasAte(d.val);return `<div class="item"><span class="badge ${d.cat==='Treinamento'?'':'g'}">${d.cat}</span><span class="nm">${esc(d.nome)}${d.path?` <button class="btn sec" data-abrir="${esc(d.path)}">abrir</button>`:''}</span><span>${d.cat==='Contracheque'&&d.comp?'ref. '+d.comp.slice(5)+'/'+d.comp.slice(0,4):(d.val?'validade '+fmtD(d.val):'sem validade')}</span>${x!==null&&x<=30?`<span class="badge ${x<0?'r':'w'}">${x<0?'vencido':'vence em '+x+'d'}</span>`:''}${edit?`<button class="btn sec" data-deldoc="${i}">remover</button>`:''}</div>`}).join('')||'<div class="empty">Nenhum anexo.</div>'}
+     ${edit?`<div class="f" style="margin-top:10px;grid-template-columns:140px 1fr 150px 150px auto;align-items:end">
+      <div><label>Categoria</label><select id="nd-cat"><option>Documento pessoal</option><option>Treinamento</option><option>Contracheque</option></select></div>
       <div><label>Arquivo (PDF/imagem)</label><input type="file" id="nd-file"></div>
       <div><label>Validade (opcional)</label><input type="date" id="nd-val"></div>
+      <div><label>Mês ref. (contracheque)</label><input type="month" id="nd-comp"></div>
       <button class="btn" id="nd-add">Anexar</button></div>
       <div class="ro" style="margin-top:4px">O arquivo fica guardado com segurança no sistema e só abre para quem tem permissão.</div>`:''}
     </div>`;
@@ -1718,7 +1719,7 @@ async function perguntarIA(pergunta,fallback){
 }
 
 /* ---------- WhatsApp real (atendimentos e conversas vindos do número do RH) ---------- */
-const WPPR={tickets:[],log:[],carregado:false,carregando:false};
+const WPPR={tickets:[],log:[],carregado:false,carregando:false,chat:null,rascunho:'',timer:null};
 const fmtFone=n=>{const d=dig(n).replace(/^55(?=\d{10,11}$)/,'');return d.length===11?`(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`:d.length===10?`(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`:String(n||'')};
 async function carregarWppReal(){
   if(WPPR.carregando||!['rh','grh'].includes(perfil))return;
@@ -1734,19 +1735,113 @@ async function atenderTicketReal(id){
   const r=await sb.from('rh_wpp_tickets').update({atendido:true,atendido_por:usuario?usuario.nome:'',atendido_em:new Date().toISOString()}).eq('id',id).select('id');
   if(r.error||!r.data||!r.data.length){alert('Não consegui atualizar (sem permissão ou sem conexão).');return}
   const t=WPPR.tickets.find(x=>x.id===id);if(t)t.atendido=true;
+  if(WPPR.chat&&WPPR.chat.ticketId===id)fecharChatWpp(true);
   auditar({acao:'Atendeu pedido do WhatsApp',alvo:t?t.nome:'',sec:'proj',campo:'WhatsApp'});
   renderWpp();
 }
+
+/* ---------- chat de atendimento humano ---------- */
+async function assumirTicketWpp(id){
+  const quem=usuario?usuario.nome:'';
+  const r=await sb.from('rh_wpp_tickets').update({assumido:true,assumido_por:quem,assumido_em:new Date().toISOString()}).eq('id',id).select('id');
+  if(r.error||!r.data||!r.data.length){alert('Não consegui assumir o atendimento (sem permissão ou sem conexão).');return}
+  const t=WPPR.tickets.find(x=>x.id===id);if(t){t.assumido=true;t.assumido_por=quem}
+  auditar({acao:'Assumiu atendimento do WhatsApp',alvo:t?t.nome:'',sec:'proj',campo:'WhatsApp'});
+  abrirChatWpp(id);
+}
+function abrirChatWpp(id){
+  const t=WPPR.tickets.find(x=>x.id===id);if(!t)return;
+  fecharChatWpp(true);
+  WPPR.chat={ticketId:id,tel:t.telefone,nome:t.nome||fmtFone(t.telefone),msgs:[],enviando:false};
+  WPPR.rascunho='';
+  renderWpp();
+  carregarChatWpp();
+  WPPR.timer=setInterval(()=>{if(!WPPR.chat||!$('wpp-chat-msgs')){fecharChatWpp(true);return}carregarChatWpp()},5000);
+  setTimeout(()=>{const i=$('wpp-chat-in');if(i)i.focus()},50);
+}
+function fecharChatWpp(silencioso){
+  if(WPPR.timer){clearInterval(WPPR.timer);WPPR.timer=null}
+  WPPR.chat=null;WPPR.rascunho='';
+  if(!silencioso)renderWpp();
+}
+async function carregarChatWpp(){
+  const c=WPPR.chat;if(!c)return;
+  const r=await sb.from('rh_wpp_log').select('id,t,direcao,texto,enviado_por').eq('telefone',c.tel).order('t',{ascending:false}).limit(60);
+  if(!WPPR.chat||WPPR.chat!==c||r.error)return;
+  c.msgs=(r.data||[]).slice().reverse();
+  pintarChatWpp();
+}
+function chatMsgsHtml(c){
+  if(!c.msgs.length)return '<div class="empty">Sem mensagens ainda.</div>';
+  return c.msgs.map(m=>{
+    const dono=m.direcao==='in'?'in':(m.enviado_por?'rh':'bot');
+    const quem=dono==='in'?esc(c.nome):dono==='rh'?'Atendente · '+esc(m.enviado_por):'Robô';
+    const cor=dono==='in'?'#fff':dono==='rh'?'#d9fdd3':'#eceff1';
+    const lado=dono==='in'?'flex-start':'flex-end';
+    return `<div style="display:flex;justify-content:${lado};margin:3px 0"><div style="max-width:82%;background:${cor};border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px"><div style="font-size:10px;color:#667;margin-bottom:2px">${quem} · ${fmtDH(m.t).slice(0,16)}</div>${esc(String(m.texto||'')).replace(/\n/g,'<br>')}</div></div>`;
+  }).join('');
+}
+function pintarChatWpp(){
+  const c=WPPR.chat,el=$('wpp-chat-msgs');if(!c||!el)return;
+  const baixo=el.scrollHeight-el.scrollTop-el.clientHeight<60||!el.dataset.pronto;
+  el.innerHTML=chatMsgsHtml(c);el.dataset.pronto='1';
+  if(baixo)el.scrollTop=el.scrollHeight;
+  const aviso=$('wpp-chat-aviso');
+  if(aviso){
+    const ult=c.msgs.filter(m=>m.direcao==='in').slice(-1)[0];
+    const fora=!ult||(Date.now()-new Date(ult.t).getTime())>24*3600*1000;
+    aviso.style.display=fora?'block':'none';
+  }
+}
+async function enviarChatWpp(){
+  const c=WPPR.chat,inp=$('wpp-chat-in');if(!c||!inp||c.enviando)return;
+  const texto=inp.value.trim();if(!texto)return;
+  c.enviando=true;const btn=$('wpp-chat-send');if(btn)btn.disabled=true;
+  try{
+    const r=await sb.functions.invoke('wpp-enviar',{body:{ticket_id:c.ticketId,texto,por:usuario?usuario.nome:''}});
+    let d=r.data;
+    if(r.error&&r.error.context&&r.error.context.json){try{d=await r.error.context.json()}catch(e){}}
+    if(!d||!d.ok){alert('Não foi possível enviar: '+((d&&d.error)||'tente de novo.'))}
+    else{inp.value='';WPPR.rascunho='';auditar({acao:'Respondeu no WhatsApp',alvo:c.nome,sec:'proj',campo:'WhatsApp'})}
+  }catch(e){alert('Não foi possível enviar. Verifique a conexão.')}
+  c.enviando=false;if($('wpp-chat-send'))$('wpp-chat-send').disabled=false;
+  carregarChatWpp();
+}
+function chatPainelHtml(){
+  const c=WPPR.chat;if(!c)return '';
+  return `<div class="card" style="border-color:#1565c0;margin-top:10px"><h3 style="margin:0 0 6px">💬 Atendendo: ${esc(c.nome)} <span class="ro" style="font-weight:400">(${esc(fmtFone(c.tel))})</span></h3>
+   <div class="ro" style="margin-bottom:6px">Enquanto este atendimento estiver aberto, o robô fica em silêncio para este colaborador. Clique em <b>Encerrar atendimento</b> quando terminar.</div>
+   <div id="wpp-chat-aviso" class="ro" style="display:none;background:#fff3e0;border:1px solid #ffb74d;padding:5px 8px;border-radius:6px;margin-bottom:6px">⚠️ Passaram mais de 24h desde a última mensagem do colaborador. A Meta só permite resposta livre dentro de 24h; peça para ele mandar um "oi" primeiro.</div>
+   <div id="wpp-chat-msgs" style="height:260px;overflow:auto;background:#f6f7f9;border:1px solid var(--line);border-radius:8px;padding:6px">${chatMsgsHtml(c)}</div>
+   <div style="display:flex;gap:6px;margin-top:6px"><textarea id="wpp-chat-in" rows="2" style="flex:1;resize:vertical" placeholder="Escreva a resposta (Enter envia · Shift+Enter quebra linha)">${esc(WPPR.rascunho)}</textarea><button class="btn" id="wpp-chat-send">Enviar</button></div>
+   <div style="margin-top:6px;display:flex;gap:6px"><button class="btn sec" id="wpp-chat-close">Minimizar</button><button class="btn" id="wpp-chat-end">✔ Encerrar atendimento</button></div></div>`;
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target&&ev.target.closest?ev.target.closest('[data-wpa],[data-wpo],#wpp-chat-send,#wpp-chat-end,#wpp-chat-close'):null;
+  if(!b)return;
+  if(b.dataset.wpa){assumirTicketWpp(Number(b.dataset.wpa));return}
+  if(b.dataset.wpo){abrirChatWpp(Number(b.dataset.wpo));return}
+  if(b.id==='wpp-chat-send'){enviarChatWpp();return}
+  if(b.id==='wpp-chat-close'){fecharChatWpp();return}
+  if(b.id==='wpp-chat-end'&&WPPR.chat){if(confirm('Encerrar este atendimento? O robô volta a responder este colaborador.'))atenderTicketReal(WPPR.chat.ticketId)}
+});
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='wpp-chat-in')WPPR.rascunho=ev.target.value});
+document.addEventListener('keydown',ev=>{if(ev.target&&ev.target.id==='wpp-chat-in'&&ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();enviarChatWpp()}});
+
 function wppRealHtml(){
   if(!WPPR.carregado&&!WPPR.carregando&&['rh','grh'].includes(perfil))setTimeout(carregarWppReal,0);
   const num=dig(WPP.numero),ed=perfil==='grh';
   const abertos=WPPR.tickets.filter(x=>!x.atendido),feitos=WPPR.tickets.filter(x=>x.atendido).slice(0,6);
+  const acoes=x=>x.assumido
+    ?`<span class="badge g">em atendimento${x.assumido_por?' · '+esc(x.assumido_por):''}</span> <button class="btn" data-wpo="${x.id}">💬 Abrir chat</button> <button class="btn sec" data-wrt="${x.id}">✔ Encerrar</button>`
+    :`<button class="btn" data-wpa="${x.id}">🙋 Assumir e responder</button> <button class="btn sec" data-wrt="${x.id}">✔ Marcar atendido</button>`;
   return `<div class="card" style="border-color:#2e7d32"><h2>📱 WhatsApp real do RH</h2>
    <div class="f" style="grid-template-columns:1fr auto;align-items:end"><div><label>Número do WhatsApp do RH (com DDD)</label><input id="wpp-numero" placeholder="(38) 99999-0000" value="${esc(fmtFone(WPP.numero))}" ${ed?'':'disabled'}></div>${num?`<a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/55${num.replace(/^55/,'')}?text=oi">Abrir conversa</a>`:''}</div>
-   <div class="ro" style="margin-top:6px;line-height:1.6">Quando o número estiver ligado à Meta, o colaborador cadastrado (telefone na ficha) manda <b>oi</b>, confirma os 4 últimos dígitos do CPF e conversa com a IA sobre os <b>próprios</b> dados. Quem não tem cadastro não recebe nada. Pedidos de atendimento humano caem abaixo. ${ed?'':'(somente o Gestor do RH altera o número)'}</div>
+   <div class="ro" style="margin-top:6px;line-height:1.6">Quando o número estiver ligado à Meta, o colaborador cadastrado (telefone na ficha) manda <b>oi</b>, confirma os 4 últimos dígitos do CPF e conversa com a IA sobre os <b>próprios</b> dados. Quem não tem cadastro não recebe nada. Pedidos de atendimento humano caem abaixo: clique em <b>Assumir e responder</b> para conversar com o colaborador por aqui. ${ed?'':'(somente o Gestor do RH altera o número)'}</div>
    <h3 style="margin-top:12px">🙋 Pedidos de atendimento (${abertos.length} aberto${abertos.length===1?'':'s'})</h3>
-   ${abertos.length?`<table class="matriz"><tr><th>Quando</th><th>Colaborador</th><th>Telefone</th><th>Motivo</th><th></th></tr>${abertos.map(x=>`<tr><td>${fmtDH(x.t)}</td><td style="text-align:left">${esc(x.nome||'')}</td><td>${esc(fmtFone(x.telefone))}</td><td style="text-align:left">${esc(x.motivo||'')}</td><td><button class="btn" data-wrt="${x.id}">✔ Atendido</button></td></tr>`).join('')}</table>`:'<div class="empty">Nenhum pedido aberto.</div>'}
+   ${abertos.length?`<table class="matriz"><tr><th>Quando</th><th>Colaborador</th><th>Telefone</th><th>Motivo</th><th></th></tr>${abertos.map(x=>`<tr><td>${fmtDH(x.t)}</td><td style="text-align:left">${esc(x.nome||'')}</td><td>${esc(fmtFone(x.telefone))}</td><td style="text-align:left">${esc(x.motivo||'')}</td><td>${acoes(x)}</td></tr>`).join('')}</table>`:'<div class="empty">Nenhum pedido aberto.</div>'}
    ${feitos.length?`<div class="ro" style="margin-top:6px">Últimos atendidos: ${feitos.map(x=>esc(x.nome||'')+' ('+fmtDH(x.atendido_em||x.t).slice(0,10)+')').join(' · ')}</div>`:''}
+   ${chatPainelHtml()}
    <h3 style="margin-top:12px">💬 Últimas mensagens <button class="btn sec" id="wpp-real-reload" style="padding:2px 8px;margin-left:6px">↻</button></h3>
    ${WPPR.log.length?WPPR.log.map(m=>`<div class="item" style="padding:3px 0;border-bottom:1px solid var(--line);font-size:12px">${fmtDH(m.t).slice(0,16)} · <b>${m.direcao==='in'?esc(m.nome||fmtFone(m.telefone)):'IA → '+esc(m.nome||fmtFone(m.telefone))}</b>: ${esc(String(m.texto||'').slice(0,140))}</div>`).join(''):'<div class="empty">Nenhuma mensagem recebida ainda.</div>'}</div>`;
 }
@@ -2117,7 +2212,7 @@ document.addEventListener('click',async ev=>{
   if(t.id==='nf-add'){const dt=$('nf-data').value;if(!dt){alert('Informe a data.');return}const f=$('nf-file').files[0];let ax=null;if(f){ax=await anexar(f,'emp'+e.id);if(!ax)return}e.faltas.push({data:dt,dias:Number($('nf-dias').value)||1,tipo:$('nf-tipo').value,anexo:ax?ax.nome:'',anexoPath:ax?ax.path:'',obs:$('nf-obs').value.trim()});auditar({acao:'Registrou falta/atestado',alvo:e.nome,alvoId:e.id,sec:'faltas',campo:$('nf-tipo').value+' '+fmtD(dt),depois:(Number($('nf-dias').value)||1)+' dia(s)'+(f?' · anexo '+f.name:'')});render()}
   if(t.dataset.bonaprov){const obs=($('bon-obs')||{value:''}).value.trim();if(t.dataset.bonaprov==='Reprovada'&&!obs){alert('Informe o motivo da reprovação.');return}const ant=e.bonAprov.status;e.bonAprov={status:t.dataset.bonaprov,por:usuario?usuario.nome:'Gestor do RH',em:fmtISO(HOJE),obs};auditar({acao:t.dataset.bonaprov==='Aprovada'?'Aprovou bonificação':'Reprovou bonificação',alvo:e.nome,alvoId:e.id,sec:'bonus',campo:'Bonificação '+e.bonMes,antes:ant,depois:t.dataset.bonaprov+(obs?' · '+obs:'')});render()}
   if(t.dataset.heaprov){const obs=($('he-obs')||{value:''}).value.trim();if(t.dataset.heaprov==='Reprovada'&&!obs){alert('Informe o motivo da reprovação.');return}const ant=e.heAprov.status;e.heAprov={status:t.dataset.heaprov,por:usuario?usuario.nome:'Gestor do RH',em:fmtISO(HOJE),obs};auditar({acao:t.dataset.heaprov==='Aprovada'?'Aprovou hora extra':'Reprovou hora extra',alvo:e.nome,alvoId:e.id,sec:'he',campo:'Hora extra',antes:ant,depois:t.dataset.heaprov+(obs?' · '+obs:'')});render()}
-  if(t.id==='nd-add'){const f=$('nd-file').files[0];if(!f){alert('Escolha um arquivo.');return}const ax=await anexar(f,'emp'+e.id);if(!ax)return;e.docs.push({cat:$('nd-cat').value,nome:f.name,val:$('nd-val').value,path:ax.path});auditar({acao:'Anexou documento',alvo:e.nome,alvoId:e.id,sec:'docs',campo:$('nd-cat').value,depois:f.name+($('nd-val').value?' · validade '+fmtD($('nd-val').value):'')});render()}
+  if(t.id==='nd-add'){const f=$('nd-file').files[0];if(!f){alert('Escolha um arquivo.');return}const cc=$('nd-cat').value==='Contracheque',comp=$('nd-comp')?$('nd-comp').value:'';if(cc&&!comp){alert('Informe o mês de referência do contracheque.');return}const ax=await anexar(f,'emp'+e.id);if(!ax)return;e.docs.push({cat:$('nd-cat').value,nome:f.name,val:cc?'':$('nd-val').value,path:ax.path,comp:cc?comp:''});auditar({acao:'Anexou documento',alvo:e.nome,alvoId:e.id,sec:'docs',campo:$('nd-cat').value,depois:f.name+($('nd-val').value?' · validade '+fmtD($('nd-val').value):'')});render()}
   if(t.id==='nm-add'){const de=$('nm-de').value,dt=$('nm-dt').value;if(!de||!dt){alert('Selecione o destino e a data.');return}if(de===$('nm-or').value){alert('Origem e destino não podem ser iguais.');return}e.mob.push({tipo:$('nm-tipo').value,origem:$('nm-or').value,destino:de,data:dt,status:'Pendente'});auditar({acao:'Registrou mobilização/transferência',alvo:e.nome,alvoId:e.id,sec:'mob',campo:$('nm-tipo').value,depois:$('nm-or').value+' → '+de+' em '+fmtD(dt)});render()}
 });
 document.addEventListener('change',async ev=>{
