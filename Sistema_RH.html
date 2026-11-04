@@ -171,6 +171,7 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
   <section id="v-pgr" hidden></section>
   <section id="v-imp" hidden></section>
   <section id="v-wpp" hidden></section>
+  <section id="v-atend" hidden></section>
   <section id="v-trein" hidden></section>
   <section id="v-alim" hidden></section>
   <section id="v-passagens" hidden></section>
@@ -353,7 +354,7 @@ function render(){
     pmo:'Módulo PMO: cria e edita contratos e CDs na aba Contratos, anexa o cronograma oficial e monitora a mobilização feita por RH, Saúde e Segurança e Compras.',
     dir:'Vê o painel (quadro de colaboradores) e o andamento da mobilização dos contratos. Não acessa dados pessoais nem salários.'}[perfil]}`;
   if(CHAT.abrir)renderChat();
-  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();renderFat();renderFatDash();
+  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();renderFat();renderFatDash();renderAtend(true);
   if(abertoId)renderModal();
   agendarSync();
 }
@@ -539,7 +540,7 @@ const MODS=[
  {id:'fin',nome:'Financeiro',ico:'💲',abas:[['painel','Alertas',['fin','grh']],['fatdash','Faturamento · Dashboard',['fin','grh','dir']],['fat','Medições e NFs',['fin','grh','dir']],['colab','Colaboradores · salário e HE',['fin']],['folha','Folha de pagamento',['fin','grh']],['imp','Impostos e encargos',['fin','grh']]]},
  {id:'sst',nome:'Saúde e Segurança',ico:'🦺',abas:[['painel','Alertas',['sst','grh']],['colab','Colaboradores · ASO e documentos',['sst']],['trein','Treinamentos',['sst','grh']],['mob','Mobilização · treinamentos e EPI',['sst']],['pgr','PGR / EPIs',['sst','rh','grh']]]},
  {id:'compras',nome:'Compras',ico:'🛒',abas:[['painel','Alertas',['cmp','grh']],['colab','Colaboradores · baixada e férias',['cmp']],['mob','Mobilização · passagens e chegada',['cmp']],['passagens','Passagens',['cmp','grh','dir']],['alim','Alimentação',['cmp','grh','dir']],['pgr','EPIs a comprar',['cmp','grh','dir']]]},
- {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['wpp','WhatsApp do colaborador',['rh','grh']]]},
+ {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['atend','Atendimento',['rh','grh']],['wpp','Número e simulador',['rh','grh']]]},
  {id:'pmo',nome:'PMO',ico:'🏗',abas:[['painel','Alertas',['pmo','grh']],['mob','Mobilização',['pmo','grh']],['colab','Colaboradores · baixada e férias',['pmo']]]},
  {id:'contratos',nome:'Contratos',ico:'📑',abas:[['contratos','Contratos',['pmo','grh','dir','rh']]]},
  {id:'admin',nome:'Administração',ico:'⚙️',abas:[['usuarios','Usuários e acessos',['grh']],['audit','Auditoria',['grh','rh']],['acessos','Matriz de perfis',['grh']]]}
@@ -1283,7 +1284,8 @@ function ligarTempoReal(){
     const n=p.new||{};
     if(usuario&&((n.updated_by&&n.updated_by===usuario.id)||(t==='rh_auditoria'&&n.user_id===usuario.id)))return;
     agendarReload()}));
-  chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_tickets'},()=>{WPPR.carregado=false;if(typeof renderWpp==='function'&&tab==='wpp')renderWpp()});
+  chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_tickets'},()=>{if(typeof carregarWppReal==='function')carregarWppReal()});
+  chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_log'},()=>{if(typeof carregarWppReal==='function'){carregarWppReal();if(typeof ATD!=='undefined'&&ATD.sel)atdCarregarMsgs()}});
   chan.subscribe();
 }
 function agendarReload(){clearTimeout(reloadT);reloadT=setTimeout(recarregar,700)}
@@ -1718,132 +1720,201 @@ async function perguntarIA(pergunta,fallback){
   }catch(e){return '⚠️ A IA não respondeu agora. Tente de novo em instantes.'+(fallback?'<br><br>'+fallback:'')}
 }
 
-/* ---------- WhatsApp real (atendimentos e conversas vindos do número do RH) ---------- */
-const WPPR={tickets:[],log:[],carregado:false,carregando:false,chat:null,rascunho:'',timer:null};
+/* ---------- WhatsApp real (número do RH, pedidos de atendimento e conversas) ---------- */
+const WPPR={tickets:[],log:[],ult:{},carregado:false,carregando:false};
+const ATD={sel:null,filtro:'abertos',msgs:[],enviando:false,rascunho:'',timer:null};
 const fmtFone=n=>{const d=dig(n).replace(/^55(?=\d{10,11}$)/,'');return d.length===11?`(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`:d.length===10?`(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`:String(n||'')};
+const PODE_ATENDER=()=>['rh','grh'].includes(perfil);
 async function carregarWppReal(){
-  if(WPPR.carregando||!['rh','grh'].includes(perfil))return;
+  if(WPPR.carregando||!PODE_ATENDER())return;
   WPPR.carregando=true;
   try{
-    const [a,b]=await Promise.all([sb.from('rh_wpp_tickets').select('*').order('t',{ascending:false}).limit(40),sb.from('rh_wpp_log').select('t,telefone,nome,direcao,texto').order('t',{ascending:false}).limit(30)]);
+    const [a,b]=await Promise.all([sb.from('rh_wpp_tickets').select('*').order('t',{ascending:false}).limit(60),sb.from('rh_wpp_log').select('t,telefone,nome,direcao,texto,enviado_por').order('t',{ascending:false}).limit(200)]);
     WPPR.tickets=a.data||[];WPPR.log=b.data||[];WPPR.carregado=true;
+    WPPR.ult={};WPPR.log.forEach(m=>{if(!WPPR.ult[m.telefone])WPPR.ult[m.telefone]=m});
   }catch(e){console.error(e)}
   WPPR.carregando=false;
   if(typeof renderWpp==='function')renderWpp();
+  if(typeof renderAtend==='function')renderAtend(true);
 }
 async function atenderTicketReal(id){
   const r=await sb.from('rh_wpp_tickets').update({atendido:true,atendido_por:usuario?usuario.nome:'',atendido_em:new Date().toISOString()}).eq('id',id).select('id');
-  if(r.error||!r.data||!r.data.length){alert('Não consegui atualizar (sem permissão ou sem conexão).');return}
-  const t=WPPR.tickets.find(x=>x.id===id);if(t)t.atendido=true;
-  if(WPPR.chat&&WPPR.chat.ticketId===id)fecharChatWpp(true);
+  if(r.error||!r.data||!r.data.length){alert('Não consegui atualizar (sem permissão ou sem conexão).');return false}
+  const t=WPPR.tickets.find(x=>x.id===id);if(t){t.atendido=true;t.atendido_por=usuario?usuario.nome:'';t.atendido_em=new Date().toISOString()}
   auditar({acao:'Atendeu pedido do WhatsApp',alvo:t?t.nome:'',sec:'proj',campo:'WhatsApp'});
-  renderWpp();
+  if(typeof renderWpp==='function')renderWpp();
+  if(typeof renderAtend==='function')renderAtend(true);
+  return true;
 }
 
-/* ---------- chat de atendimento humano ---------- */
-async function assumirTicketWpp(id){
-  const quem=usuario?usuario.nome:'';
-  const r=await sb.from('rh_wpp_tickets').update({assumido:true,assumido_por:quem,assumido_em:new Date().toISOString()}).eq('id',id).select('id');
-  if(r.error||!r.data||!r.data.length){alert('Não consegui assumir o atendimento (sem permissão ou sem conexão).');return}
-  const t=WPPR.tickets.find(x=>x.id===id);if(t){t.assumido=true;t.assumido_por=quem}
-  auditar({acao:'Assumiu atendimento do WhatsApp',alvo:t?t.nome:'',sec:'proj',campo:'WhatsApp'});
-  abrirChatWpp(id);
+/* ---------- aba Atendimento: lista de conversas + chat ---------- */
+const atdTk=()=>WPPR.tickets.find(x=>x.id===ATD.sel)||null;
+const atdHora=iso=>{if(!iso)return '';const d=new Date(iso),h=new Date();const mesmo=d.toDateString()===h.toDateString();return mesmo?String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')};
+function atdListaTickets(){
+  const f=ATD.filtro;
+  let l=WPPR.tickets.filter(x=>f==='abertos'?!x.atendido&&!x.assumido:f==='andamento'?!x.atendido&&x.assumido:x.atendido);
+  const ordem=x=>{const u=WPPR.ult[x.telefone];return new Date((u&&u.t)||x.t).getTime()};
+  return l.slice().sort((a,b)=>ordem(b)-ordem(a));
 }
-function abrirChatWpp(id){
-  const t=WPPR.tickets.find(x=>x.id===id);if(!t)return;
-  fecharChatWpp(true);
-  WPPR.chat={ticketId:id,tel:t.telefone,nome:t.nome||fmtFone(t.telefone),msgs:[],enviando:false};
-  WPPR.rascunho='';
-  renderWpp();
-  carregarChatWpp();
-  WPPR.timer=setInterval(()=>{if(!WPPR.chat||!$('wpp-chat-msgs')){fecharChatWpp(true);return}carregarChatWpp()},5000);
-  setTimeout(()=>{const i=$('wpp-chat-in');if(i)i.focus()},50);
+function atdListaHtml(){
+  const cont={abertos:WPPR.tickets.filter(x=>!x.atendido&&!x.assumido).length,andamento:WPPR.tickets.filter(x=>!x.atendido&&x.assumido).length};
+  const chip=(k,l,n)=>`<button class="atd-chip ${ATD.filtro===k?'on':''}" data-atd-filtro="${k}">${l}${n?` <span class="atd-n">${n}</span>`:''}</button>`;
+  const itens=atdListaTickets();
+  return `<div class="atd-chips">${chip('abertos','Aguardando',cont.abertos)}${chip('andamento','Em atendimento',cont.andamento)}${chip('fim','Encerrados',0)}</div>
+   <div class="atd-itens">${itens.length?itens.map(x=>{
+     const u=WPPR.ult[x.telefone],snip=u?(u.direcao==='out'?'Você: ':'')+String(u.texto||'').replace(/\s+/g,' ').slice(0,46):esc(x.motivo||'');
+     const nome=x.nome||fmtFone(x.telefone);
+     return `<div class="atd-it ${x.id===ATD.sel?'on':''}" data-atd-sel="${x.id}"><div class="atd-av">${esc(String(nome).trim().charAt(0).toUpperCase())}</div><div class="atd-tx"><div class="atd-l1"><b>${esc(nome)}</b><span>${atdHora((u&&u.t)||x.t)}</span></div><div class="atd-l2">${esc(snip)}</div>${x.assumido&&!x.atendido?`<div class="atd-l3">🙋 ${esc(x.assumido_por||'em atendimento')}</div>`:''}</div></div>`}).join(''):`<div class="atd-vazio">${ATD.filtro==='abertos'?'Nenhuma conversa aguardando atendimento. 🎉':ATD.filtro==='andamento'?'Nenhum atendimento em andamento.':'Nenhum atendimento encerrado ainda.'}</div>`}</div>`;
 }
-function fecharChatWpp(silencioso){
-  if(WPPR.timer){clearInterval(WPPR.timer);WPPR.timer=null}
-  WPPR.chat=null;WPPR.rascunho='';
-  if(!silencioso)renderWpp();
-}
-async function carregarChatWpp(){
-  const c=WPPR.chat;if(!c)return;
-  const r=await sb.from('rh_wpp_log').select('id,t,direcao,texto,enviado_por').eq('telefone',c.tel).order('t',{ascending:false}).limit(60);
-  if(!WPPR.chat||WPPR.chat!==c||r.error)return;
-  c.msgs=(r.data||[]).slice().reverse();
-  pintarChatWpp();
-}
-function chatMsgsHtml(c){
-  if(!c.msgs.length)return '<div class="empty">Sem mensagens ainda.</div>';
-  return c.msgs.map(m=>{
+function atdMsgsHtml(){
+  if(!ATD.msgs.length)return '<div class="atd-vazio">Sem mensagens ainda.</div>';
+  const t=atdTk(),nome=t?(t.nome||fmtFone(t.telefone)):'';
+  let ult='';
+  return ATD.msgs.map(m=>{
+    const d=new Date(m.t),dia=d.toLocaleDateString('pt-BR'),sep=dia!==ult?`<div class="atd-dia"><span>${dia}</span></div>`:'';ult=dia;
     const dono=m.direcao==='in'?'in':(m.enviado_por?'rh':'bot');
-    const quem=dono==='in'?esc(c.nome):dono==='rh'?'Atendente · '+esc(m.enviado_por):'Robô';
-    const cor=dono==='in'?'#fff':dono==='rh'?'#d9fdd3':'#eceff1';
-    const lado=dono==='in'?'flex-start':'flex-end';
-    return `<div style="display:flex;justify-content:${lado};margin:3px 0"><div style="max-width:82%;background:${cor};border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px"><div style="font-size:10px;color:#667;margin-bottom:2px">${quem} · ${fmtDH(m.t).slice(0,16)}</div>${esc(String(m.texto||'')).replace(/\n/g,'<br>')}</div></div>`;
+    const quem=dono==='in'?esc(nome):dono==='rh'?esc(m.enviado_por):'Assistente (robô)';
+    return sep+`<div class="atd-row ${dono==='in'?'e':'d'}"><div class="atd-bb ${dono}"><div class="atd-q">${quem}</div>${esc(String(m.texto||'')).replace(/\*(.+?)\*/g,'<b>$1</b>').replace(/\n/g,'<br>')}<div class="atd-h">${atdHora(m.t)}</div></div></div>`;
   }).join('');
 }
-function pintarChatWpp(){
-  const c=WPPR.chat,el=$('wpp-chat-msgs');if(!c||!el)return;
-  const baixo=el.scrollHeight-el.scrollTop-el.clientHeight<60||!el.dataset.pronto;
-  el.innerHTML=chatMsgsHtml(c);el.dataset.pronto='1';
-  if(baixo)el.scrollTop=el.scrollHeight;
-  const aviso=$('wpp-chat-aviso');
-  if(aviso){
-    const ult=c.msgs.filter(m=>m.direcao==='in').slice(-1)[0];
-    const fora=!ult||(Date.now()-new Date(ult.t).getTime())>24*3600*1000;
-    aviso.style.display=fora?'block':'none';
-  }
+function atdPainelHtml(){
+  const t=atdTk();
+  if(!t)return `<div class="atd-vazio" style="margin:auto">Selecione uma conversa à esquerda para atender.</div>`;
+  const nome=t.nome||fmtFone(t.telefone),fim=!!t.atendido,andamento=!fim&&!!t.assumido;
+  const ultIn=ATD.msgs.filter(m=>m.direcao==='in').slice(-1)[0];
+  const fora=andamento&&(!ultIn||Date.now()-new Date(ultIn.t).getTime()>24*3600*1000);
+  const status=fim?`<span class="badge g">encerrado${t.atendido_por?' · '+esc(t.atendido_por):''}</span>`:andamento?`<span class="badge g">em atendimento${t.assumido_por?' · '+esc(t.assumido_por):''}</span>`:'<span class="badge w">aguardando</span>';
+  const acao=fim?'':andamento?'<button class="btn sec" data-atd-encerrar="1">✔ Encerrar</button>':'<button class="btn" data-atd-assumir="1">🙋 Assumir atendimento</button>';
+  return `<div class="atd-top"><div class="atd-av">${esc(String(nome).trim().charAt(0).toUpperCase())}</div><div style="flex:1;min-width:0"><b>${esc(nome)}</b> ${status}<div class="atd-sub">${esc(fmtFone(t.telefone))}${t.motivo?' · '+esc(t.motivo):''}</div></div>${acao}</div>
+   <div class="atd-msgs" id="atd-msgs">${atdMsgsHtml()}</div>
+   ${fora?'<div class="atd-aviso">⚠️ Passaram mais de 24h desde a última mensagem do colaborador. A Meta só permite resposta livre dentro de 24h; peça para ele mandar um "oi" primeiro.</div>':''}
+   ${andamento?`<div class="atd-comp"><textarea id="atd-in" rows="1" placeholder="Escreva uma mensagem… (Enter envia)">${esc(ATD.rascunho)}</textarea><button class="btn" id="atd-send">Enviar</button></div>`
+   :fim?'<div class="atd-aviso" style="background:#f1f3f4;border-color:#dadce0;color:#555">Atendimento encerrado. O assistente voltou a responder este colaborador.</div>'
+   :'<div class="atd-aviso" style="background:#e8f5e9;border-color:#a5d6a7;color:#1b5e20">Clique em <b>Assumir atendimento</b> para responder. Enquanto você atende, o assistente (robô) fica em silêncio para este colaborador.</div>'}`;
 }
-async function enviarChatWpp(){
-  const c=WPPR.chat,inp=$('wpp-chat-in');if(!c||!inp||c.enviando)return;
+const ATD_CSS=`<style>
+.atd{display:grid;grid-template-columns:310px 1fr;gap:0;height:calc(100vh - 190px);min-height:460px;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.atd-lista{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;background:#fff}
+.atd-ttl{padding:12px 14px 6px;font-weight:700;font-size:15px}
+.atd-chips{display:flex;gap:6px;padding:4px 12px 10px;flex-wrap:wrap}
+.atd-chip{border:1px solid var(--line);background:#fff;border-radius:16px;padding:3px 10px;font-size:12px;cursor:pointer}
+.atd-chip.on{background:#e3f2fd;border-color:#90caf9;font-weight:600}
+.atd-n{background:#d32f2f;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:2px}
+.atd-itens{overflow:auto;flex:1}
+.atd-it{display:flex;gap:10px;padding:10px 12px;border-top:1px solid #f0f0f0;cursor:pointer}
+.atd-it:hover{background:#f7f9fb}.atd-it.on{background:#e8f0fe}
+.atd-av{width:38px;height:38px;border-radius:50%;background:#1565c0;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.atd-tx{min-width:0;flex:1}.atd-l1{display:flex;justify-content:space-between;gap:6px}.atd-l1 span{font-size:11px;color:#778}
+.atd-l1 b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atd-l2{font-size:12px;color:#667;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.atd-l3{font-size:11px;color:#2e7d32;margin-top:2px}
+.atd-vazio{padding:24px 16px;text-align:center;color:#889;font-size:13px}
+.atd-painel{display:flex;flex-direction:column;min-width:0;background:#efeae2}
+.atd-top{display:flex;gap:10px;align-items:center;padding:10px 14px;background:#fff;border-bottom:1px solid var(--line)}
+.atd-sub{font-size:12px;color:#667;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atd-msgs{flex:1;overflow:auto;padding:12px 14px}
+.atd-dia{text-align:center;margin:8px 0}.atd-dia span{background:#fff;border-radius:8px;padding:2px 10px;font-size:11px;color:#667;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.atd-row{display:flex;margin:3px 0}.atd-row.e{justify-content:flex-start}.atd-row.d{justify-content:flex-end}
+.atd-bb{max-width:78%;border-radius:8px;padding:5px 9px 3px;font-size:13px;line-height:1.4;box-shadow:0 1px 1px rgba(0,0,0,.1);word-wrap:break-word}
+.atd-bb.in{background:#fff}.atd-bb.rh{background:#d9fdd3}.atd-bb.bot{background:#e3e8ec}
+.atd-q{font-size:10.5px;color:#4a6;font-weight:600;margin-bottom:1px}.atd-bb.in .atd-q{color:#1565c0}.atd-bb.bot .atd-q{color:#667}
+.atd-h{font-size:10px;color:#889;text-align:right;margin-top:1px}
+.atd-comp{display:flex;gap:8px;padding:10px 12px;background:#f0f2f5;align-items:flex-end}
+.atd-comp textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:18px;padding:8px 12px;font:inherit;max-height:120px}
+.atd-aviso{padding:8px 14px;background:#fff3e0;border-top:1px solid #ffb74d;font-size:12px;color:#8a5a00}
+@media(max-width:820px){.atd{grid-template-columns:1fr;height:auto}.atd-lista{max-height:260px;border-right:0;border-bottom:1px solid var(--line)}.atd-painel{min-height:420px}}
+</style>`;
+function renderAtend(parcial){
+  const el=$('v-atend');if(!el)return;
+  if(!PODE_ATENDER()){el.innerHTML='<div class="empty">Sem permissão para esta aba.</div>';return}
+  if(!WPPR.carregado&&!WPPR.carregando)setTimeout(carregarWppReal,0);
+  const foco=document.activeElement&&document.activeElement.id==='atd-in';
+  const msgsAnt=$('atd-msgs'),rolarFim=!msgsAnt||msgsAnt.scrollHeight-msgsAnt.scrollTop-msgsAnt.clientHeight<80;
+  if(parcial&&$('atd-lista')&&$('atd-painel')){
+    // atualização leve: mantém o campo de texto e a rolagem
+    $('atd-lista').innerHTML=atdListaHtml();
+    const tk=atdTk(),chave=tk?[tk.id,tk.assumido,tk.atendido,tk.assumido_por].join('|'):'';
+    if(el.dataset.chave!==chave){el.dataset.chave=chave;$('atd-painel').innerHTML=atdPainelHtml()}
+    else if($('atd-msgs'))$('atd-msgs').innerHTML=atdMsgsHtml();
+  }else{
+    const tk=atdTk();el.dataset.chave=tk?[tk.id,tk.assumido,tk.atendido,tk.assumido_por].join('|'):'';
+    el.innerHTML=ATD_CSS+`<div class="atd"><div class="atd-lista"><div class="atd-ttl">💬 Atendimento WhatsApp</div><div id="atd-lista" style="display:flex;flex-direction:column;min-height:0;flex:1">${atdListaHtml()}</div></div><div class="atd-painel" id="atd-painel">${atdPainelHtml()}</div></div>`;
+  }
+  const m=$('atd-msgs');if(m&&(rolarFim||!parcial))m.scrollTop=m.scrollHeight;
+  if(foco&&$('atd-in'))$('atd-in').focus();
+  if(!ATD.timer)ATD.timer=setInterval(atdTick,6000);
+}
+async function atdTick(){
+  if(!$('v-atend')||$('v-atend').hidden||document.hidden){ if(!$('v-atend')){clearInterval(ATD.timer);ATD.timer=null} return}
+  if(!PODE_ATENDER())return;
+  await carregarWppReal();
+  if(ATD.sel)await atdCarregarMsgs();
+}
+async function atdCarregarMsgs(){
+  const t=atdTk();if(!t)return;
+  const r=await sb.from('rh_wpp_log').select('id,t,direcao,texto,enviado_por').eq('telefone',t.telefone).order('t',{ascending:false}).limit(80);
+  if(atdTk()!==t||r.error)return;
+  ATD.msgs=(r.data||[]).slice().reverse();
+  const el=$('atd-msgs');
+  if(el){const fim=el.scrollHeight-el.scrollTop-el.clientHeight<80;el.innerHTML=atdMsgsHtml();if(fim)el.scrollTop=el.scrollHeight}
+  else renderAtend(true);
+}
+function atdSelecionar(id){
+  ATD.sel=id;ATD.msgs=[];ATD.rascunho='';
+  renderAtend();atdCarregarMsgs();
+}
+async function atdAssumir(){
+  const t=atdTk();if(!t)return;
+  const quem=usuario?usuario.nome:'';
+  const r=await sb.from('rh_wpp_tickets').update({assumido:true,assumido_por:quem,assumido_em:new Date().toISOString()}).eq('id',t.id).select('id');
+  if(r.error||!r.data||!r.data.length){alert('Não consegui assumir o atendimento (sem permissão ou sem conexão).');return}
+  t.assumido=true;t.assumido_por=quem;
+  auditar({acao:'Assumiu atendimento do WhatsApp',alvo:t.nome,sec:'proj',campo:'WhatsApp'});
+  if(ATD.filtro==='abertos')ATD.filtro='andamento';
+  renderAtend();
+  const i=$('atd-in');if(i)i.focus();
+}
+async function atdEncerrar(){
+  const t=atdTk();if(!t)return;
+  if(!confirm('Encerrar este atendimento? O assistente (robô) volta a responder este colaborador.'))return;
+  if(await atenderTicketReal(t.id)){ATD.rascunho='';if(ATD.filtro==='andamento')ATD.filtro='fim';renderAtend()}
+}
+async function atdEnviar(){
+  const t=atdTk(),inp=$('atd-in');if(!t||!inp||ATD.enviando)return;
   const texto=inp.value.trim();if(!texto)return;
-  c.enviando=true;const btn=$('wpp-chat-send');if(btn)btn.disabled=true;
+  ATD.enviando=true;const btn=$('atd-send');if(btn)btn.disabled=true;
   try{
-    const r=await sb.functions.invoke('wpp-enviar',{body:{ticket_id:c.ticketId,texto,por:usuario?usuario.nome:''}});
+    const r=await sb.functions.invoke('wpp-enviar',{body:{ticket_id:t.id,texto,por:usuario?usuario.nome:''}});
     let d=r.data;
     if(r.error&&r.error.context&&r.error.context.json){try{d=await r.error.context.json()}catch(e){}}
-    if(!d||!d.ok){alert('Não foi possível enviar: '+((d&&d.error)||'tente de novo.'))}
-    else{inp.value='';WPPR.rascunho='';auditar({acao:'Respondeu no WhatsApp',alvo:c.nome,sec:'proj',campo:'WhatsApp'})}
+    if(!d||!d.ok)alert('Não foi possível enviar: '+((d&&d.error)||'tente de novo.'));
+    else{inp.value='';ATD.rascunho='';auditar({acao:'Respondeu no WhatsApp',alvo:t.nome,sec:'proj',campo:'WhatsApp'})}
   }catch(e){alert('Não foi possível enviar. Verifique a conexão.')}
-  c.enviando=false;if($('wpp-chat-send'))$('wpp-chat-send').disabled=false;
-  carregarChatWpp();
-}
-function chatPainelHtml(){
-  const c=WPPR.chat;if(!c)return '';
-  return `<div class="card" style="border-color:#1565c0;margin-top:10px"><h3 style="margin:0 0 6px">💬 Atendendo: ${esc(c.nome)} <span class="ro" style="font-weight:400">(${esc(fmtFone(c.tel))})</span></h3>
-   <div class="ro" style="margin-bottom:6px">Enquanto este atendimento estiver aberto, o robô fica em silêncio para este colaborador. Clique em <b>Encerrar atendimento</b> quando terminar.</div>
-   <div id="wpp-chat-aviso" class="ro" style="display:none;background:#fff3e0;border:1px solid #ffb74d;padding:5px 8px;border-radius:6px;margin-bottom:6px">⚠️ Passaram mais de 24h desde a última mensagem do colaborador. A Meta só permite resposta livre dentro de 24h; peça para ele mandar um "oi" primeiro.</div>
-   <div id="wpp-chat-msgs" style="height:260px;overflow:auto;background:#f6f7f9;border:1px solid var(--line);border-radius:8px;padding:6px">${chatMsgsHtml(c)}</div>
-   <div style="display:flex;gap:6px;margin-top:6px"><textarea id="wpp-chat-in" rows="2" style="flex:1;resize:vertical" placeholder="Escreva a resposta (Enter envia · Shift+Enter quebra linha)">${esc(WPPR.rascunho)}</textarea><button class="btn" id="wpp-chat-send">Enviar</button></div>
-   <div style="margin-top:6px;display:flex;gap:6px"><button class="btn sec" id="wpp-chat-close">Minimizar</button><button class="btn" id="wpp-chat-end">✔ Encerrar atendimento</button></div></div>`;
+  ATD.enviando=false;if($('atd-send'))$('atd-send').disabled=false;
+  await atdCarregarMsgs();
+  const m=$('atd-msgs');if(m)m.scrollTop=m.scrollHeight;
+  if($('atd-in'))$('atd-in').focus();
 }
 document.addEventListener('click',ev=>{
-  const b=ev.target&&ev.target.closest?ev.target.closest('[data-wpa],[data-wpo],#wpp-chat-send,#wpp-chat-end,#wpp-chat-close'):null;
+  const b=ev.target&&ev.target.closest?ev.target.closest('[data-atd-sel],[data-atd-filtro],[data-atd-assumir],[data-atd-encerrar],#atd-send'):null;
   if(!b)return;
-  if(b.dataset.wpa){assumirTicketWpp(Number(b.dataset.wpa));return}
-  if(b.dataset.wpo){abrirChatWpp(Number(b.dataset.wpo));return}
-  if(b.id==='wpp-chat-send'){enviarChatWpp();return}
-  if(b.id==='wpp-chat-close'){fecharChatWpp();return}
-  if(b.id==='wpp-chat-end'&&WPPR.chat){if(confirm('Encerrar este atendimento? O robô volta a responder este colaborador.'))atenderTicketReal(WPPR.chat.ticketId)}
+  if(b.dataset.atdSel){atdSelecionar(Number(b.dataset.atdSel));return}
+  if(b.dataset.atdFiltro){ATD.filtro=b.dataset.atdFiltro;ATD.sel=null;ATD.msgs=[];renderAtend();return}
+  if(b.dataset.atdAssumir){atdAssumir();return}
+  if(b.dataset.atdEncerrar){atdEncerrar();return}
+  if(b.id==='atd-send')atdEnviar();
 });
-document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='wpp-chat-in')WPPR.rascunho=ev.target.value});
-document.addEventListener('keydown',ev=>{if(ev.target&&ev.target.id==='wpp-chat-in'&&ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();enviarChatWpp()}});
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='atd-in'){ATD.rascunho=ev.target.value;ev.target.style.height='auto';ev.target.style.height=Math.min(ev.target.scrollHeight,120)+'px'}});
+document.addEventListener('keydown',ev=>{if(ev.target&&ev.target.id==='atd-in'&&ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();atdEnviar()}});
 
+/* ---------- aba WhatsApp (número do RH + simulador): enxuta ---------- */
 function wppRealHtml(){
-  if(!WPPR.carregado&&!WPPR.carregando&&['rh','grh'].includes(perfil))setTimeout(carregarWppReal,0);
+  if(!WPPR.carregado&&!WPPR.carregando&&PODE_ATENDER())setTimeout(carregarWppReal,0);
   const num=dig(WPP.numero),ed=perfil==='grh';
-  const abertos=WPPR.tickets.filter(x=>!x.atendido),feitos=WPPR.tickets.filter(x=>x.atendido).slice(0,6);
-  const acoes=x=>x.assumido
-    ?`<span class="badge g">em atendimento${x.assumido_por?' · '+esc(x.assumido_por):''}</span> <button class="btn" data-wpo="${x.id}">💬 Abrir chat</button> <button class="btn sec" data-wrt="${x.id}">✔ Encerrar</button>`
-    :`<button class="btn" data-wpa="${x.id}">🙋 Assumir e responder</button> <button class="btn sec" data-wrt="${x.id}">✔ Marcar atendido</button>`;
-  return `<div class="card" style="border-color:#2e7d32"><h2>📱 WhatsApp real do RH</h2>
+  const abertos=WPPR.tickets.filter(x=>!x.atendido).length;
+  return `<div class="card" style="border-color:#2e7d32"><h2>📱 Número do WhatsApp do RH</h2>
    <div class="f" style="grid-template-columns:1fr auto;align-items:end"><div><label>Número do WhatsApp do RH (com DDD)</label><input id="wpp-numero" placeholder="(38) 99999-0000" value="${esc(fmtFone(WPP.numero))}" ${ed?'':'disabled'}></div>${num?`<a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/55${num.replace(/^55/,'')}?text=oi">Abrir conversa</a>`:''}</div>
-   <div class="ro" style="margin-top:6px;line-height:1.6">Quando o número estiver ligado à Meta, o colaborador cadastrado (telefone na ficha) manda <b>oi</b>, confirma os 4 últimos dígitos do CPF e conversa com a IA sobre os <b>próprios</b> dados. Quem não tem cadastro não recebe nada. Pedidos de atendimento humano caem abaixo: clique em <b>Assumir e responder</b> para conversar com o colaborador por aqui. ${ed?'':'(somente o Gestor do RH altera o número)'}</div>
-   <h3 style="margin-top:12px">🙋 Pedidos de atendimento (${abertos.length} aberto${abertos.length===1?'':'s'})</h3>
-   ${abertos.length?`<table class="matriz"><tr><th>Quando</th><th>Colaborador</th><th>Telefone</th><th>Motivo</th><th></th></tr>${abertos.map(x=>`<tr><td>${fmtDH(x.t)}</td><td style="text-align:left">${esc(x.nome||'')}</td><td>${esc(fmtFone(x.telefone))}</td><td style="text-align:left">${esc(x.motivo||'')}</td><td>${acoes(x)}</td></tr>`).join('')}</table>`:'<div class="empty">Nenhum pedido aberto.</div>'}
-   ${feitos.length?`<div class="ro" style="margin-top:6px">Últimos atendidos: ${feitos.map(x=>esc(x.nome||'')+' ('+fmtDH(x.atendido_em||x.t).slice(0,10)+')').join(' · ')}</div>`:''}
-   ${chatPainelHtml()}
-   <h3 style="margin-top:12px">💬 Últimas mensagens <button class="btn sec" id="wpp-real-reload" style="padding:2px 8px;margin-left:6px">↻</button></h3>
-   ${WPPR.log.length?WPPR.log.map(m=>`<div class="item" style="padding:3px 0;border-bottom:1px solid var(--line);font-size:12px">${fmtDH(m.t).slice(0,16)} · <b>${m.direcao==='in'?esc(m.nome||fmtFone(m.telefone)):'IA → '+esc(m.nome||fmtFone(m.telefone))}</b>: ${esc(String(m.texto||'').slice(0,140))}</div>`).join(''):'<div class="empty">Nenhuma mensagem recebida ainda.</div>'}</div>`;
+   <div class="ro" style="margin-top:6px;line-height:1.6">O colaborador cadastrado (telefone na ficha) manda <b>oi</b>, confirma os 4 últimos dígitos do CPF e conversa com o assistente sobre os <b>próprios</b> dados. Quem não tem cadastro não recebe nada. ${ed?'':'(somente o Gestor do RH altera o número)'}</div>
+   <div style="margin-top:10px"><button class="btn" data-tab="atend">💬 Ir para o Atendimento${abertos?` (${abertos} em aberto)`:''}</button></div></div>`;
 }
 
 const diffDias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
