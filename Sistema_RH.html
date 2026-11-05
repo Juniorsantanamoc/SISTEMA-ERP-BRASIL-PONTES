@@ -1756,14 +1756,26 @@ async function atenderTicketReal(id){
 /* ---------- aba Atendimento: lista de conversas + chat ---------- */
 const atdTk=()=>WPPR.tickets.find(x=>x.id===ATD.sel)||null;
 const atdHora=iso=>{if(!iso)return '';const d=new Date(iso),h=new Date();const mesmo=d.toDateString()===h.toDateString();return mesmo?String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')};
+/* um chat por telefone: o mesmo número (com/sem 9, com/sem 55) vira uma conversa só, mostrando o pedido mais recente */
+const atdChaveFone=n=>{let d=dig(n);if(d.length>11&&d.startsWith('55'))d=d.slice(2);if(d.length===11&&d[2]==='9')d=d.slice(0,2)+d.slice(3);return d};
+function atdUnicos(){
+  const m={};
+  WPPR.tickets.forEach(x=>{const k=atdChaveFone(x.telefone)||('id'+x.id);if(!m[k]||x.id>m[k].id)m[k]=x});
+  return Object.keys(m).map(k=>m[k]);
+}
+function atdVariantes(tel){
+  const d=dig(tel),r=[d],k=atdChaveFone(d);
+  [k,'55'+k,'55'+k.slice(0,2)+'9'+k.slice(2)].forEach(v=>{if(v&&!r.includes(v))r.push(v)});
+  return r;
+}
 function atdListaTickets(){
   const f=ATD.filtro;
-  let l=WPPR.tickets.filter(x=>f==='abertos'?!x.atendido&&!x.assumido:f==='andamento'?!x.atendido&&x.assumido:x.atendido);
+  let l=atdUnicos().filter(x=>f==='abertos'?!x.atendido&&!x.assumido:f==='andamento'?!x.atendido&&x.assumido:x.atendido);
   const ordem=x=>{const u=WPPR.ult[x.telefone];return new Date((u&&u.t)||x.t).getTime()};
   return l.slice().sort((a,b)=>ordem(b)-ordem(a));
 }
 function atdListaHtml(){
-  const cont={abertos:WPPR.tickets.filter(x=>!x.atendido&&!x.assumido).length,andamento:WPPR.tickets.filter(x=>!x.atendido&&x.assumido).length};
+  const un=atdUnicos(),cont={abertos:un.filter(x=>!x.atendido&&!x.assumido).length,andamento:un.filter(x=>!x.atendido&&x.assumido).length};
   const chip=(k,l,n)=>`<button class="atd-chip ${ATD.filtro===k?'on':''}" data-atd-filtro="${k}">${l}${n?` <span class="atd-n">${n}</span>`:''}</button>`;
   const itens=atdListaTickets();
   return `<div class="atd-chips">${chip('abertos','Aguardando',cont.abertos)}${chip('andamento','Em atendimento',cont.andamento)}${chip('fim','Encerrados',0)}</div>
@@ -1857,7 +1869,7 @@ async function atdTick(){
 }
 async function atdCarregarMsgs(){
   const t=atdTk();if(!t)return;
-  const r=await sb.from('rh_wpp_log').select('id,t,direcao,texto,enviado_por').eq('telefone',t.telefone).order('t',{ascending:false}).limit(80);
+  const r=await sb.from('rh_wpp_log').select('id,t,direcao,texto,enviado_por').in('telefone',atdVariantes(t.telefone)).order('t',{ascending:false}).limit(80);
   if(atdTk()!==t||r.error)return;
   ATD.msgs=(r.data||[]).slice().reverse();
   const el=$('atd-msgs');
