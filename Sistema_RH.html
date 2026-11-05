@@ -1728,7 +1728,7 @@ async function perguntarIA(pergunta,fallback){
 
 /* ---------- WhatsApp real (número do RH, pedidos de atendimento e conversas) ---------- */
 const WPPR={tickets:[],log:[],ult:{},carregado:false,carregando:false};
-const ATD={sel:null,filtro:'abertos',msgs:[],enviando:false,rascunho:'',timer:null};
+const ATD={novo:false,busca:'',iniciando:false,sel:null,filtro:'abertos',msgs:[],enviando:false,rascunho:'',timer:null};
 const fmtFone=n=>{const d=dig(n).replace(/^55(?=\d{10,11}$)/,'');return d.length===11?`(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`:d.length===10?`(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`:String(n||'')};
 const PODE_ATENDER=()=>['rh','grh'].includes(perfil);
 async function carregarWppReal(){
@@ -1795,7 +1795,41 @@ function atdMsgsHtml(){
     return sep+`<div class="atd-row ${dono==='in'?'e':'d'}"><div class="atd-bb ${dono}"><div class="atd-q">${quem}</div>${esc(String(m.texto||'')).replace(/\*(.+?)\*/g,'<b>$1</b>').replace(/\n/g,'<br>')}<div class="atd-h">${atdHora(m.t)}</div></div></div>`;
   }).join('');
 }
+function atdNovoLista(){
+  const q=String(ATD.busca||'').trim().toLowerCase();
+  const l=EMP.filter(e=>e.status!=='Desligado'&&(!q||String(e.nome||'').toLowerCase().includes(q)||String(e.matricula||'').toLowerCase().includes(q))).slice(0,40);
+  if(!l.length)return '<div class="atd-vazio">Nenhum colaborador encontrado.</div>';
+  return l.map(e=>e.tel&&dig(e.tel).length>=10
+    ?`<div class="atd-it" data-atd-iniciar="${e.id}"><div class="atd-av">${esc(String(e.nome||'?').trim().charAt(0).toUpperCase())}</div><div class="atd-tx"><div class="atd-l1"><b>${esc(e.nome)}</b></div><div class="atd-l2">${esc(fmtFone(e.tel))}${e.obra?' · '+esc(e.obra):''}</div></div></div>`
+    :`<div class="atd-it" style="opacity:.5;cursor:default"><div class="atd-av" style="background:#9aa">${esc(String(e.nome||'?').trim().charAt(0).toUpperCase())}</div><div class="atd-tx"><div class="atd-l1"><b>${esc(e.nome)}</b></div><div class="atd-l2">sem telefone cadastrado</div></div></div>`).join('');
+}
+function atdNovoHtml(){
+  return `<div class="atd-top"><div style="flex:1;min-width:0"><b>Nova conversa</b><div class="atd-sub">Escolha o colaborador. Ele recebe uma mensagem do RH com o seu nome e, quando responder, o chat abre aqui.</div></div><button class="btn sec" data-atd-voltar="1">Cancelar</button></div>
+   <div style="padding:10px 14px;background:#fff;border-bottom:1px solid var(--line)"><input id="atd-busca" placeholder="Buscar colaborador por nome ou matrícula…" value="${esc(ATD.busca)}" style="width:100%"></div>
+   <div class="atd-itens" id="atd-novo-lista" style="background:#fff">${atdNovoLista()}</div>
+   <div class="atd-aviso" style="background:#e8f0fe;border-color:#90caf9;color:#0d47a1">A primeira mensagem é um modelo aprovado pela Meta (tem custo por envio). Depois que o colaborador responde, a conversa é livre por 24h.</div>`;
+}
+async function atdIniciar(id){
+  const e=EMP.find(x=>x.id===id);if(!e||ATD.iniciando)return;
+  if(!confirm('Enviar mensagem do RH para '+e.nome+' ('+fmtFone(e.tel)+')?\nO colaborador receberá: "Olá, '+String(e.nome).split(' ')[0]+'! Há uma atualização sobre o seu cadastro no RH... Podemos continuar o atendimento por aqui?"'))return;
+  ATD.iniciando=true;
+  let d=null;
+  try{
+    const r=await sb.functions.invoke('wpp-enviar',{body:{acao:'iniciar',func_id:e.id,por:usuario?usuario.nome:''}});
+    d=r.data;
+    if(r.error&&r.error.context&&r.error.context.json){try{d=await r.error.context.json()}catch(x){}}
+  }catch(x){}
+  ATD.iniciando=false;
+  if(!d||!d.ok){alert('Não foi possível iniciar a conversa: '+((d&&d.error)||'tente de novo.'));return}
+  auditar({acao:'Iniciou conversa no WhatsApp',alvo:e.nome,alvoId:e.id,sec:'proj',campo:'WhatsApp'});
+  alert(d.aviso||'Mensagem enviada.');
+  ATD.novo=false;ATD.busca='';ATD.filtro='andamento';
+  await carregarWppReal();
+  if(d.ticket_id){ATD.sel=d.ticket_id;ATD.msgs=[];}
+  renderAtend();atdCarregarMsgs();
+}
 function atdPainelHtml(){
+  if(ATD.novo)return atdNovoHtml();
   const t=atdTk();
   if(!t)return `<div class="atd-vazio" style="margin:auto">Selecione uma conversa à esquerda para atender.</div>`;
   const nome=t.nome||fmtFone(t.telefone),fim=!!t.atendido,andamento=!fim&&!!t.assumido;
@@ -1850,12 +1884,12 @@ function renderAtend(parcial){
   if(parcial&&$('atd-lista')&&$('atd-painel')){
     // atualização leve: mantém o campo de texto e a rolagem
     $('atd-lista').innerHTML=atdListaHtml();
-    const tk=atdTk(),chave=tk?[tk.id,tk.assumido,tk.atendido,tk.assumido_por].join('|'):'';
+    const tk=atdTk(),chave=(ATD.novo?'novo|':'')+(tk?[tk.id,tk.assumido,tk.atendido,tk.assumido_por].join('|'):'');
     if(el.dataset.chave!==chave){el.dataset.chave=chave;$('atd-painel').innerHTML=atdPainelHtml()}
     else if($('atd-msgs'))$('atd-msgs').innerHTML=atdMsgsHtml();
   }else{
-    const tk=atdTk();el.dataset.chave=tk?[tk.id,tk.assumido,tk.atendido,tk.assumido_por].join('|'):'';
-    el.innerHTML=ATD_CSS+`<div class="atd"><div class="atd-lista"><div class="atd-ttl">💬 Atendimento WhatsApp</div><div id="atd-lista" style="display:flex;flex-direction:column;min-height:0;flex:1">${atdListaHtml()}</div></div><div class="atd-painel" id="atd-painel">${atdPainelHtml()}</div></div>`;
+    const tk=atdTk();el.dataset.chave=(ATD.novo?'novo|':'')+(tk?[tk.id,tk.assumido,tk.atendido,tk.assumido_por].join('|'):'');
+    el.innerHTML=ATD_CSS+`<div class="atd"><div class="atd-lista"><div class="atd-ttl" style="display:flex;align-items:center;gap:8px"><span style="flex:1">💬 Atendimento WhatsApp</span><button class="btn" style="padding:4px 10px;font-size:12px" data-atd-novo="1">＋ Nova conversa</button></div><div id="atd-lista" style="display:flex;flex-direction:column;min-height:0;flex:1">${atdListaHtml()}</div></div><div class="atd-painel" id="atd-painel">${atdPainelHtml()}</div></div>`;
   }
   const m=$('atd-msgs');if(m&&(rolarFim||!parcial))m.scrollTop=m.scrollHeight;
   if(foco&&$('atd-in'))$('atd-in').focus();
@@ -1926,15 +1960,18 @@ async function atdEnviar(){
   if($('atd-in'))$('atd-in').focus();
 }
 document.addEventListener('click',ev=>{
-  const b=ev.target&&ev.target.closest?ev.target.closest('[data-atd-sel],[data-atd-filtro],[data-atd-assumir],[data-atd-encerrar],#atd-send'):null;
+  const b=ev.target&&ev.target.closest?ev.target.closest('[data-atd-sel],[data-atd-filtro],[data-atd-assumir],[data-atd-encerrar],[data-atd-novo],[data-atd-iniciar],[data-atd-voltar],#atd-send'):null;
   if(!b)return;
-  if(b.dataset.atdSel){atdSelecionar(Number(b.dataset.atdSel));return}
-  if(b.dataset.atdFiltro){ATD.filtro=b.dataset.atdFiltro;ATD.sel=null;ATD.msgs=[];renderAtend();return}
+  if(b.dataset.atdNovo){ATD.novo=true;ATD.sel=null;ATD.busca='';renderAtend();setTimeout(()=>{const i=$('atd-busca');if(i)i.focus()},0);return}
+  if(b.dataset.atdVoltar){ATD.novo=false;renderAtend();return}
+  if(b.dataset.atdIniciar){atdIniciar(Number(b.dataset.atdIniciar));return}
+  if(b.dataset.atdSel){ATD.novo=false;atdSelecionar(Number(b.dataset.atdSel));return}
+  if(b.dataset.atdFiltro){ATD.novo=false;ATD.filtro=b.dataset.atdFiltro;ATD.sel=null;ATD.msgs=[];renderAtend();return}
   if(b.dataset.atdAssumir){atdAssumir();return}
   if(b.dataset.atdEncerrar){atdEncerrar();return}
   if(b.id==='atd-send')atdEnviar();
 });
-document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='atd-in'){ATD.rascunho=ev.target.value;ev.target.style.height='auto';ev.target.style.height=Math.min(ev.target.scrollHeight,120)+'px'}});
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='atd-busca'){ATD.busca=ev.target.value;const l=$('atd-novo-lista');if(l)l.innerHTML=atdNovoLista();return}if(ev.target&&ev.target.id==='atd-in'){ATD.rascunho=ev.target.value;ev.target.style.height='auto';ev.target.style.height=Math.min(ev.target.scrollHeight,120)+'px'}});
 document.addEventListener('keydown',ev=>{if(ev.target&&ev.target.id==='atd-in'&&ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();atdEnviar()}});
 
 /* ---------- aba Avaliações (nota 1-5 + comentário após o encerramento) ---------- */
