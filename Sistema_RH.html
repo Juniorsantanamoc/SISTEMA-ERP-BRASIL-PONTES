@@ -172,6 +172,7 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
   <section id="v-imp" hidden></section>
   <section id="v-wpp" hidden></section>
   <section id="v-atend" hidden></section>
+  <section id="v-aval" hidden></section>
   <section id="v-trein" hidden></section>
   <section id="v-alim" hidden></section>
   <section id="v-passagens" hidden></section>
@@ -354,7 +355,7 @@ function render(){
     pmo:'Módulo PMO: cria e edita contratos e CDs na aba Contratos, anexa o cronograma oficial e monitora a mobilização feita por RH, Saúde e Segurança e Compras.',
     dir:'Vê o painel (quadro de colaboradores) e o andamento da mobilização dos contratos. Não acessa dados pessoais nem salários.'}[perfil]}`;
   if(CHAT.abrir)renderChat();
-  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();renderFat();renderFatDash();renderAtend(true);
+  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();renderFat();renderFatDash();renderAtend(true);renderAval();
   if(abertoId)renderModal();
   agendarSync();
 }
@@ -540,7 +541,7 @@ const MODS=[
  {id:'fin',nome:'Financeiro',ico:'💲',abas:[['painel','Alertas',['fin','grh']],['fatdash','Faturamento · Dashboard',['fin','grh','dir']],['fat','Medições e NFs',['fin','grh','dir']],['colab','Colaboradores · salário e HE',['fin']],['folha','Folha de pagamento',['fin','grh']],['imp','Impostos e encargos',['fin','grh']]]},
  {id:'sst',nome:'Saúde e Segurança',ico:'🦺',abas:[['painel','Alertas',['sst','grh']],['colab','Colaboradores · ASO e documentos',['sst']],['trein','Treinamentos',['sst','grh']],['mob','Mobilização · treinamentos e EPI',['sst']],['pgr','PGR / EPIs',['sst','rh','grh']]]},
  {id:'compras',nome:'Compras',ico:'🛒',abas:[['painel','Alertas',['cmp','grh']],['colab','Colaboradores · baixada e férias',['cmp']],['mob','Mobilização · passagens e chegada',['cmp']],['passagens','Passagens',['cmp','grh','dir']],['alim','Alimentação',['cmp','grh','dir']],['pgr','EPIs a comprar',['cmp','grh','dir']]]},
- {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['atend','Atendimento',['rh','grh']],['wpp','Número e simulador',['rh','grh']]]},
+ {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['atend','Atendimento',['rh','grh']],['aval','Avaliações',['rh','grh']],['wpp','Número e simulador',['rh','grh']]]},
  {id:'pmo',nome:'PMO',ico:'🏗',abas:[['painel','Alertas',['pmo','grh']],['mob','Mobilização',['pmo','grh']],['colab','Colaboradores · baixada e férias',['pmo']]]},
  {id:'contratos',nome:'Contratos',ico:'📑',abas:[['contratos','Contratos',['pmo','grh','dir','rh']]]},
  {id:'admin',nome:'Administração',ico:'⚙️',abas:[['usuarios','Usuários e acessos',['grh']],['audit','Auditoria',['grh','rh']],['acessos','Matriz de perfis',['grh']]]}
@@ -1162,8 +1163,11 @@ const deepSet=(dst,src)=>{Object.keys(src||{}).forEach(k=>{if(src[k]&&typeof src
 function addFuncao(f){f=String(f||'').trim();if(!f||FUNCOES.includes(f))return;const i=FUNCOES.indexOf('Outra');if(i>=0)FUNCOES.splice(i,0,f);else FUNCOES.push(f)}
 const envSer=x=>({t:x.t instanceof Date?x.t.toISOString():x.t,quem:x.quem,pessoa:x.pessoa,funcao:x.funcao,contrato:x.contrato,itens:x.itens,compra:x.compra||null,projId:x.projId});
 
+/* avaliação do atendimento: config (rh_config 'aval') + lista carregada de rh_wpp_avaliacoes */
+const AVAL={ativo:true,limite:3,email:'',lista:[],carregado:false,filtro:'todas'};
 /* configurações compartilhadas (uma linha por chave em rh_config) */
 const cfgObj={
+ aval:()=>({ativo:AVAL.ativo!==false,limite:Number(AVAL.limite)||3,email:String(AVAL.email||'').trim()}),
  pgr:()=>({arquivo:PGR.arquivo,rev:PGR.rev,por:PGR.por,path:PGR.path||'',epis:PGR.epis}),
  imp:()=>IMP,
  glob:()=>({done:GLOB.done,folha:FOLHA.geradas,tickets:WPP.tickets}),
@@ -1177,9 +1181,10 @@ const cfgApply={
  glob:d=>{GLOB.done=d.done||{};FOLHA.geradas=d.folha||{};WPP.tickets=(d.tickets||[]).map(x=>Object.assign({},x,{t:new Date(x.t)}))},
  cds:d=>{(d.lista||[]).forEach(c=>{if(!CDS.includes(c))CDS.push(c)})},
  wpp:d=>{WPP.numero=d.numero||''},
+ aval:d=>{AVAL.ativo=d.ativo!==false;AVAL.limite=Number(d.limite)||3;AVAL.email=String(d.email||'')},
  secoes:d=>{SECOES.forEach(s=>{if(d.ver&&d.ver[s.id])s.ver=d.ver[s.id].slice();if(d.edit&&d.edit[s.id])s.edit=d.edit[s.id].slice();if(!s.ver.includes('grh'))s.ver.push('grh');if(s.edit.length&&!s.edit.includes('grh'))s.edit.push('grh')})}
 };
-const CFG_ESCREVE=k=>k==='glob'?TODOS:(k==='secoes'||k==='wpp')?['grh']:['rh','grh','fin','sst','cmp','pmo'];
+const CFG_ESCREVE=k=>k==='glob'?TODOS:(k==='secoes'||k==='wpp'||k==='aval')?['grh']:['rh','grh','fin','sst','cmp','pmo'];
 
 /* ---------- gravação (compara com o que veio do banco e envia só o que mudou) ---------- */
 let syncTimer=null,syncBusy=false,syncAgain=false,syncPromise=null;
@@ -1285,6 +1290,7 @@ function ligarTempoReal(){
     if(usuario&&((n.updated_by&&n.updated_by===usuario.id)||(t==='rh_auditoria'&&n.user_id===usuario.id)))return;
     agendarReload()}));
   chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_tickets'},()=>{if(typeof carregarWppReal==='function')carregarWppReal()});
+  chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_avaliacoes'},()=>{if(typeof carregarAval==='function')carregarAval()});
   chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_log'},()=>{if(typeof carregarWppReal==='function'){carregarWppReal();if(typeof ATD!=='undefined'&&ATD.sel)atdCarregarMsgs()}});
   chan.subscribe();
 }
@@ -1875,8 +1881,21 @@ async function atdAssumir(){
 }
 async function atdEncerrar(){
   const t=atdTk();if(!t)return;
-  if(!confirm('Encerrar este atendimento? O assistente (robô) volta a responder este colaborador.'))return;
-  if(await atenderTicketReal(t.id)){ATD.rascunho='';if(ATD.filtro==='andamento')ATD.filtro='fim';renderAtend()}
+  if(!confirm('Encerrar este atendimento?'+(AVAL.ativo!==false?' O colaborador será avisado no WhatsApp e convidado a avaliar o atendimento (nota de 1 a 5).':' O colaborador será avisado no WhatsApp.')+' O assistente (robô) volta a responder.'))return;
+  const nome=usuario?usuario.nome:'';
+  let d=null;
+  try{
+    const r=await sb.functions.invoke('wpp-enviar',{body:{acao:'encerrar',ticket_id:t.id,por:nome}});
+    d=r.data;
+    if(r.error&&r.error.context&&r.error.context.json){try{d=await r.error.context.json()}catch(e){}}
+  }catch(e){}
+  if(!d||!d.ok){alert('Não foi possível encerrar: '+((d&&d.error)||'tente de novo.'));return}
+  t.atendido=true;t.atendido_por=nome;t.atendido_em=new Date().toISOString();
+  auditar({acao:'Encerrou atendimento do WhatsApp',alvo:t.nome,sec:'proj',campo:'WhatsApp'});
+  if(d.aviso)alert(d.aviso);
+  ATD.rascunho='';if(ATD.filtro==='andamento')ATD.filtro='fim';
+  renderAtend();carregarWppReal();
+  if(typeof carregarAval==='function')carregarAval();
 }
 async function atdEnviar(){
   const t=atdTk(),inp=$('atd-in');if(!t||!inp||ATD.enviando)return;
@@ -1905,6 +1924,58 @@ document.addEventListener('click',ev=>{
 });
 document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='atd-in'){ATD.rascunho=ev.target.value;ev.target.style.height='auto';ev.target.style.height=Math.min(ev.target.scrollHeight,120)+'px'}});
 document.addEventListener('keydown',ev=>{if(ev.target&&ev.target.id==='atd-in'&&ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();atdEnviar()}});
+
+/* ---------- aba Avaliações (nota 1-5 + comentário após o encerramento) ---------- */
+let AVAL_CARREGANDO=false;
+async function carregarAval(){
+  if(AVAL_CARREGANDO||!PODE_ATENDER())return;
+  AVAL_CARREGANDO=true;
+  try{
+    const r=await sb.from('rh_wpp_avaliacoes').select('*').order('t',{ascending:false}).limit(300);
+    if(!r.error){AVAL.lista=r.data||[];AVAL.carregado=true}
+  }catch(e){console.error(e)}
+  AVAL_CARREGANDO=false;
+  renderAval();
+}
+const avalEstrelas=n=>n?'★'.repeat(n)+'☆'.repeat(5-n):'—';
+function avalHtml(){
+  if(!PODE_ATENDER())return '<div class="empty">Sem permissão para esta aba.</div>';
+  if(!AVAL.carregado&&!AVAL_CARREGANDO)setTimeout(carregarAval,0);
+  const ed=perfil==='grh',lim=Number(AVAL.limite)||3,L=AVAL.lista||[];
+  const resp=L.filter(a=>a.nota!=null),baixas=resp.filter(a=>a.nota<=lim);
+  const media=resp.length?(resp.reduce((s,a)=>s+a.nota,0)/resp.length):0;
+  const aguard=L.filter(a=>a.status==='aguardando_nota'||a.status==='aguardando_comentario').length;
+  const f=AVAL.filtro;
+  const vis=L.filter(a=>f==='baixas'?(a.nota!=null&&a.nota<=lim):f==='aguardando'?(a.nota==null&&(a.status==='aguardando_nota'||a.status==='aguardando_comentario')):true);
+  const kpi=(t,v,c)=>`<div class="card" style="flex:1;min-width:130px;text-align:center;padding:10px"><div style="font-size:12px;color:#667">${t}</div><div style="font-size:24px;font-weight:700;${c?'color:'+c:''}">${v}</div></div>`;
+  const chip=(k,l)=>`<button class="atd-chip ${f===k?'on':''}" data-aval-filtro="${k}">${l}</button>`;
+  const stTxt=a=>a.nota!=null?(a.nota<=lim?(a.alerta_enviado?'<span class="badge w">alerta enviado</span>':a.status==='concluida'?`<span class="badge r" title="${esc(a.alerta_erro||'')}">alerta não enviado</span>`:'<span class="badge w">aguardando comentário</span>'):'<span class="badge g">ok</span>'):a.status==='ignorada'?'<span class="badge">sem resposta</span>':'<span class="badge w">aguardando resposta</span>';
+  return ATD_CSS+`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">${kpi('Avaliações recebidas',resp.length)}${kpi('Nota média',resp.length?media.toFixed(1).replace('.',',')+' ★':'—',media&&media<=lim?'#d32f2f':'#2e7d32')}${kpi('Notas baixas (≤ '+lim+')',baixas.length,baixas.length?'#d32f2f':'')}${kpi('Aguardando resposta',aguard)}</div>
+  <div class="card"><h2>⚙️ Alerta de avaliação baixa</h2>
+   <div class="f" style="grid-template-columns:auto 130px 1fr;align-items:end;gap:10px">
+    <div><label>Avaliação</label><label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="aval-ativo" ${AVAL.ativo!==false?'checked':''} ${ed?'':'disabled'}> ativada</label></div>
+    <div><label>Alertar se nota ≤</label><select id="aval-limite" ${ed?'':'disabled'}>${[1,2,3,4].map(n=>`<option value="${n}" ${n===lim?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div><label>E-mail do gerente de RH (recebe o alerta)</label><input id="aval-email" type="email" placeholder="gerente.rh@empresa.com.br" value="${esc(AVAL.email||'')}" ${ed?'':'disabled'}></div>
+   </div>
+   <div class="ro" style="margin-top:6px;line-height:1.6">Ao encerrar um atendimento, o assistente avisa o colaborador e pede uma nota de 1 a 5 e um comentário. Se a nota for igual ou menor que o limite, o gerente recebe um e-mail com o resumo e a conversa. ${ed?'':'(somente o Gestor do RH altera)'}${AVAL.email?'':'<br><b style="color:#d32f2f">⚠ Informe o e-mail do gerente para que os alertas sejam enviados.</b>'}</div></div>
+  <div class="card"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><h2 style="margin:0;flex:1">⭐ Avaliações</h2>${chip('todas','Todas')}${chip('baixas','Notas baixas')}${chip('aguardando','Aguardando')}</div>
+   ${vis.length?`<div style="overflow:auto"><table><thead><tr><th>Data</th><th>Colaborador</th><th>Atendente</th><th>Nota</th><th>Comentário</th><th>Situação</th></tr></thead><tbody>${vis.map(a=>`<tr><td>${atdHora(a.t)}</td><td><b>${esc(a.nome||fmtFone(a.telefone))}</b><div class="ro">${esc(fmtFone(a.telefone))}</div></td><td>${esc(a.atendente||'—')}</td><td style="white-space:nowrap;color:${a.nota!=null&&a.nota<=lim?'#d32f2f':'#f9a825'}" title="${a.nota!=null?a.nota+' de 5':''}">${avalEstrelas(a.nota)}</td><td style="max-width:340px;white-space:normal">${a.comentario?esc(a.comentario):'<span class="ro">—</span>'}${a.motivo?`<div class="ro">Assunto: ${esc(a.motivo)}</div>`:''}</td><td>${stTxt(a)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhuma avaliação ainda.</div>'}</div>`;
+}
+function renderAval(){const el=$('v-aval');if(!el)return;if(el.contains(document.activeElement)&&document.activeElement.id==='aval-email')return;el.innerHTML=avalHtml()}
+document.addEventListener('click',ev=>{
+  const b=ev.target&&ev.target.closest?ev.target.closest('[data-aval-filtro]'):null;
+  if(b){AVAL.filtro=b.dataset.avalFiltro;renderAval()}
+});
+document.addEventListener('change',ev=>{
+  const t=ev.target;if(!t||!t.id||t.id.indexOf('aval-')!==0||perfil!=='grh')return;
+  if(t.id==='aval-ativo')AVAL.ativo=t.checked;
+  else if(t.id==='aval-limite')AVAL.limite=Number(t.value)||3;
+  else if(t.id==='aval-email'){const v=String(t.value||'').trim();if(v&&!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(v)){alert('E-mail inválido.');t.value=AVAL.email||'';return}AVAL.email=v}
+  else return;
+  auditar({acao:'Alterou configuração de avaliação',alvo:'Avaliações',sec:'proj',campo:'Avaliação'});
+  if(typeof agendarSync==='function')agendarSync();
+  renderAval();
+});
 
 /* ---------- aba WhatsApp (número do RH + simulador): enxuta ---------- */
 function wppRealHtml(){
