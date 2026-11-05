@@ -1955,9 +1955,9 @@ function avalHtml(){
    <div class="f" style="grid-template-columns:auto 130px 1fr;align-items:end;gap:10px">
     <div><label>Avaliação</label><label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="aval-ativo" ${AVAL.ativo!==false?'checked':''} ${ed?'':'disabled'}> ativada</label></div>
     <div><label>Alertar se nota ≤</label><select id="aval-limite" ${ed?'':'disabled'}>${[1,2,3,4].map(n=>`<option value="${n}" ${n===lim?'selected':''}>${n}</option>`).join('')}</select></div>
-    <div><label>E-mail do gerente de RH (recebe o alerta)</label><input id="aval-email" type="email" placeholder="gerente.rh@empresa.com.br" value="${esc(AVAL.email||'')}" ${ed?'':'disabled'}></div>
+    <div><label>E-mails que recebem o alerta (separe por vírgula)</label><input id="aval-email" placeholder="fulano@brasilpontes.com.br, ciclano@brasilpontes.com.br" value="${esc(AVAL.email||'')}" ${ed?'':'disabled'}></div>
    </div>
-   <div class="ro" style="margin-top:6px;line-height:1.6">Ao encerrar um atendimento, o assistente avisa o colaborador e pede uma nota de 1 a 5 e um comentário. Se a nota for igual ou menor que o limite, o gerente recebe um e-mail com o resumo e a conversa. ${ed?'':'(somente o Gestor do RH altera)'}${AVAL.email?'':'<br><b style="color:#d32f2f">⚠ Informe o e-mail do gerente para que os alertas sejam enviados.</b>'}</div></div>
+   <div class="ro" style="margin-top:6px;line-height:1.6">Ao encerrar um atendimento, o assistente avisa o colaborador e pede uma nota de 1 a 5 e um comentário. Se a nota for igual ou menor que o limite, o gerente recebe um e-mail com o resumo e a conversa. ${ed?'':'(somente o Gestor do RH altera)'}${AVAL.email?'':'<br><b style="color:#d32f2f">⚠ Informe pelo menos um e-mail para que os alertas sejam enviados.</b>'}</div></div>
   <div class="card"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><h2 style="margin:0;flex:1">⭐ Avaliações</h2>${chip('todas','Todas')}${chip('baixas','Notas baixas')}${chip('aguardando','Aguardando')}</div>
    ${vis.length?`<div style="overflow:auto"><table><thead><tr><th>Data</th><th>Colaborador</th><th>Atendente</th><th>Nota</th><th>Comentário</th><th>Situação</th></tr></thead><tbody>${vis.map(a=>`<tr><td>${atdHora(a.t)}</td><td><b>${esc(a.nome||fmtFone(a.telefone))}</b><div class="ro">${esc(fmtFone(a.telefone))}</div></td><td>${esc(a.atendente||'—')}</td><td style="white-space:nowrap;color:${a.nota!=null&&a.nota<=lim?'#d32f2f':'#f9a825'}" title="${a.nota!=null?a.nota+' de 5':''}">${avalEstrelas(a.nota)}</td><td style="max-width:340px;white-space:normal">${a.comentario?esc(a.comentario):'<span class="ro">—</span>'}${a.motivo?`<div class="ro">Assunto: ${esc(a.motivo)}</div>`:''}</td><td>${stTxt(a)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhuma avaliação ainda.</div>'}</div>`;
 }
@@ -1970,7 +1970,7 @@ document.addEventListener('change',ev=>{
   const t=ev.target;if(!t||!t.id||t.id.indexOf('aval-')!==0||perfil!=='grh')return;
   if(t.id==='aval-ativo')AVAL.ativo=t.checked;
   else if(t.id==='aval-limite')AVAL.limite=Number(t.value)||3;
-  else if(t.id==='aval-email'){const v=String(t.value||'').trim();if(v&&!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(v)){alert('E-mail inválido.');t.value=AVAL.email||'';return}AVAL.email=v}
+  else if(t.id==='aval-email'){const ls=String(t.value||'').split(/[;,\s]+/).map(x=>x.trim()).filter(Boolean);if(ls.some(x=>!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(x))){alert('E-mail inválido. Separe vários e-mails com vírgula.');t.value=AVAL.email||'';return}AVAL.email=ls.join(', ')}
   else return;
   auditar({acao:'Alterou configuração de avaliação',alvo:'Avaliações',sec:'proj',campo:'Avaliação'});
   if(typeof agendarSync==='function')agendarSync();
