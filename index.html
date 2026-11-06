@@ -8484,6 +8484,92 @@ function novoHistoricoModal(){
     renderHistorico(); renderDashboard(); refreshBadges(); refreshFilterOptions();
   });
 }
+/* ============== Troca de item numa requisição já criada (só Gestor Mestre) ==============
+   Descrição, código e unidade ficam TRAVADOS pelo item cadastrado. Só o Gestor Mestre vê o
+   bloco "Trocar item": busca outro item do cadastro (SINAPI / Cadastro Extra / EPI) ou cadastra
+   um novo na hora — assim não precisa apagar e refazer a requisição quando a obra pediu um
+   modelo e a compra foi de outro. A troca só vale ao clicar em "Salvar alterações". */
+function trocaItemHtml(p){
+  if(!IS_MESTRE) return `<div class="hint" style="margin:-8px 0 12px;">🔒 Descrição, código e unidade vêm do item cadastrado e ficam travados. Só o Gestor Mestre pode trocar o item.</div>`;
+  return `
+    <div class="form-row" style="position:relative;">
+      <label>🔄 Trocar item (só Gestor Mestre)</label>
+      <input type="text" id="${p}-troca" autocomplete="off" placeholder="Busque outro item do cadastro por código ou descrição...">
+      <div class="autocomplete-list" id="${p}-troca-ac"></div>
+      <div class="hint">Comprou outro modelo? Escolha o item aqui. Não existe? <a href="#" id="${p}-novo-toggle">Cadastrar novo item agora</a>.</div>
+    </div>
+    <div id="${p}-novo-panel" style="display:none; margin:0 0 14px; padding:14px; background:var(--bg-2,#f4f5f7); border-radius:8px;">
+      <div class="form-row"><label>Descrição do novo item *</label><input type="text" id="${p}-novo-desc" autocomplete="off"></div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Categoria *</label><select id="${p}-novo-pref">${categoriaPrefixoOptions()}</select></div>
+        <div class="form-row"><label>Código</label><input type="text" id="${p}-novo-cod"></div>
+      </div>
+      <div class="form-grid2">
+        <div class="form-row"><label>Unidade *</label><input type="text" id="${p}-novo-un" placeholder="UN, M², KG..."></div>
+        <div class="form-row"><label>Preço de referência</label><input type="number" id="${p}-novo-preco" min="0" step="0.01" placeholder="Opcional"></div>
+      </div>
+      <div class="form-actions" style="justify-content:flex-end; margin-top:0;">
+        <button type="button" class="btn btn-sm btn-secondary" id="${p}-novo-cancel">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-primary" id="${p}-novo-save">Salvar e usar este item</button>
+      </div>
+    </div>`;
+}
+function trocaItemWire(p, tipo, ids){
+  if(!IS_MESTRE) return;
+  const $ = id=>document.getElementById(id);
+  const lookup = LOOKUP.concat((STATE.epiEstoque||[]).map(e=>({codigo:e.codigo, descricao:e.descricao, unidade:e.unidade, preco:null, fonte:'EPI ESTOQUE'})));
+  const aplicar = m=>{
+    $(ids.desc).value = m.descricao || '';
+    $(ids.cod).value = m.codigo || '';
+    $(ids.un).value = m.unidade || '';
+  };
+  attachAutocomplete(p+'-troca', p+'-troca-ac', m=>{
+    aplicar(m);
+    toast('Item trocado na tela — clique em "Salvar alterações" para confirmar.');
+  }, lookup);
+  const prefixoPadrao = tipo==='epi' ? 'EPI' : (tipo==='servico' ? 'SER' : 'MAT');
+  wireCodigoAuto(p+'-novo-pref', p+'-novo-cod');
+  $(p+'-novo-toggle').addEventListener('click', e=>{
+    e.preventDefault();
+    const panel = $(p+'-novo-panel');
+    const abrir = panel.style.display === 'none';
+    panel.style.display = abrir ? 'block' : 'none';
+    if(abrir){
+      $(p+'-novo-desc').value = $(p+'-troca').value.trim();
+      const sel = $(p+'-novo-pref'); sel.value = prefixoPadrao; sel.dispatchEvent(new Event('change'));
+      $(p+'-novo-desc').focus();
+    }
+  });
+  $(p+'-novo-cancel').addEventListener('click', ()=>{ $(p+'-novo-panel').style.display = 'none'; });
+  $(p+'-novo-save').addEventListener('click', async ()=>{
+    const descricao = $(p+'-novo-desc').value.trim();
+    const unidade = $(p+'-novo-un').value.trim();
+    if(!descricao || !unidade){ toast('Preencha a descrição e a unidade do novo item.', true); return; }
+    const qNorm = normalizeBusca(descricao);
+    if(qNorm.length>=3){
+      const parecidos = lookup.filter(m=>{ const d = normalizeBusca(m.descricao); return d.includes(qNorm) || qNorm.includes(d); }).slice(0,5);
+      if(parecidos.length){
+        const lista = parecidos.map(m=>`• ${m.descricao}${m.codigo?' ('+m.codigo+')':''}`).join('\n');
+        if(!confirm(`Já existe(m) ${parecidos.length} item(ns) parecido(s):\n\n${lista}\n\nO ideal é usar um desses na busca. Cadastrar "${descricao}" como item novo mesmo assim?`)) return;
+      }
+    }
+    const btn = $(p+'-novo-save'); btn.disabled = true; btn.textContent = 'Salvando…';
+    const rec = {
+      descricao, unidade,
+      codigo: $(p+'-novo-cod').value.trim() || null,
+      preco_ref: $(p+'-novo-preco').value ? Number($(p+'-novo-preco').value) : null,
+      fonte_preco: null, cadastrado_em: todayISO(),
+    };
+    const { data: novo, error } = await sb.from('cadastro_extra').insert(rec).select().single();
+    btn.disabled = false; btn.textContent = 'Salvar e usar este item';
+    if(error){ toast('Erro ao salvar item: ' + friendlyErrorMsg(error), true); return; }
+    await refreshLookup();
+    aplicar(novo);
+    $(p+'-novo-panel').style.display = 'none';
+    toast('Item cadastrado e aplicado — clique em "Salvar alterações" para confirmar.');
+  });
+}
+
 /* ============== Editar item (só gestor) ============== */
 function editarComprasModal(id){
   const item = STATE.compras.find(r=>r.id===id);
@@ -8492,11 +8578,12 @@ function editarComprasModal(id){
     <h3>Editar Requisição de Compra</h3>
     <div class="modal-sub">#${esc(item.numero)} — ${esc(item.obra)}</div>
     <form id="form-editar-compra">
-      <div class="form-row"><label>Descrição *</label><input type="text" id="ec-descricao" required value="${esc(item.descricao)}"></div>
+      <div class="form-row"><label>Descrição * 🔒</label><input type="text" id="ec-descricao" required readonly value="${esc(item.descricao)}"></div>
       <div class="form-grid2">
-        <div class="form-row"><label>Código</label><input type="text" id="ec-codigo" value="${esc(item.codigo)||''}"></div>
-        <div class="form-row"><label>Unidade *</label><input type="text" id="ec-unidade" required value="${esc(item.unidade)||''}"></div>
+        <div class="form-row"><label>Código 🔒</label><input type="text" id="ec-codigo" readonly value="${esc(item.codigo)||''}"></div>
+        <div class="form-row"><label>Unidade * 🔒</label><input type="text" id="ec-unidade" required readonly value="${esc(item.unidade)||''}"></div>
       </div>
+      ${trocaItemHtml('ec')}
       <div class="form-grid2">
         <div class="form-row"><label>Quantidade *</label><input type="number" id="ec-qtde" min="0" step="any" required value="${item.qtde??''}"></div>
         <div class="form-row"><label>Data prevista em obra</label><input type="date" id="ec-data-nec" value="${item.data_necessaria||''}"></div>
@@ -8516,6 +8603,7 @@ function editarComprasModal(id){
       </div>
     </form>
   `);
+  trocaItemWire('ec','compra',{desc:'ec-descricao',cod:'ec-codigo',un:'ec-unidade'});
   document.getElementById('form-editar-compra').addEventListener('submit', async e=>{
     e.preventDefault();
     const btn = document.getElementById('btn-salvar-editar-compra');
@@ -8559,11 +8647,12 @@ function editarServicoModal(id){
     <h3>Editar Requisição de Serviço</h3>
     <div class="modal-sub">#${esc(item.numero)} — ${esc(item.obra)}</div>
     <form id="form-editar-servico">
-      <div class="form-row"><label>Descrição *</label><input type="text" id="es-descricao" required value="${esc(item.descricao)}"></div>
+      <div class="form-row"><label>Descrição * 🔒</label><input type="text" id="es-descricao" required readonly value="${esc(item.descricao)}"></div>
       <div class="form-grid2">
-        <div class="form-row"><label>Código</label><input type="text" id="es-codigo" value="${esc(item.codigo)||''}"></div>
-        <div class="form-row"><label>Unidade *</label><input type="text" id="es-unidade" required value="${esc(item.unidade)||''}"></div>
+        <div class="form-row"><label>Código 🔒</label><input type="text" id="es-codigo" readonly value="${esc(item.codigo)||''}"></div>
+        <div class="form-row"><label>Unidade * 🔒</label><input type="text" id="es-unidade" required readonly value="${esc(item.unidade)||''}"></div>
       </div>
+      ${trocaItemHtml('es')}
       <div class="form-grid2">
         <div class="form-row"><label>Quantidade *</label><input type="number" id="es-qtde" min="0" step="any" required value="${item.qtde??''}"></div>
         <div class="form-row"><label>Data prevista em obra</label><input type="date" id="es-data-nec" value="${item.data_necessaria||''}"></div>
@@ -8583,6 +8672,7 @@ function editarServicoModal(id){
       </div>
     </form>
   `);
+  trocaItemWire('es','servico',{desc:'es-descricao',cod:'es-codigo',un:'es-unidade'});
   document.getElementById('form-editar-servico').addEventListener('submit', async e=>{
     e.preventDefault();
     const btn = document.getElementById('btn-salvar-editar-servico');
@@ -8923,11 +9013,12 @@ function editarEpiModal(id){
     <h3>Editar Requisição de EPI</h3>
     <div class="modal-sub">#${esc(item.numero)} — ${esc(item.obra)}</div>
     <form id="form-editar-epi">
-      <div class="form-row"><label>Descrição *</label><input type="text" id="ee-descricao" required value="${esc(item.descricao)}"></div>
+      <div class="form-row"><label>Descrição * 🔒</label><input type="text" id="ee-descricao" required readonly value="${esc(item.descricao)}"></div>
       <div class="form-grid2">
-        <div class="form-row"><label>Código</label><input type="text" id="ee-codigo" value="${esc(item.codigo)||''}"></div>
-        <div class="form-row"><label>Unidade *</label><input type="text" id="ee-unidade" required value="${esc(item.unidade)||''}"></div>
+        <div class="form-row"><label>Código 🔒</label><input type="text" id="ee-codigo" readonly value="${esc(item.codigo)||''}"></div>
+        <div class="form-row"><label>Unidade * 🔒</label><input type="text" id="ee-unidade" required readonly value="${esc(item.unidade)||''}"></div>
       </div>
+      ${trocaItemHtml('ee')}
       <div class="form-grid2">
         <div class="form-row"><label>Quantidade *</label><input type="number" id="ee-qtde" min="0" step="any" required value="${item.qtde??''}"></div>
         <div class="form-row"><label>Data prevista em obra</label><input type="date" id="ee-data-nec" value="${item.data_necessaria||''}"></div>
@@ -8947,6 +9038,7 @@ function editarEpiModal(id){
       </div>
     </form>
   `);
+  trocaItemWire('ee','epi',{desc:'ee-descricao',cod:'ee-codigo',un:'ee-unidade'});
   document.getElementById('form-editar-epi').addEventListener('submit', async e=>{
     e.preventDefault();
     const btn = document.getElementById('btn-salvar-editar-epi');
