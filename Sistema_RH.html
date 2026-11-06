@@ -173,6 +173,10 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
   <section id="v-wpp" hidden></section>
   <section id="v-atend" hidden></section>
   <section id="v-aval" hidden></section>
+  <section id="v-psol" hidden></section>
+  <section id="v-pfin" hidden></section>
+  <section id="v-phist" hidden></section>
+  <section id="v-pconf" hidden></section>
   <section id="v-trein" hidden></section>
   <section id="v-alim" hidden></section>
   <section id="v-passagens" hidden></section>
@@ -355,7 +359,7 @@ function render(){
     pmo:'Módulo PMO: cria e edita contratos e CDs na aba Contratos, anexa o cronograma oficial e monitora a mobilização feita por RH, Saúde e Segurança e Compras.',
     dir:'Vê o painel (quadro de colaboradores) e o andamento da mobilização dos contratos. Não acessa dados pessoais nem salários.'}[perfil]}`;
   if(CHAT.abrir)renderChat();
-  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();renderFat();renderFatDash();renderAtend(true);renderAval();
+  renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();renderFat();renderFatDash();renderAtend(true);renderAval();renderPass();
   if(abertoId)renderModal();
   agendarSync();
 }
@@ -544,12 +548,13 @@ const MODS=[
  {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['atend','Atendimento',['rh','grh']],['aval','Avaliações',['rh','grh']],['wpp','Número e simulador',['rh','grh']]]},
  {id:'pmo',nome:'PMO',ico:'🏗',abas:[['painel','Alertas',['pmo','grh']],['mob','Mobilização',['pmo','grh']],['colab','Colaboradores · baixada e férias',['pmo']]]},
  {id:'contratos',nome:'Contratos',ico:'📑',abas:[['contratos','Contratos',['pmo','grh','dir','rh']]]},
+ {id:'pass',nome:'Passagens',ico:'✈️',abas:[['psol','Solicitações',['rh','grh','cmp']],['pfin','Financeiro',['fin','grh','cmp']],['phist','Histórico',['rh','grh','cmp','fin']],['pconf','Conferidos',['grh','cmp','fin']]]},
  {id:'admin',nome:'Administração',ico:'⚙️',abas:[['usuarios','Usuários e acessos',['grh']],['audit','Auditoria',['grh','rh']],['acessos','Matriz de perfis',['grh']]]}
 ];
 const ABAS=[...new Set(MODS.flatMap(m=>m.abas.map(a=>a[0])))].map(x=>[x]);
 let mod='rh';
-const MODROLES={wpp:['rh'],rh:['rh','grh','dir'],fin:['fin'],sst:['sst'],compras:['cmp'],pmo:['pmo'],contratos:['pmo','dir']};
-const MODNOME_={wpp:'WhatsApp',rh:'RH',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',contratos:'Contratos',admin:'Administração'};
+const MODROLES={wpp:['rh'],rh:['rh','grh','dir'],fin:['fin'],sst:['sst'],compras:['cmp'],pmo:['pmo'],contratos:['pmo','dir'],pass:['rh','grh','cmp','fin']};
+const MODNOME_={wpp:'WhatsApp',rh:'RH',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',contratos:'Contratos',pass:'Passagens',admin:'Administração'};
 const alertasMod=()=>gerarAlertas().filter(a=>roleOk(a.roles)&&a.roles.some(r=>(MODROLES[mod]||[]).includes(r)));
 const modLiberado=m=>m.id!=='admin'||!!(usuario&&usuario.mestre);
 const rhPag=()=>usuario&&!usuario.mestre&&Array.isArray(usuario.paginas)?new Set(usuario.paginas):null;
@@ -557,7 +562,7 @@ const abasOk=m=>{if(!modLiberado(m))return [];const pg=rhPag();return m.abas.fil
 const modsOk=()=>MODS.filter(m=>abasOk(m).length>0);
 function irPara(tabId){const ms=modsOk();const m=ms.find(x=>x.id===mod&&abasOk(x).some(a=>a[0]===tabId))||ms.find(x=>abasOk(x).some(a=>a[0]===tabId));if(m){mod=m.id;tab=tabId}}
 const toast=m=>{const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',4500)};
-function abrirCustom(html){abertoId=null;$('modal').innerHTML=html;$('ov').classList.add('on')}
+function abrirCustom(html){window.__semFora=false;abertoId=null;$('modal').innerHTML=html;$('ov').classList.add('on')}
 function fecharModal(){abertoId=null;$('ov').classList.remove('on')}
 
 /* ---------- Painel ---------- */
@@ -1291,6 +1296,7 @@ function ligarTempoReal(){
     agendarReload()}));
   chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_tickets'},()=>{if(typeof carregarWppReal==='function')carregarWppReal()});
   chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_avaliacoes'},()=>{if(typeof carregarAval==='function')carregarAval()});
+  chan.on('postgres_changes',{event:'*',schema:'public',table:'passagens'},()=>{if(typeof PASS!=='undefined'&&PASS.carregado&&typeof passRecarrega==='function')passRecarrega()});
   chan.on('postgres_changes',{event:'*',schema:'public',table:'rh_wpp_log'},()=>{if(typeof carregarWppReal==='function'){carregarWppReal();if(typeof ATD!=='undefined'&&ATD.sel)atdCarregarMsgs()}});
   chan.subscribe();
 }
@@ -2037,6 +2043,466 @@ function wppRealHtml(){
    <div style="margin-top:10px"><button class="btn" data-tab="atend">💬 Ir para o Atendimento${abertos?` (${abertos} em aberto)`:''}</button></div></div>`;
 }
 
+/* =====================================================================
+   PASSAGENS (RH solicita → Compras compra → Financeiro paga → Conferidos)
+   Tabela única `passagens` do banco (a mesma do ERP de Compras).
+   ===================================================================== */
+const PASS={lista:[],ref:[{key:'cafeM',nome:'Café da Manhã',hora:'06:30',valor:20},{key:'almoco',nome:'Almoço',hora:'12:00',valor:35},{key:'cafeT',nome:'Café da Tarde',hora:'15:30',valor:20},{key:'janta',nome:'Janta',hora:'20:00',valor:35}],obras:[],carregado:false,carregando:false,filtro:'andamento',conf:'pend',q:'',cd:'',sel:new Set()};
+const PASS_CRIA=['rh','grh','cmp'],PASS_COMPRA=['cmp','grh'],PASS_FIN=['fin','grh'],PASS_CONF=['cmp','fin','grh'];
+const PASS_TIPOS=['Aérea/Ida','Aérea/Volta','Ônibus/Ida','Ônibus/Volta'];
+const PASS_QKEY={cafeM:'qtd_cafe_m',almoco:'qtd_almoco',cafeT:'qtd_cafe_t',janta:'qtd_janta'};
+const passPode=l=>l.includes(perfil);
+const passVeValor=()=>perfil!=='rh';
+const passHM=v=>v?String(v).slice(0,5):'';
+const passTotal=r=>(Number(r.total_colaborador)||0)+(Number(r.valor_passagem)||0);
+const passNome=()=>(usuario&&usuario.nome)||(usuario&&usuario.email)||null;
+const passIso=s=>{s=String(s||'').trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);const m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);return m?m[3]+'-'+pad(m[2])+'-'+pad(m[1]):''};
+const passHoje=()=>fmtISO(HOJE);
+const PASS_CSS='<style id="pass-css">#pass-print{display:none}.pass-chip{border:1px solid var(--line);background:#fff;border-radius:16px;padding:4px 12px;font-size:12.5px;cursor:pointer}.pass-chip.on{background:var(--blue);color:#fff;border-color:var(--blue)}.pass-rec{font-family:Arial,sans-serif;color:#111;max-width:640px}.pass-rec table{width:100%;border-collapse:collapse;margin-top:8px}.pass-rec th,.pass-rec td{border:1px solid #bbb;padding:5px 8px;text-align:left;font-size:13px}.pass-rec .tot td{font-weight:700;background:#eee}@media print{body.pass-printing>*:not(#pass-print){display:none!important}body.pass-printing #pass-print{display:block!important;padding:18px}}</style>';
+
+/* ---------- cálculo de refeições (mesma lógica da planilha de origem) ---------- */
+const passFrac=(d,h)=>{if(!d)return null;const [y,m,dd]=d.split('-').map(Number);let hh=0,mm=0;if(h){const p=h.split(':').map(Number);hh=p[0]||0;mm=p[1]||0}return Date.UTC(y,m-1,dd)/86400000+(hh+mm/60)/24};
+function passContar(ds,hs,dc,hc,ref){
+  if(!ds||!dc)return 0;
+  const [rh,rm]=ref.split(':').map(Number),f=(rh+rm/60)/24;
+  const a=passFrac(dc,hc)-f,b=passFrac(ds,hs)-f;
+  return Math.max(0,Math.floor(a)-Math.ceil(b)+1);
+}
+function passCalc(ds,hs,dc,hc){const o={};PASS.ref.forEach(r=>{o[r.key]=passContar(ds,hs,dc,hc,r.hora)});return o}
+const passValorRef=q=>PASS.ref.reduce((s,r)=>s+(q[r.key]||0)*(Number(r.valor)||0),0);
+const passOrdemOk=(ds,hs,dc,hc)=>{const a=passFrac(ds,hs),b=passFrac(dc,hc);return a!=null&&b!=null&&b>=a};
+
+/* ---------- carregamento ---------- */
+async function carregarPass(){
+  if(PASS.carregando||!sb)return;
+  PASS.carregando=true;
+  try{
+    const [a,b,c]=await Promise.all([sb.from('passagens').select('*').order('numero'),sb.from('passagens_config').select('*').eq('id',1).maybeSingle(),sb.from('obras').select('nome').order('nome')]);
+    if(!a.error)PASS.lista=a.data||[];
+    const cfg=Array.isArray(b.data)?b.data[0]:b.data;
+    if(!b.error&&cfg&&Array.isArray(cfg.refeicoes)&&cfg.refeicoes.length)PASS.ref=cfg.refeicoes;
+    if(!c.error&&Array.isArray(c.data))PASS.obras=c.data.map(o=>o.nome).filter(Boolean);
+    PASS.carregado=true;
+  }catch(e){console.error(e)}
+  PASS.carregando=false;
+  renderPass();
+}
+const passCDs=()=>{const s=new Set([...PASS.obras,...CDS]);PASS.lista.forEach(r=>r.cd&&s.add(r.cd));return [...s].sort((a,b)=>a.localeCompare(b,'pt-BR'))};
+
+/* ---------- anexos (bucket privado anexos-passagens) ---------- */
+async function passUpload(files,sub){
+  const out=[];
+  for(const f of Array.from(files||[])){
+    const ext=(f.name.split('.').pop()||'bin').toLowerCase();
+    const path=sub+'/'+Date.now()+'-'+Math.random().toString(36).slice(2,8)+'.'+ext;
+    const r=await sb.storage.from('anexos-passagens').upload(path,f,{contentType:f.type||undefined,upsert:false});
+    if(r.error)throw r.error;
+    out.push({nome:f.name,path});
+  }
+  return out;
+}
+async function passAbrirAnexo(path){
+  const r=await sb.storage.from('anexos-passagens').createSignedUrl(path,300);
+  if(r.error||!r.data){toast('Sem permissão ou arquivo indisponível.');return}
+  window.open(r.data.signedUrl,'_blank','noopener');
+}
+const passChips=a=>!a||!a.length?'<span class="ro">—</span>':a.map(x=>`<button class="btn sec" style="padding:2px 8px;font-size:12px;margin:1px" data-pass-anexo="${esc(x.path)}" title="${esc(x.nome)}">📎 ${esc(String(x.nome).length>18?String(x.nome).slice(0,16)+'…':x.nome)}</button>`).join('');
+const passBadge=s=>s==='pago'?'<span class="badge g">Pago</span>':s==='comprado'?'<span class="badge">Comprada</span>':'<span class="badge w">Aguardando compra</span>';
+function passRefs(r){
+  const p=[];PASS.ref.forEach(x=>{const q=r[PASS_QKEY[x.key]]||0;if(q)p.push(q+'× '+esc(x.nome))});
+  return p.length?p.join('<br>'):'<span class="ro">—</span>';
+}
+
+/* ---------- filtros ---------- */
+function passLinhas(t){
+  let L=PASS.lista.slice();
+  if(t==='psol'){const f=PASS.filtro;L=L.filter(r=>f==='todas'||(f==='andamento'?r.status!=='pago':f==='pend'?r.status==='pendente':f==='comp'?r.status==='comprado':r.status==='pago'))}
+  else if(t==='pfin')L=L.filter(r=>r.status==='comprado');
+  else if(t==='phist')L=L.filter(r=>r.status==='pago');
+  else if(t==='pconf'){L=L.filter(r=>r.status==='pago');if(PASS.conf==='pend')L=L.filter(r=>!r.conferido);else if(PASS.conf==='ok')L=L.filter(r=>r.conferido)}
+  const q=norm(PASS.q);
+  if(q)L=L.filter(r=>[r.numero,r.nome,r.cd,r.origem,r.destino,r.criado_por].some(v=>norm(v).includes(q)));
+  if(PASS.cd)L=L.filter(r=>r.cd===PASS.cd);
+  return L.sort((a,b)=>t==='psol'&&a.status!==b.status?(a.status==='pendente'?-1:b.status==='pendente'?1:0)||(b.numero-a.numero):b.numero-a.numero);
+}
+
+/* ---------- ações por linha ---------- */
+function passExclCel(r){
+  if(r.status==='pago')return '';
+  if(r.exclusao_solicitada){
+    const tip=`Motivo: ${r.exclusao_motivo||'—'} · por ${r.exclusao_solicitada_por||'—'}`;
+    return `<span class="badge r" title="${esc(tip)}">⚠ Exclusão solicitada</span>`+(perfil==='grh'?` <button class="btn sec" data-pass="negar:${r.id}">Negar</button> <button class="btn sec" data-pass="del:${r.id}">🗑 Excluir</button>`:'');
+  }
+  if(perfil==='grh')return `<button class="btn sec" data-pass="del:${r.id}">🗑 Excluir</button>`;
+  if(passPode(PASS_CRIA))return `<button class="btn sec" data-pass="excl:${r.id}">🚫 Solicitar exclusão</button>`;
+  return '';
+}
+function passAcoes(r,t){
+  const b=[`<button class="btn sec" data-pass="recibo:${r.id}">🧾 Recibo</button>`];
+  if(r.status==='pendente'&&passPode(PASS_CRIA))b.push(`<button class="btn sec" data-pass="edit:${r.id}">✏️ Editar</button>`);
+  if(r.status==='pendente'&&passPode(PASS_COMPRA))b.push(`<button class="btn" data-pass="compra:${r.id}">✅ Registrar compra</button>`);
+  if(r.status==='comprado'&&passPode(PASS_FIN)){
+    b.push(`<button class="btn sec" data-pass="comprov:${r.id}">📎 Comprovante</button>`,`<button class="btn sec" data-pass="edit:${r.id}">⏰ Editar horário</button>`,`<button class="btn" data-pass="pago:${r.id}">💰 Marcar como pago</button>`);
+  }
+  const x=passExclCel(r);if(x)b.push(x);
+  return `<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">${b.join('')}</div>`;
+}
+
+/* ---------- tabelas ---------- */
+const passTh=a=>`<thead><tr>${a.map(x=>`<th>${x}</th>`).join('')}</tr></thead>`;
+const passRota=r=>`${esc(r.origem)} → ${esc(r.destino)}<div class="ro">${esc(r.tipo)}</div>`;
+const passDT=(d,h)=>`${fmtD(d)}<div class="ro">${passHM(h)}</div>`;
+const passQuem=r=>`${esc(r.criado_por||'—')}<div class="ro">${r.created_at?fmtDH(r.created_at).slice(0,16):''}</div>`;
+function passLista(t){
+  if(!PASS.carregado)return '<div class="empty">Carregando…</div>';
+  const L=passLinhas(t);
+  if(!L.length)return '<div class="empty">Nada por aqui.</div>';
+  const ver=passVeValor(),obs=r=>r.obs?`<div class="ro" style="max-width:240px;white-space:normal" title="${esc(r.obs)}">📝 ${esc(String(r.obs).length>60?String(r.obs).slice(0,58)+'…':r.obs)}</div>`:'';
+  let h='';
+  if(t==='psol'){
+    h=`<table>${passTh(['Nº','Colaborador','CD','Rota','Saída','Chegada','Refeições','Uber/Táxi','Total colab.','Passagem','Status','Ações'])}<tbody>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b><div class="ro">por ${passQuem(r)}</div>${obs(r)}${(r.anexos_documento||[]).length?`<div>${passChips(r.anexos_documento)}</div>`:''}</td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}</td><td>${passDT(r.data_chegada,r.hora_chegada)}</td><td style="white-space:nowrap">${passRefs(r)}</td><td>${brl(r.uber)}</td><td>${brl(r.total_colaborador)}</td><td>${passChips(r.anexos_passagem)}${ver&&r.valor_passagem!=null&&r.status!=='pendente'?`<div class="ro">${brl(r.valor_passagem)}</div>`:''}</td><td>${passBadge(r.status)}</td><td>${passAcoes(r,t)}</td></tr>`).join('')}</tbody></table>`;
+  }else if(t==='pfin'){
+    h=`<table>${passTh(['Nº','Colaborador','CD','Rota','Saída','Chegada','Refeições + Uber','Passagem','Total geral','Docs / passagem / comprovante','Ações'])}<tbody>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b><div class="ro">por ${passQuem(r)}</div>${obs(r)}</td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}</td><td>${passDT(r.data_chegada,r.hora_chegada)}</td><td>${brl(r.total_colaborador)}</td><td>${brl(r.valor_passagem)}</td><td><b>${brl(passTotal(r))}</b></td><td>${passChips(r.anexos_documento)}<br>${passChips(r.anexos_passagem)}<br>${passChips(r.anexos_comprovante)}</td><td>${passAcoes(r,t)}</td></tr>`).join('')}</tbody></table>`;
+  }else if(t==='phist'){
+    h=`<table>${passTh(['Nº','Colaborador','CD','Rota','Saída','Chegada','Refeições + Uber','Passagem','Total geral','Anexos','Pago em','Conferido','Ações'])}<tbody>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b><div class="ro">por ${passQuem(r)}</div>${obs(r)}</td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}</td><td>${passDT(r.data_chegada,r.hora_chegada)}</td><td>${brl(r.total_colaborador)}</td><td>${ver?brl(r.valor_passagem):'—'}</td><td>${ver?`<b>${brl(passTotal(r))}</b>`:brl(r.total_colaborador)}</td><td>${passChips(r.anexos_passagem)}${passChips(r.anexos_comprovante)}</td><td>${r.data_pagamento?fmtDH(r.data_pagamento).slice(0,16):'—'}</td><td>${r.conferido?'<span class="badge g">sim</span>':'<span class="badge w">não</span>'}</td><td><button class="btn sec" data-pass="recibo:${r.id}">🧾 Recibo</button></td></tr>`).join('')}</tbody></table>`;
+  }else{
+    h=`<table>${passTh(['<input type="checkbox" data-pass-selall="1" title="Marcar todos">','Nº','Colaborador','CD','Rota','Saída','Refeições + Uber','Passagem','Total geral','Pago em','Conferido'])}<tbody>${L.map(r=>`<tr><td><input type="checkbox" data-pass-sel="${r.id}" ${PASS.sel.has(r.id)?'checked':''}></td><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b></td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}</td><td>${brl(r.total_colaborador)}</td><td>${brl(r.valor_passagem)}</td><td><b>${brl(passTotal(r))}</b></td><td>${r.data_pagamento?fmtDH(r.data_pagamento).slice(0,16):'—'}</td><td>${r.conferido?`<span class="badge g" title="${esc((r.conferido_por||'')+' em '+(r.conferido_em?fmtDH(r.conferido_em).slice(0,16):''))}">conferido</span>`:'<span class="badge w">a conferir</span>'}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="8">Total (${L.length})</td><td colspan="3">${brl(L.reduce((s,r)=>s+passTotal(r),0))}</td></tr></tfoot></table>`;
+  }
+  return `<div style="overflow:auto">${h}</div>`;
+}
+
+/* ---------- abas ---------- */
+function passToolbar(t){
+  const L=PASS.lista,n=s=>L.filter(r=>r.status===s).length;
+  const chip=(k,l,on,a)=>`<button class="pass-chip ${on?'on':''}" data-pass="${a}:${k}">${l}</button>`;
+  let h='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">';
+  if(t==='psol'){
+    if(passPode(PASS_CRIA))h+='<button class="btn" data-pass="nova">➕ Nova solicitação</button>';
+    h+=chip('andamento','Em andamento ('+(n('pendente')+n('comprado'))+')',PASS.filtro==='andamento','chip')+chip('pend','Aguardando compra ('+n('pendente')+')',PASS.filtro==='pend','chip')+chip('comp','Compradas ('+n('comprado')+')',PASS.filtro==='comp','chip')+chip('pago','Pagas ('+n('pago')+')',PASS.filtro==='pago','chip')+chip('todas','Todas',PASS.filtro==='todas','chip');
+  }
+  if(t==='pconf')h+=chip('pend','A conferir',PASS.conf==='pend','cchip')+chip('ok','Conferidos',PASS.conf==='ok','cchip')+chip('todos','Todos',PASS.conf==='todos','cchip');
+  if((t==='pfin'||t==='psol')&&passPode(PASS_FIN))h+='<button class="btn sec" data-pass="valores">⚙ Valores das refeições</button>';
+  h+=`<input id="pass-q" placeholder="Buscar colaborador, CD, rota…" value="${esc(PASS.q)}" style="max-width:260px"><select id="pass-cd" style="max-width:240px"><option value="">Todos os CDs</option>${passCDs().map(c=>`<option ${c===PASS.cd?'selected':''}>${esc(c)}</option>`).join('')}</select>`;
+  if(t==='pconf'&&passPode(PASS_CONF))h+=`<span id="pass-selinfo" class="ro">${PASS.sel.size} selecionada(s)</span><button class="btn" data-pass="conferir">✔ Marcar como conferidas</button><button class="btn sec" data-pass="xlsx">⬇ Excel</button><button class="btn sec" data-pass="imprimir">🖨 Imprimir</button>`;
+  return h+'</div>';
+}
+const PASS_TIT={psol:['✈️ Solicitações de passagem','O RH solicita, Compras compra e anexa a passagem, e o Financeiro paga. Acompanhe aqui cada etapa.'],pfin:['💰 Financeiro · passagens compradas','Passagens já compradas aguardando pagamento. Anexe o comprovante e marque como pago.'],phist:['📚 Histórico · passagens pagas',''],pconf:['✔ Conferidos','Marque as passagens pagas que você conferiu (extrato/fatura) e exporte para a prestação de contas.']};
+function passTabHtml(t){
+  if(!PASS.carregado&&!PASS.carregando)setTimeout(carregarPass,0);
+  const T=PASS_TIT[t];
+  return `<div class="card"><h2>${T[0]}</h2>${T[1]?`<div class="ro" style="margin-bottom:8px">${T[1]}</div>`:''}${passToolbar(t)}<div id="pass-lista">${passLista(t)}</div></div>`;
+}
+function renderPass(){
+  if(typeof mod==='undefined'||mod!=='pass'||!usuario)return;
+  const el=$('v-'+tab);if(!el||!PASS_TIT[tab])return;
+  const ae=document.activeElement;
+  if(ae&&ae.id==='pass-q'&&el.contains(ae)){const l=$('pass-lista');if(l)l.innerHTML=passLista(tab);return}
+  if(!$('pass-css'))document.head.insertAdjacentHTML('beforeend',PASS_CSS);
+  el.innerHTML=passTabHtml(tab);
+}
+function passAtualiza(){const l=$('pass-lista');if(l)l.innerHTML=passLista(tab);const s=$('pass-selinfo');if(s)s.textContent=PASS.sel.size+' selecionada(s)'}
+async function passRecarrega(){const r=await sb.from('passagens').select('*').order('numero');if(!r.error)PASS.lista=r.data||[];renderPass()}
+
+/* ---------- modal (não fecha ao clicar fora, para não perder o que foi digitado) ---------- */
+function passAbrir(html){abrirCustom(html);window.__semFora=true}
+function passFechar(){window.__semFora=false;fecharModal()}
+
+/* ---------- formulário de solicitação (novo e edição) ---------- */
+function passEmpPorNome(n){const k=norm(n).trim();return k?EMP.find(e=>norm(e.nome).trim()===k&&e.status!=='Desligado'):null}
+function passFormHtml(p,r){
+  const v=k=>esc(r&&r[k]!=null?r[k]:'');
+  const edit=!!(r&&r.id);
+  return `<div class="hd"><h2 style="margin:0">${edit?'Editar solicitação Nº '+esc(r.numero):'Nova solicitação de passagem'}</h2></div><div class="secs" style="padding:12px 16px">
+  <div class="ro" style="margin-bottom:8px">Escolha o colaborador cadastrado: os dados pessoais são preenchidos automaticamente (e podem ser editados). As refeições são calculadas pelo horário da viagem.</div>
+  <div class="f" style="grid-template-columns:2fr 1.4fr"><div><label>Colaborador *</label><input id="${p}-nome" list="${p}-nomes" value="${v('nome')}" placeholder="Digite ou selecione o nome cadastrado" autocomplete="off"><datalist id="${p}-nomes">${EMP.filter(e=>e.status!=='Desligado').slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(e=>`<option value="${esc(e.nome)}">`).join('')}</datalist></div>
+  <div><label>CD *</label><select id="${p}-cd"><option value="">Selecione…</option>${passCDs().map(c=>`<option ${r&&r.cd===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div></div>
+  <div class="f" style="grid-template-columns:1fr 1fr 1fr"><div><label>CPF *</label><input id="${p}-cpf" value="${v('cpf')}" placeholder="000.000.000-00"></div><div><label>RG *</label><input id="${p}-rg" value="${v('rg')}"></div><div><label>Data de nascimento *</label><input type="date" id="${p}-nasc" value="${esc(r&&r.data_nascimento||'')}"></div></div>
+  <div class="f" style="grid-template-columns:1fr 1fr"><div><label>Origem *</label><input id="${p}-origem" value="${v('origem')}"></div><div><label>Destino *</label><input id="${p}-destino" value="${v('destino')}"></div></div>
+  <div class="f" style="grid-template-columns:1fr"><div><label>Tipo *</label><select id="${p}-tipo">${PASS_TIPOS.map(t=>`<option ${r&&r.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
+  <div class="f" style="grid-template-columns:repeat(4,1fr)"><div><label>Data saída *</label><input type="date" id="${p}-ds" value="${esc(r?r.data_saida:passHoje())}"></div><div><label>Hora saída *</label><input type="time" id="${p}-hs" value="${esc(r?passHM(r.hora_saida):'08:00')}"></div><div><label>Data chegada *</label><input type="date" id="${p}-dc" value="${esc(r?r.data_chegada:passHoje())}"></div><div><label>Hora chegada *</label><input type="time" id="${p}-hc" value="${esc(r?passHM(r.hora_chegada):'18:00')}"></div></div>
+  <div class="f" style="grid-template-columns:1fr"><div><label>Uber / Táxi (R$)</label><input type="number" id="${p}-uber" min="0" step="0.01" value="${esc(r?r.uber:0)}"></div></div>
+  ${edit?'':`<div class="f" style="grid-template-columns:1fr"><div><label>Documento do colaborador (RG/CPF) — foto ou PDF</label><input type="file" id="${p}-doc" accept="image/*,.pdf" multiple></div></div>`}
+  <div class="f" style="grid-template-columns:1fr"><div><label>Observação (aparece no recibo)</label><textarea id="${p}-obs" rows="3" placeholder="Se houver rota alternativa feita por outro meio de locomoção, descreva aqui e informe o valor em Uber / Táxi.">${esc(r&&r.obs||'')}</textarea></div></div>
+  <div class="ro" id="${p}-prev" style="margin:8px 0"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn sec" data-pass="fechar">Cancelar</button><button class="btn" data-pass="${edit?'salvar-edit:'+r.id:'salvar-nova'}">${edit?'Salvar alterações':'Criar solicitação'}</button></div></div>`;
+}
+function passPreview(p){
+  const el=$(p+'-prev');if(!el)return;
+  const g=k=>($(p+'-'+k)||{}).value||'';
+  if(!g('ds')||!g('dc')){el.textContent='';return}
+  if(!passOrdemOk(g('ds'),g('hs'),g('dc'),g('hc'))){el.innerHTML='<b style="color:#d32f2f">Verifique as datas: a chegada não pode ser antes da saída.</b>';return}
+  const q=passCalc(g('ds'),g('hs'),g('dc'),g('hc'));
+  el.innerHTML='Refeições: '+PASS.ref.map(r=>esc(r.nome)+': <b>'+(q[r.key]||0)+'</b>').join(' · ')+' · Total refeições: <b>'+brl(passValorRef(q))+'</b>';
+}
+function passLer(p){
+  const g=k=>(($(p+'-'+k)||{}).value||'').trim();
+  const d={nome:g('nome'),cd:g('cd'),cpf:g('cpf'),rg:g('rg'),data_nascimento:g('nasc')||null,origem:g('origem'),destino:g('destino'),tipo:g('tipo'),data_saida:g('ds'),hora_saida:g('hs'),data_chegada:g('dc'),hora_chegada:g('hc'),uber:Number(g('uber'))||0,obs:g('obs')||null};
+  const falta=[['nome','Colaborador'],['cd','CD'],['cpf','CPF'],['rg','RG'],['data_nascimento','Data de nascimento'],['origem','Origem'],['destino','Destino'],['data_saida','Data de saída'],['hora_saida','Hora de saída'],['data_chegada','Data de chegada'],['hora_chegada','Hora de chegada']].filter(x=>!d[x[0]]).map(x=>x[1]);
+  if(falta.length)return{erro:'Preencha: '+falta.join(', ')+'.'};
+  if(!passOrdemOk(d.data_saida,d.hora_saida,d.data_chegada,d.hora_chegada))return{erro:'A data/hora de chegada não pode ser antes da saída.'};
+  if(d.uber<0)return{erro:'Uber / Táxi não pode ser negativo.'};
+  const q=passCalc(d.data_saida,d.hora_saida,d.data_chegada,d.hora_chegada),vr=passValorRef(q);
+  Object.assign(d,{qtd_cafe_m:q.cafeM||0,qtd_almoco:q.almoco||0,qtd_cafe_t:q.cafeT||0,qtd_janta:q.janta||0,valor_refeicoes:vr,total_colaborador:vr+d.uber});
+  return{d};
+}
+function passNovaModal(){
+  if(!passPode(PASS_CRIA))return;
+  passAbrir(passFormHtml('np',null));passPreview('np');
+}
+async function passSalvarNova(btn){
+  const x=passLer('np');if(x.erro){toast(x.erro);return}
+  const emp=passEmpPorNome(x.d.nome);
+  if(!emp){
+    if(!['cmp','grh'].includes(perfil)){toast('Colaborador não cadastrado. Cadastre-o na aba Colaboradores antes de solicitar a passagem.');return}
+    if(!confirm('"'+x.d.nome+'" não está no cadastro de colaboradores. Solicitar mesmo assim (caso urgente)?'))return;
+  }
+  btn.disabled=true;btn.textContent='Salvando…';
+  const arq=($('np-doc')||{}).files;
+  let novo=null,err=null;
+  for(let i=0;i<3&&!novo;i++){
+    const max=PASS.lista.reduce((m,r)=>Math.max(m,r.numero||0),0);
+    const rec=Object.assign({numero:max+1,status:'pendente',aprovacao_status:'aprovado',criado_por:passNome()},x.d);
+    const r=await sb.from('passagens').insert(rec).select().single();
+    if(!r.error){novo=Array.isArray(r.data)?r.data[0]:r.data||rec;break}
+    err=r.error;
+    if(!(err.code==='23505'))break;
+    await passRecarrega();
+  }
+  if(!novo){btn.disabled=false;btn.textContent='Criar solicitação';toast('Erro ao criar solicitação: '+(err&&err.message||'tente de novo')+'.');return}
+  if(arq&&arq.length){
+    try{
+      const an=await passUpload(arq,'documento-'+novo.numero);
+      const u=await sb.from('passagens').update({anexos_documento:an}).eq('id',novo.id);
+      if(u.error)toast('Solicitação criada, mas o documento não foi salvo: '+u.error.message);
+    }catch(e){toast('Solicitação criada, mas o envio do documento falhou: '+(e.message||e))}
+  }
+  auditar({acao:'Solicitou passagem',alvo:x.d.nome,sec:'proj',campo:'Passagem',depois:x.d.origem+' → '+x.d.destino});
+  passFechar();toast('Solicitação criada. Ela já aparece para o Compras.');
+  await passRecarrega();
+}
+function passEditarModal(id){
+  const r=PASS.lista.find(x=>x.id===id);if(!r)return;
+  if(!((r.status==='pendente'&&passPode(PASS_CRIA))||(r.status==='comprado'&&passPode(PASS_FIN))))return;
+  passAbrir(passFormHtml('ep',r));passPreview('ep');
+}
+async function passSalvarEdit(id,btn){
+  const r=PASS.lista.find(x=>x.id===id);if(!r)return;
+  const x=passLer('ep');if(x.erro){toast(x.erro);return}
+  btn.disabled=true;btn.textContent='Salvando…';
+  const u=await sb.from('passagens').update(Object.assign({},x.d,{updated_at:new Date().toISOString()})).eq('id',id).select('id');
+  if(u.error||!(u.data||[]).length){btn.disabled=false;btn.textContent='Salvar alterações';toast('Não consegui salvar: '+(u.error?u.error.message:'sem permissão')+'.');return}
+  auditar({acao:'Editou passagem',alvo:x.d.nome,alvoId:r.numero,sec:'proj',campo:'Passagem'});
+  passFechar();toast('Solicitação atualizada.');await passRecarrega();
+}
+
+/* ---------- compra (Compras) ---------- */
+function passCompraModal(id){
+  const r=PASS.lista.find(x=>x.id===id);if(!r||!passPode(PASS_COMPRA))return;
+  passAbrir(`<div class="hd"><h2 style="margin:0">Registrar compra da passagem</h2></div><div class="secs" style="padding:12px 16px"><div class="ro" style="margin-bottom:8px">${esc(r.nome)} — ${esc(r.origem)} → ${esc(r.destino)}</div>
+  <div class="f" style="grid-template-columns:1fr"><div><label>Valor da passagem (R$) *</label><input type="number" id="pc-valor" min="0" step="0.01"></div><div><label>Anexar passagem(ns) — PDF ou imagem (pode ser mais de uma: ida/volta)</label><input type="file" id="pc-anexos" accept="image/*,.pdf" multiple></div></div>
+  <div class="ro" style="margin:8px 0">Ao confirmar, a solicitação segue para o Financeiro e o RH passa a ver a passagem anexada.</div>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn sec" data-pass="fechar">Cancelar</button><button class="btn" data-pass="salvar-compra:${id}">✅ Comprado — enviar ao Financeiro</button></div></div>`);
+}
+async function passSalvarCompra(id,btn){
+  const r=PASS.lista.find(x=>x.id===id);if(!r)return;
+  const v=$('pc-valor').value,files=$('pc-anexos').files;
+  if(v===''||isNaN(Number(v))||Number(v)<0){toast('Informe o valor da passagem.');return}
+  if(!files.length&&!(r.anexos_passagem||[]).length&&!confirm('Nenhuma passagem foi anexada. Continuar mesmo assim?'))return;
+  btn.disabled=true;btn.textContent='Salvando…';
+  try{
+    const novos=await passUpload(files,'passagem-'+r.numero);
+    const u=await sb.from('passagens').update({valor_passagem:Number(v),anexos_passagem:[...(r.anexos_passagem||[]),...novos],status:'comprado',comprado_por:passNome(),data_compra:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id).select('id');
+    if(u.error||!(u.data||[]).length)throw new Error(u.error?u.error.message:'sem permissão');
+    auditar({acao:'Registrou compra de passagem',alvo:r.nome,alvoId:r.numero,sec:'proj',campo:'Passagem',depois:brl(Number(v))});
+    passFechar();toast('Compra registrada. Enviada ao Financeiro.');await passRecarrega();
+  }catch(e){btn.disabled=false;btn.textContent='✅ Comprado — enviar ao Financeiro';toast('Erro ao registrar compra: '+(e.message||e))}
+}
+
+/* ---------- financeiro ---------- */
+function passComprovModal(id){
+  const r=PASS.lista.find(x=>x.id===id);if(!r||!passPode(PASS_FIN))return;
+  passAbrir(`<div class="hd"><h2 style="margin:0">Comprovante de pagamento</h2></div><div class="secs" style="padding:12px 16px"><div class="ro" style="margin-bottom:8px">${esc(r.nome)} — ${esc(r.origem)} → ${esc(r.destino)}</div>
+  <div style="margin-bottom:8px"><label>Já anexados</label>${(r.anexos_comprovante||[]).length?(r.anexos_comprovante||[]).map((a,i)=>`<div>${passChips([a])} <button class="btn sec" data-pass="rmcomprov:${id}:${i}">Remover</button></div>`).join(''):'<div class="ro">Nenhum comprovante ainda.</div>'}</div>
+  <div class="f" style="grid-template-columns:1fr"><div><label>Adicionar arquivo(s) — PDF ou imagem</label><input type="file" id="pcv-anexos" accept="image/*,.pdf" multiple></div></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-pass="fechar">Fechar</button><button class="btn" data-pass="salvar-comprov:${id}">Anexar</button></div></div>`);
+}
+async function passSalvarComprov(id){
+  const r=PASS.lista.find(x=>x.id===id);if(!r)return;
+  const files=$('pcv-anexos').files;if(!files.length){toast('Selecione ao menos um arquivo.');return}
+  try{
+    const novos=await passUpload(files,'comprovante-'+r.numero);
+    const u=await sb.from('passagens').update({anexos_comprovante:[...(r.anexos_comprovante||[]),...novos],updated_at:new Date().toISOString()}).eq('id',id).select('id');
+    if(u.error||!(u.data||[]).length)throw new Error(u.error?u.error.message:'sem permissão');
+    toast('Comprovante anexado.');await passRecarrega();passComprovModal(id);
+  }catch(e){toast('Erro ao anexar: '+(e.message||e))}
+}
+async function passRmComprov(id,i){
+  const r=PASS.lista.find(x=>x.id===id);if(!r)return;
+  const l=(r.anexos_comprovante||[]).slice();l.splice(i,1);
+  const u=await sb.from('passagens').update({anexos_comprovante:l,updated_at:new Date().toISOString()}).eq('id',id).select('id');
+  if(u.error||!(u.data||[]).length){toast('Não consegui remover.');return}
+  await passRecarrega();passComprovModal(id);
+}
+async function passMarcarPago(id){
+  const r=PASS.lista.find(x=>x.id===id);if(!r||!passPode(PASS_FIN))return;
+  if(!confirm('Marcar a passagem de '+r.nome+' como paga e enviar para o Histórico?'))return;
+  const u=await sb.from('passagens').update({status:'pago',pago_por:passNome(),data_pagamento:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id).select('id');
+  if(u.error||!(u.data||[]).length){toast('Não consegui marcar como paga: '+(u.error?u.error.message:'sem permissão'));return}
+  auditar({acao:'Marcou passagem como paga',alvo:r.nome,alvoId:r.numero,sec:'proj',campo:'Passagem',depois:brl(passTotal(r))});
+  toast('Passagem paga e enviada ao Histórico.');await passRecarrega();
+}
+
+/* ---------- exclusão ---------- */
+async function passExcluir(id){
+  const r=PASS.lista.find(x=>x.id===id);if(!r||perfil!=='grh')return;
+  if(!confirm('Excluir a solicitação de '+r.nome+'? Não dá para desfazer.'))return;
+  const d=await sb.from('passagens').delete().eq('id',id).select('id');
+  if(d.error||!(d.data||[]).length){toast('Não consegui excluir (sem permissão).');return}
+  auditar({acao:'Excluiu passagem',alvo:r.nome,alvoId:r.numero,sec:'proj',campo:'Passagem'});
+  toast('Solicitação excluída.');await passRecarrega();
+}
+function passExclModal(id){
+  const r=PASS.lista.find(x=>x.id===id);if(!r)return;
+  passAbrir(`<div class="hd"><h2 style="margin:0">Solicitar exclusão</h2></div><div class="secs" style="padding:12px 16px"><div class="ro" style="margin-bottom:8px">${esc(r.nome)} — ${esc(r.origem)} → ${esc(r.destino)}</div><div class="f" style="grid-template-columns:1fr"><div><label>Motivo *</label><textarea id="pe-motivo" rows="3" placeholder="Ex.: lançamento errado, duplicado…"></textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-pass="fechar">Cancelar</button><button class="btn" data-pass="salvar-excl:${id}">Enviar ao gestor</button></div></div>`);
+}
+async function passSalvarExcl(id){
+  const m=($('pe-motivo').value||'').trim();if(m.length<3){toast('Informe o motivo.');return}
+  const u=await sb.from('passagens').update({exclusao_solicitada:true,exclusao_motivo:m,exclusao_solicitada_por:passNome(),exclusao_solicitada_em:new Date().toISOString()}).eq('id',id).select('id');
+  if(u.error||!(u.data||[]).length){toast('Não consegui enviar o pedido.');return}
+  passFechar();toast('Pedido de exclusão enviado ao Gestor do RH.');await passRecarrega();
+}
+async function passNegarExcl(id){
+  if(perfil!=='grh')return;
+  const u=await sb.from('passagens').update({exclusao_solicitada:false,exclusao_motivo:null}).eq('id',id).select('id');
+  if(u.error||!(u.data||[]).length){toast('Não consegui negar.');return}
+  toast('Pedido de exclusão negado.');await passRecarrega();
+}
+
+/* ---------- conferidos: marcar, exportar, imprimir ---------- */
+async function passConferir(){
+  if(!passPode(PASS_CONF))return;
+  const ids=[...PASS.sel].filter(id=>{const r=PASS.lista.find(x=>x.id===id);return r&&r.status==='pago'&&!r.conferido});
+  if(!ids.length){toast('Marque ao menos uma passagem paga ainda não conferida.');return}
+  const u=await sb.from('passagens').update({conferido:true,conferido_por:passNome(),conferido_em:new Date().toISOString()}).in('id',ids).select('id');
+  if(u.error||!(u.data||[]).length){toast('Não consegui marcar como conferidas.');return}
+  auditar({acao:'Conferiu passagens',alvo:ids.length+' passagem(ns)',sec:'proj',campo:'Passagem'});
+  PASS.sel.clear();toast(ids.length+' passagem(ns) conferida(s).');await passRecarrega();
+}
+const passSelecionadas=()=>passLinhas('pconf').filter(r=>PASS.sel.has(r.id));
+const passCab=['Nº','Colaborador','CD','Origem','Destino','Tipo','Saída','Chegada','Refeições + Uber (R$)','Passagem (R$)','Total (R$)','Pago em','Conferido por'];
+const passLin=r=>[r.numero,r.nome,r.cd,r.origem,r.destino,r.tipo,fmtD(r.data_saida)+' '+passHM(r.hora_saida),fmtD(r.data_chegada)+' '+passHM(r.hora_chegada),Number(r.total_colaborador)||0,Number(r.valor_passagem)||0,passTotal(r),r.data_pagamento?fmtDH(r.data_pagamento).slice(0,16):'',r.conferido?(r.conferido_por||'sim'):''];
+async function passExportar(){
+  const L=passSelecionadas();if(!L.length){toast('Marque as passagens que quer exportar.');return}
+  const nome='passagens_'+passHoje();
+  const lin=L.map(passLin);
+  const o=typeof optsPlanilha==='function'?optsPlanilha('Passagens pagas e conferidas',passCab,lin,{aba:'Passagens'}):{cab:passCab,linhas:lin,aba:'Passagens'};
+  await baixarPlanilha(nome,o);
+  auditar({acao:'Exportou planilha',alvo:'Passagens ('+L.length+')'});
+}
+function passImprimir(html){
+  let d=$('pass-print');if(!d){d=document.createElement('div');d.id='pass-print';document.body.appendChild(d)}
+  if(!$('pass-css'))document.head.insertAdjacentHTML('beforeend',PASS_CSS);
+  d.innerHTML=html;document.body.classList.add('pass-printing');
+  const fim=()=>{document.body.classList.remove('pass-printing');window.removeEventListener('afterprint',fim)};
+  window.addEventListener('afterprint',fim);
+  window.print();
+}
+function passImprimirLista(){
+  const L=passSelecionadas();if(!L.length){toast('Marque as passagens que quer imprimir.');return}
+  passImprimir(`<div class="pass-rec" style="max-width:none"><img src="data:image/png;base64,${LOGO_BP_B64}" style="height:36px"><h3>Passagens conferidas · ${fmtD(passHoje())}</h3><table><tr>${['Nº','Colaborador','CD','Rota','Saída','Total (R$)','Pago em'].map(x=>`<th>${x}</th>`).join('')}</tr>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td>${esc(r.nome)}</td><td>${esc(r.cd)}</td><td>${esc(r.origem)} → ${esc(r.destino)}</td><td>${fmtD(r.data_saida)}</td><td>${brl(passTotal(r))}</td><td>${r.data_pagamento?fmtD(String(r.data_pagamento).slice(0,10)):'—'}</td></tr>`).join('')}<tr class="tot"><td colspan="5">TOTAL</td><td colspan="2">${brl(L.reduce((s,r)=>s+passTotal(r),0))}</td></tr></table></div>`);
+}
+
+/* ---------- recibo de refeições (o RH envia ao colaborador) ---------- */
+function passReciboHtml(r,logo){
+  const ver=passVeValor();
+  return `<div class="pass-rec">${logo?`<div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #1d3b6e;padding-bottom:8px;margin-bottom:8px"><img src="data:image/png;base64,${LOGO_BP_B64}" style="height:36px"><b style="font-size:15px">RECIBO DE REFEIÇÕES — VIAGEM</b></div>`:''}
+  <h3 style="margin:4px 0">${esc(r.nome)}</h3><div class="ro">${esc(r.cd)} · Solicitação Nº ${esc(r.numero)}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;font-size:13px;margin:8px 0"><div><b>CPF:</b> ${esc(r.cpf||'—')}</div><div><b>RG:</b> ${esc(r.rg||'—')}</div><div><b>Nascimento:</b> ${r.data_nascimento?fmtD(r.data_nascimento):'—'}</div><div><b>Tipo:</b> ${esc(r.tipo)}</div><div style="grid-column:1/3"><b>Rota:</b> ${esc(r.origem)} → ${esc(r.destino)}</div><div><b>Saída:</b> ${fmtD(r.data_saida)} ${passHM(r.hora_saida)}</div><div><b>Chegada:</b> ${fmtD(r.data_chegada)} ${passHM(r.hora_chegada)}</div></div>
+  <table><tr><th>Refeição</th><th>Qtde</th><th>Vlr unit.</th><th>Subtotal</th></tr>${PASS.ref.map(x=>{const q=r[PASS_QKEY[x.key]]||0;return `<tr><td>${esc(x.nome)}</td><td>${q}</td><td>${brl(x.valor)}</td><td>${brl(q*(Number(x.valor)||0))}</td></tr>`}).join('')}<tr><td colspan="3">Uber / Táxi</td><td>${brl(r.uber)}</td></tr><tr class="tot"><td colspan="3">Valor que o colaborador pode gastar na viagem (refeições + Uber/Táxi)</td><td>${brl(r.total_colaborador)}</td></tr>${ver?`<tr><td colspan="3">Passagem (transporte)</td><td>${r.valor_passagem!=null?brl(r.valor_passagem):'—'}</td></tr><tr class="tot"><td colspan="3">TOTAL GERAL</td><td>${brl(passTotal(r))}</td></tr>`:''}</table>
+  ${r.obs?`<div style="margin-top:8px;font-size:13px"><b>Observação:</b> ${esc(r.obs)}</div>`:''}</div>`;
+}
+function passTextoRecibo(r){
+  const L=['*Brasil Pontes Engenharia — Recibo de refeições (viagem)*','',r.nome,'Rota: '+r.origem+' → '+r.destino+' ('+r.tipo+')','Saída: '+fmtD(r.data_saida)+' '+passHM(r.hora_saida),'Chegada: '+fmtD(r.data_chegada)+' '+passHM(r.hora_chegada),''];
+  PASS.ref.forEach(x=>{const q=r[PASS_QKEY[x.key]]||0;if(q)L.push(q+'× '+x.nome+' ('+brl(x.valor)+') = '+brl(q*(Number(x.valor)||0)))});
+  if(Number(r.uber))L.push('Uber/Táxi: '+brl(r.uber));
+  L.push('','*Valor disponível para a viagem: '+brl(r.total_colaborador)+'*');
+  if(r.obs)L.push('','Obs.: '+r.obs);
+  return L.join('\n');
+}
+function passReciboModal(id){
+  const r=PASS.lista.find(x=>x.id===id);if(!r)return;
+  passAbrir(`<div class="hd"><h2 style="margin:0">Recibo de refeições — viagem</h2></div><div class="secs" style="padding:12px 16px">${passReciboHtml(r,false)}<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap"><button class="btn sec" data-pass="fechar">Fechar</button><button class="btn sec" data-pass="copiar:${id}">📋 Copiar para WhatsApp</button><button class="btn" data-pass="imprimir-rec:${id}">🖨 Imprimir / PDF</button></div></div>`);
+}
+
+/* ---------- valores das refeições (Financeiro e Gestor do RH) ---------- */
+function passValoresModal(){
+  if(!passPode(PASS_FIN))return;
+  passAbrir(`<div class="hd"><h2 style="margin:0">Valores e horários das refeições</h2></div><div class="secs" style="padding:12px 16px"><div class="ro" style="margin-bottom:8px">Usado para calcular as refeições de cada viagem. Vale para as próximas solicitações (as já criadas não mudam).</div><table><tr><th>Refeição</th><th>Horário de referência</th><th>Valor unit. (R$)</th></tr>${PASS.ref.map((r,i)=>`<tr><td>${esc(r.nome)}</td><td><input type="time" data-pass-ref="${i}|hora" value="${esc(r.hora)}"></td><td><input type="number" min="0" step="0.01" data-pass-ref="${i}|valor" value="${esc(r.valor)}" style="width:110px"></td></tr>`).join('')}</table><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-pass="fechar">Cancelar</button><button class="btn" data-pass="salvar-valores">Salvar valores</button></div></div>`);
+}
+async function passSalvarValores(){
+  const nv=PASS.ref.map(r=>Object.assign({},r));
+  document.querySelectorAll('[data-pass-ref]').forEach(i=>{const [ix,f]=i.dataset.passRef.split('|');nv[Number(ix)][f]=f==='valor'?(Number(i.value)||0):i.value});
+  const u=await sb.from('passagens_config').update({refeicoes:nv,updated_at:new Date().toISOString()}).eq('id',1).select('id');
+  if(u.error||!(u.data||[]).length){toast('Não consegui salvar os valores (sem permissão).');return}
+  PASS.ref=nv;auditar({acao:'Alterou valores das refeições',alvo:'Passagens',sec:'proj',campo:'Refeições'});
+  passFechar();toast('Valores atualizados.');renderPass();
+}
+
+/* ---------- eventos ---------- */
+document.addEventListener('click',ev=>{
+  const b=ev.target&&ev.target.closest?ev.target.closest('[data-pass],[data-pass-anexo]'):null;
+  if(!b||!usuario)return;
+  if(b.dataset.passAnexo){passAbrirAnexo(b.dataset.passAnexo);return}
+  const [a,x,y]=String(b.dataset.pass).split(':'),id=Number(x);
+  switch(a){
+    case 'nova':passNovaModal();break;
+    case 'chip':PASS.filtro=x;renderPass();break;
+    case 'cchip':PASS.conf=x;PASS.sel.clear();renderPass();break;
+    case 'fechar':passFechar();break;
+    case 'salvar-nova':passSalvarNova(b);break;
+    case 'edit':passEditarModal(id);break;
+    case 'salvar-edit':passSalvarEdit(id,b);break;
+    case 'compra':passCompraModal(id);break;
+    case 'salvar-compra':passSalvarCompra(id,b);break;
+    case 'comprov':passComprovModal(id);break;
+    case 'salvar-comprov':passSalvarComprov(id);break;
+    case 'rmcomprov':passRmComprov(id,Number(y));break;
+    case 'pago':passMarcarPago(id);break;
+    case 'del':passExcluir(id);break;
+    case 'excl':passExclModal(id);break;
+    case 'salvar-excl':passSalvarExcl(id);break;
+    case 'negar':passNegarExcl(id);break;
+    case 'recibo':passReciboModal(id);break;
+    case 'imprimir-rec':{const r=PASS.lista.find(z=>z.id===id);if(r)passImprimir(passReciboHtml(r,true));break}
+    case 'copiar':{const r=PASS.lista.find(z=>z.id===id);if(r){const t=passTextoRecibo(r);if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>toast('Recibo copiado. É só colar no WhatsApp.'),()=>toast('Não consegui copiar.'));else toast('Seu navegador não permite copiar automaticamente.')}break}
+    case 'valores':passValoresModal();break;
+    case 'salvar-valores':passSalvarValores();break;
+    case 'conferir':passConferir();break;
+    case 'xlsx':passExportar();break;
+    case 'imprimir':passImprimirLista();break;
+  }
+});
+document.addEventListener('input',ev=>{
+  const t=ev.target;if(!t)return;
+  if(t.id==='pass-q'){PASS.q=t.value;passAtualiza()}
+  else if(/^(np|ep)-(ds|hs|dc|hc)$/.test(t.id||''))passPreview(t.id.slice(0,2));
+});
+document.addEventListener('change',ev=>{
+  const t=ev.target;if(!t||!usuario)return;
+  if(t.id==='pass-cd'){PASS.cd=t.value;passAtualiza();return}
+  if(/^(np|ep)-(ds|hs|dc|hc)$/.test(t.id||'')){passPreview(t.id.slice(0,2));return}
+  if(/^(np|ep)-nome$/.test(t.id||'')){
+    const p=t.id.slice(0,2),e=passEmpPorNome(t.value);if(!e)return;
+    const set=(k,v)=>{const el=$(p+'-'+k);if(el&&v)el.value=v};
+    set('nome',e.nome);set('cpf',e.cpf);set('rg',e.rg);set('nasc',passIso(e.nasc));
+    if(e.obra&&passCDs().includes(e.obra))set('cd',e.obra);
+    if(!$(p+'-origem').value&&e.cidade)set('origem',e.cidade+(e.uf?'/'+e.uf:''));
+    return;
+  }
+  if(t.dataset&&t.dataset.passSel!==undefined){const id=Number(t.dataset.passSel);if(t.checked)PASS.sel.add(id);else PASS.sel.delete(id);const s=$('pass-selinfo');if(s)s.textContent=PASS.sel.size+' selecionada(s)';return}
+  if(t.dataset&&t.dataset.passSelall!==undefined){passLinhas('pconf').forEach(r=>{if(t.checked)PASS.sel.add(r.id);else PASS.sel.delete(r.id)});passAtualiza()}
+});
+
 const diffDias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
 const mesesTxt=n=>{const m=Math.floor(n/30.4375);return m>=1?` (~${m} ${m===1?'mês':'meses'})`:''};
 function refreshCDS(){const v=$('fobra').value;$('fobra').innerHTML='<option value="">Todas as obras</option>'+CDS.map(o=>`<option>${esc(o)}</option>`).join('');$('fobra').value=v}
@@ -2388,7 +2854,7 @@ document.addEventListener('click',async ev=>{
   const t=ev.target;
   if(acoesGlobais(t))return;
   const row=t.closest('tr.row'); if(row){abertoId=Number(row.dataset.id);renderModal();return}
-  if(t.dataset.close||t===$('ov')){abertoId=null;$('ov').classList.remove('on');return}
+  if(t.dataset.close||(t===$('ov')&&!window.__semFora)){window.__semFora=false;abertoId=null;$('ov').classList.remove('on');return}
   if(t.dataset.id&&t.closest('.alert')){abertoId=Number(t.dataset.id);renderModal();return}
   if(t.dataset.done){const [id,k]=t.dataset.done.split('|');const e=Number(id)===0?GLOB:EMP.find(x=>x.id===Number(id));e.done[k]=!e.done[k];
     const m=/^mob(\d+)(\d)/.exec(k);
