@@ -173,6 +173,7 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
   <section id="v-wpp" hidden></section>
   <section id="v-atend" hidden></section>
   <section id="v-aval" hidden></section>
+  <section id="v-ph" hidden></section>
   <section id="v-psol" hidden></section>
   <section id="v-pfin" hidden></section>
   <section id="v-phist" hidden></section>
@@ -591,13 +592,14 @@ function renderDash(){
 
 /* ---------- Tabs ---------- */
 function renderTabs(){
-  const ms=modsOk();if(mod!=='inicio'&&!ms.some(m=>m.id===mod))mod='inicio';
+  const ms=modsOk();if(mod!=='inicio'&&mod!=='ph'&&!ms.some(m=>m.id===mod))mod='inicio';
   if(mod==='inicio'){layoutInicio(ms);return}
+  if(mod==='ph'){layoutPlaceholder(ms);return}
   const M=MODS.find(m=>m.id===mod),ok=abasOk(M);
   if(!ok.some(a=>a[0]===tab))tab=ok[0][0];
   $('side').innerHTML=railHtml(ms)||ms.map(m=>`<button class="mbtn ${m.id===mod?'on':''}" data-mod="${m.id}" title="${m.nome}"${m.id==='admin'?' style="margin-top:auto"':''}><span class="i">${m.ico}</span>${m.nome}</button>`).join('');
-  $('h-titulo').textContent=M.nome;document.documentElement.style.setProperty('--c',MODCOR[mod]||'#2f6fb8');capaMostrar(false);
-  $('tabs').innerHTML='<div class="modtag">'+M.nome+'</div>'+ok.map(a=>`<button class="tab ${a[0]===tab?'on':''}" data-tab="${a[0]}">${a[1]}</button>`).join('');
+  capaMostrar(false);
+  layoutCabecalho(M);$('tabs').innerHTML=tabsSetor()||'<div class="modtag">'+M.nome+'</div>'+ok.map(a=>`<button class="tab ${a[0]===tab?'on':''}" data-tab="${a[0]}">${a[1]}</button>`).join('');
   ABAS.forEach(a=>{$('v-'+a[0]).hidden=a[0]!==tab});
 }
 
@@ -2635,6 +2637,7 @@ function layoutCss(){
   +'.mbtn:hover{background:#ffffff12;color:#fff}.mbtn:hover .i{background:transparent}.mbtn.on{color:#fff}.mbtn.on .i{background:var(--c);box-shadow:0 2px 10px #0006}'
   +'body:not(.out) main{padding-left:92px}body:not(.out) .tabs{margin:0 0 0 68px}'
   +'.tabs{position:sticky;top:var(--hh,44px);z-index:15;height:38px;display:flex;align-items:flex-end;gap:0;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;background:#0e2f50;border-bottom:2px solid var(--c);padding:0}'
+  +'.tabs{scrollbar-width:none;-ms-overflow-style:none}.tabs::-webkit-scrollbar{display:none}'
   +'.tabs:empty{display:none}.tabs .modtag{background:var(--c);color:#fff;font-size:13px;font-weight:600;padding:0 18px;height:100%;display:flex;align-items:center;flex:none}'
   +'.tab{padding:0 16px;height:100%;color:#b9c8d8;font-size:12.5px;font-weight:400;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px}.tab:hover{color:#fff}.tab.on{color:#fff;font-weight:600;border-bottom-color:var(--c)}'
   +'#capa{display:none;position:fixed;left:68px;top:var(--hh,44px);right:0;bottom:0;background:#0a2540;overflow:hidden;z-index:5}#capa.on{display:block}body.out #capa{display:none!important}'
@@ -2679,12 +2682,81 @@ function capaMostrar(on){
   if(on){const h=document.getElementById('capa-hi');if(h)h.textContent='Olá, '+layoutPrimeiroNome()+'!';
     CAPA.t=setInterval(()=>capaIr((CAPA.cur+1)%CAPAS_B64.length),7000)}
 }
-function railHtml(ms){
-  const bt=(id,ico,nome,extra)=>`<button class="mbtn ${mod===id?'on':''}" data-mod="${id}" title="${nome}" style="--c:${MODCOR[id]||'#2f6fb8'}${extra||''}"><span class="i">${ico}</span>${nome}</button>`;
-  const comuns=ms.filter(m=>m.id!=='admin'),adm=ms.find(m=>m.id==='admin');
-  const curto=n=>({'Saúde e Segurança':'Saúde e Seg.','Administração':'Admin'}[n]||n);
-  return bt('inicio','🏠','Início')+comuns.map(m=>bt(m.id,m.ico,curto(m.nome))).join('')+(adm?bt('admin',adm.ico,curto(adm.nome),';margin-top:auto'):'');
+/* ---------- Setores: o menu lateral só tem SETORES; cada setor reúne abas de vários módulos ----------
+   (ex.: Passagens aparece em RH, Compras e Financeiro, cada um com a sua função).
+   Abas que ainda não existem no Sistema RH aparecem como "em migração" só para o Gestor do RH. */
+let SETOR=null,PH={l:''};
+const LBL={'wpp:wpp':'WhatsApp · número e simulador','compras:passagens':'Passagens · baixada e férias','contratos:contratos':'Contratos com clientes','pmo:painel':'PMO · Alertas','pmo:mob':'Contratos, CDs e mobilização','pmo:colab':'PMO · Colaboradores','wpp:atend':'WhatsApp · atendimento','wpp:aval':'WhatsApp · avaliações'};
+const SETORES_DEF=[
+ {id:'compras',nome:'Compras',ico:'🛒',c:'#e8553d',mods:['compras'],
+  extras:[['pass','psol','Passagens · comprar',['cmp','grh']],['pass','phist','Passagens · histórico',['cmp','grh']],['pass','pconf','Passagens · conferidos',['cmp','grh']]],
+  ph:['Requisições da obra','Cotações','Serviços','Contratos e locações','Histórico']},
+ {id:'almox',nome:'Almoxarifado',ico:'📦',c:'#c77d0a',mods:[],extras:[],ph:['Geral','Elétrico','EPI','Manutenção','Patrimônio']},
+ {id:'orc',nome:'Orçamento',ico:'🧮',c:'#0c7b93',mods:[],extras:[],ph:['Orçamentos de obra','Base de preços (SINAPI)']},
+ {id:'obras',nome:'Obras',ico:'🏗',c:'#6b4fbb',mods:['pmo','contratos'],extras:[],ph:['CDs','Plano de ação','Painel geral']},
+ {id:'sst',nome:'Saúde e Seg.',ico:'🦺',c:'#d9822b',mods:['sst'],extras:[],ph:[]},
+ {id:'qual',nome:'Qualidade',ico:'✅',c:'#1b8a7a',mods:[],extras:[],ph:['Em definição']},
+ {id:'rh',nome:'RH',ico:'👥',c:'#2f6fed',mods:['rh','wpp'],
+  extras:[['pass','psol','Passagens · solicitar',['rh','grh']],['pass','phist','Passagens · histórico',['rh','grh']]],ph:[]},
+ {id:'fin',nome:'Financeiro',ico:'$',c:'#59b300',mods:['fin'],
+  extras:[['pass','pfin','Passagens · pagar',['fin','grh']],['pass','pconf','Passagens · conferir',['fin','grh']],['pass','phist','Passagens · histórico',['fin','grh']]],ph:['Contas a pagar','Reembolsos']},
+ {id:'admin',nome:'Admin',ico:'⚙️',c:'#44546a',mods:['admin'],extras:[],ph:[]}
+];
+function setorItens(S){
+  const out=[];
+  S.mods.forEach(id=>{const M=MODS.find(m=>m.id===id);if(!M)return;abasOk(M).forEach(a=>out.push({m:id,t:a[0],l:LBL[id+':'+a[0]]||a[1]}))});
+  (S.extras||[]).forEach(([m,t,l,r])=>{const M=MODS.find(x=>x.id===m);if(M&&r.includes(perfil)&&abasOk(M).some(a=>a[0]===t))out.push({m,t,l})});
+  const livre=perfil==='grh'&&!(typeof rhPag==='function'&&rhPag());
+  if(livre)(S.ph||[]).forEach(l=>{if(!out.some(o=>o.l===l))out.push({ph:true,l})});
+  return out;
 }
+const setoresOk=()=>SETORES_DEF.map(S=>Object.assign({},S,{itens:setorItens(S)})).filter(S=>S.itens.length);
+const itemAtual=it=>mod==='ph'?(it.ph&&it.l===PH.l):(!it.ph&&it.m===mod&&it.t===tab);
+function setorAtual(){
+  const L=setoresOk();
+  const S=L.find(x=>x.id===SETOR&&x.itens.some(itemAtual))||L.find(x=>x.itens.some(itemAtual))||null;
+  SETOR=S?S.id:null;return{S,L};
+}
+function irItem(it){
+  if(!it)return;
+  if(it.ph){mod='ph';PH={l:it.l}}else{mod=it.m;tab=it.t}
+  render();window.scrollTo(0,0);
+}
+function railHtml(ms){
+  const {S,L}=(mod==='inicio')?{S:null,L:setoresOk()}:setorAtual();
+  const bt=(att,on,ico,nome,c,extra)=>`<button class="mbtn ${on?'on':''}" ${att} title="${nome}" style="--c:${c}${extra||''}"><span class="i">${ico}</span>${nome}</button>`;
+  const comuns=L.filter(x=>x.id!=='admin'),adm=L.find(x=>x.id==='admin');
+  return bt('data-mod="inicio"',mod==='inicio','🏠','Início',MODCOR.inicio)
+   +comuns.map(x=>bt(`data-setor="${x.id}"`,S&&S.id===x.id,x.ico,x.nome,x.c)).join('')
+   +(adm?bt('data-setor="admin"',S&&S.id==='admin',adm.ico,adm.nome,adm.c,';margin-top:auto'):'');
+}
+function tabsSetor(){
+  const {S}=setorAtual();if(!S)return '';
+  return '<div class="modtag">'+esc(S.nome)+'</div>'+S.itens.map((it,i)=>`<button class="tab ${itemAtual(it)?'on':''}" data-sitem="${i}">${esc(it.l)}${it.ph?' <span style="opacity:.55;font-size:10px">· em breve</span>':''}</button>`).join('');
+}
+function layoutCabecalho(M){
+  const {S}=setorAtual();
+  const ph=$('v-ph');if(ph)ph.hidden=true;
+  $('h-titulo').textContent=S?S.nome:M.nome;
+  document.documentElement.style.setProperty('--c',S?S.c:(MODCOR[mod]||'#2f6fb8'));
+}
+function layoutPlaceholder(ms){
+  capaMostrar(false);
+  $('side').innerHTML=railHtml(ms);
+  const {S}=setorAtual();
+  $('h-titulo').textContent=S?S.nome:'';
+  document.documentElement.style.setProperty('--c',S?S.c:MODCOR.inicio);
+  $('tabs').innerHTML=tabsSetor();
+  ABAS.forEach(a=>{const el=$('v-'+a[0]);if(el)el.hidden=true});
+  const el=$('v-ph');if(el){el.hidden=false;el.innerHTML=`<div class="card"><h2>${esc(PH.l)}</h2><div class="ro">Esta aba ainda está no Sistema Compras (ou em definição) e será trazida para cá. Quando chegar, aparece neste lugar.</div></div>`}
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest&&e.target.closest('[data-setor],[data-sitem]');
+  if(!b||typeof usuario==='undefined'||!usuario)return;
+  e.stopPropagation();
+  if(b.dataset.setor){const S=setoresOk().find(x=>x.id===b.dataset.setor);if(S){SETOR=S.id;irItem(S.itens[0])}}
+  else{const {S}=setorAtual();if(S)irItem(S.itens[Number(b.dataset.sitem)])}
+},true);
 function layoutInicio(ms){
   capaMostrar(true);
   $('side').innerHTML=railHtml(ms);
