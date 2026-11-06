@@ -549,7 +549,7 @@ const MODS=[
  {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['atend','Atendimento',['rh','grh']],['aval','Avaliações',['rh','grh']],['wpp','Número e simulador',['rh','grh']]]},
  {id:'pmo',nome:'PMO',ico:'🏗',abas:[['painel','Alertas',['pmo','grh']],['mob','Mobilização',['pmo','grh']],['colab','Colaboradores · baixada e férias',['pmo']]]},
  {id:'contratos',nome:'Contratos',ico:'📑',abas:[['contratos','Contratos',['pmo','grh','dir','rh']]]},
- {id:'pass',nome:'Passagens',ico:'✈️',abas:[['psol','Solicitações',['rh','grh','cmp']],['pfin','Financeiro',['fin','grh','cmp']],['phist','Histórico',['rh','grh','cmp','fin']],['pconf','Conferidos',['grh','cmp','fin']]]},
+ {id:'pass',nome:'Passagens',ico:'✈️',abas:[['psol','Solicitações',['rh','grh','cmp']],['pfin','Financeiro',['fin','grh','cmp']],['phist','Histórico',['rh','grh','cmp','fin']],['pconf','Conferir',['grh','cmp']]]},
  {id:'admin',nome:'Administração',ico:'⚙️',abas:[['usuarios','Usuários e acessos',['grh']],['audit','Auditoria',['grh','rh']],['acessos','Matriz de perfis',['grh']]]}
 ];
 const ABAS=[...new Set(MODS.flatMap(m=>m.abas.map(a=>a[0])))].map(x=>[x]);
@@ -2053,7 +2053,7 @@ function wppRealHtml(){
    Tabela única `passagens` do banco (a mesma do ERP de Compras).
    ===================================================================== */
 const PASS={lista:[],ref:[{key:'cafeM',nome:'Café da Manhã',hora:'06:30',valor:20},{key:'almoco',nome:'Almoço',hora:'12:00',valor:35},{key:'cafeT',nome:'Café da Tarde',hora:'15:30',valor:20},{key:'janta',nome:'Janta',hora:'20:00',valor:35}],obras:[],carregado:false,carregando:false,filtro:'andamento',conf:'pend',q:'',cd:'',sel:new Set()};
-const PASS_CRIA=['rh','grh','cmp'],PASS_COMPRA=['cmp','grh'],PASS_FIN=['fin','grh'],PASS_CONF=['cmp','fin','grh'];
+const PASS_CRIA=['rh','grh','cmp'],PASS_COMPRA=['cmp','grh'],PASS_FIN=['fin','grh'],PASS_CONF=['cmp','grh'];
 const PASS_TIPOS=['Aérea/Ida','Aérea/Volta','Ônibus/Ida','Ônibus/Volta'];
 const PASS_QKEY={cafeM:'qtd_cafe_m',almoco:'qtd_almoco',cafeT:'qtd_cafe_t',janta:'qtd_janta'};
 const passPode=l=>l.includes(perfil);
@@ -2191,7 +2191,7 @@ function passToolbar(t){
   if(t==='pconf'&&passPode(PASS_CONF))h+=`<span id="pass-selinfo" class="ro">${PASS.sel.size} selecionada(s)</span><button class="btn" data-pass="conferir">✔ Marcar como conferidas</button><button class="btn sec" data-pass="xlsx">⬇ Excel</button><button class="btn sec" data-pass="imprimir">🖨 Imprimir</button>`;
   return h+'</div>';
 }
-const PASS_TIT={psol:['✈️ Solicitações de passagem','O RH solicita, Compras compra e anexa a passagem, e o Financeiro paga. Acompanhe aqui cada etapa.'],pfin:['💰 Financeiro · passagens compradas','Passagens já compradas aguardando pagamento. Anexe o comprovante e marque como pago.'],phist:['📚 Histórico · passagens pagas',''],pconf:['✔ Conferidos','Marque as passagens pagas que você conferiu (extrato/fatura) e exporte para a prestação de contas.']};
+const PASS_TIT={psol:['✈️ Solicitações de passagem','O RH solicita, Compras compra e anexa a passagem, e o Financeiro paga. Acompanhe aqui cada etapa.'],pfin:['💰 Financeiro · passagens compradas','Passagens já compradas aguardando pagamento. Anexe o comprovante e marque como pago.'],phist:['📚 Histórico · passagens pagas',''],pconf:['✔ Conferir passagens','A Compras confere as passagens (extrato/fatura), marca como conferidas e exporta para subir o pedido de pagamento ao Financeiro.']};
 function passTabHtml(t){
   if(!PASS.carregado&&!PASS.carregando)setTimeout(carregarPass,0);
   const T=PASS_TIT[t];
@@ -2638,6 +2638,7 @@ function layoutCss(){
   +'body:not(.out) main{padding-left:92px}body:not(.out) .tabs{margin:0 0 0 68px}'
   +'.tabs{position:sticky;top:var(--hh,44px);z-index:15;height:38px;display:flex;align-items:flex-end;gap:0;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;background:#0e2f50;border-bottom:2px solid var(--c);padding:0}'
   +'.tabs{scrollbar-width:none;-ms-overflow-style:none}.tabs::-webkit-scrollbar{display:none}'
+  +'.subnav{display:flex;gap:6px;margin:0 0 12px}.subnav button{border:1px solid var(--c);background:#fff;color:var(--c);border-radius:16px;padding:5px 14px;font:inherit;font-size:12.5px;cursor:pointer}.subnav button.on{background:var(--c);color:#fff;font-weight:600}'
   +'.tabs:empty{display:none}.tabs .modtag{background:var(--c);color:#fff;font-size:13px;font-weight:600;padding:0 18px;height:100%;display:flex;align-items:center;flex:none}'
   +'.tab{padding:0 16px;height:100%;color:#b9c8d8;font-size:12.5px;font-weight:400;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px}.tab:hover{color:#fff}.tab.on{color:#fff;font-weight:600;border-bottom-color:var(--c)}'
   +'#capa{display:none;position:fixed;left:68px;top:var(--hh,44px);right:0;bottom:0;background:#0a2540;overflow:hidden;z-index:5}#capa.on{display:block}body.out #capa{display:none!important}'
@@ -2689,7 +2690,7 @@ let SETOR=null,PH={l:''};
 const LBL={'wpp:wpp':'WhatsApp · número e simulador','compras:passagens':'Passagens · baixada e férias','contratos:contratos':'Contratos com clientes','pmo:painel':'PMO · Alertas','pmo:mob':'Contratos, CDs e mobilização','pmo:colab':'PMO · Colaboradores','wpp:atend':'WhatsApp · atendimento','wpp:aval':'WhatsApp · avaliações'};
 const SETORES_DEF=[
  {id:'compras',nome:'Compras',ico:'🛒',c:'#e8553d',mods:['compras'],
-  extras:[['pass','psol','Passagens · comprar',['cmp','grh']],['pass','phist','Passagens · histórico',['cmp','grh']],['pass','pconf','Passagens · conferidos',['cmp','grh']]],
+  grupos:[{m:'pass',l:'Passagens',subs:[['psol','Comprar',['cmp','grh']],['pconf','Conferir',['cmp','grh']],['phist','Histórico',['cmp','grh']],['passagens','Baixada e férias',['cmp','grh'],'compras']]}],
   ph:['Requisições da obra','Cotações','Serviços','Contratos e locações','Histórico']},
  {id:'almox',nome:'Almoxarifado',ico:'📦',c:'#c77d0a',mods:[],extras:[],ph:['Geral','Elétrico','EPI','Manutenção','Patrimônio']},
  {id:'orc',nome:'Orçamento',ico:'🧮',c:'#0c7b93',mods:[],extras:[],ph:['Orçamentos de obra','Base de preços (SINAPI)']},
@@ -2697,21 +2698,23 @@ const SETORES_DEF=[
  {id:'sst',nome:'Saúde e Seg.',ico:'🦺',c:'#d9822b',mods:['sst'],extras:[],ph:[]},
  {id:'qual',nome:'Qualidade',ico:'✅',c:'#1b8a7a',mods:[],extras:[],ph:['Em definição']},
  {id:'rh',nome:'RH',ico:'👥',c:'#2f6fed',mods:['rh','wpp'],
-  extras:[['pass','psol','Passagens · solicitar',['rh','grh']],['pass','phist','Passagens · histórico',['rh','grh']]],ph:[]},
+  grupos:[{m:'pass',l:'Passagens',subs:[['psol','Solicitar',['rh','grh']],['phist','Histórico',['rh','grh']]]}],ph:[]},
  {id:'fin',nome:'Financeiro',ico:'$',c:'#59b300',mods:['fin'],
-  extras:[['pass','pfin','Passagens · pagar',['fin','grh']],['pass','pconf','Passagens · conferir',['fin','grh']],['pass','phist','Passagens · histórico',['fin','grh']]],ph:['Contas a pagar','Reembolsos']},
+  grupos:[{m:'pass',l:'Passagens',subs:[['pfin','Pagar',['fin','grh']],['phist','Histórico',['fin','grh']]]}],ph:['Contas a pagar','Reembolsos']},
  {id:'admin',nome:'Admin',ico:'⚙️',c:'#44546a',mods:['admin'],extras:[],ph:[]}
 ];
 function setorItens(S){
   const out=[];
-  S.mods.forEach(id=>{const M=MODS.find(m=>m.id===id);if(!M)return;abasOk(M).forEach(a=>out.push({m:id,t:a[0],l:LBL[id+':'+a[0]]||a[1]}))});
-  (S.extras||[]).forEach(([m,t,l,r])=>{const M=MODS.find(x=>x.id===m);if(M&&r.includes(perfil)&&abasOk(M).some(a=>a[0]===t))out.push({m,t,l})});
+  S.mods.forEach(id=>{const M=MODS.find(m=>m.id===id);if(!M)return;abasOk(M).filter(a=>!(id==='compras'&&a[0]==='passagens')).forEach(a=>out.push({m:id,t:a[0],l:LBL[id+':'+a[0]]||a[1]}))});
+  (S.grupos||[]).forEach(g=>{const M=MODS.find(x=>x.id===g.m);if(!M)return;
+    const subs=g.subs.filter(([t,l,r,mm])=>{const MM=MODS.find(x=>x.id===(mm||g.m));return MM&&r.includes(perfil)&&abasOk(MM).some(a=>a[0]===t)}).map(([t,l,r,mm])=>({m:mm||g.m,t,l}));
+    if(subs.length)out.push({m:subs[0].m,t:subs[0].t,l:g.l,subs});});
   const livre=perfil==='grh'&&!(typeof rhPag==='function'&&rhPag());
   if(livre)(S.ph||[]).forEach(l=>{if(!out.some(o=>o.l===l))out.push({ph:true,l})});
   return out;
 }
 const setoresOk=()=>SETORES_DEF.map(S=>Object.assign({},S,{itens:setorItens(S)})).filter(S=>S.itens.length);
-const itemAtual=it=>mod==='ph'?(it.ph&&it.l===PH.l):(!it.ph&&it.m===mod&&it.t===tab);
+const itemAtual=it=>mod==='ph'?(it.ph&&it.l===PH.l):(!it.ph&&(it.subs?it.subs.some(s=>s.m===mod&&s.t===tab):(it.m===mod&&it.t===tab)));
 function setorAtual(){
   const L=setoresOk();
   const S=L.find(x=>x.id===SETOR&&x.itens.some(itemAtual))||L.find(x=>x.itens.some(itemAtual))||null;
@@ -2737,12 +2740,13 @@ function tabsSetor(){
 function layoutCabecalho(M){
   const {S}=setorAtual();
   const ph=$('v-ph');if(ph)ph.hidden=true;
+  subnavAtualiza();
   $('h-titulo').textContent=S?S.nome:M.nome;
   document.documentElement.style.setProperty('--c',S?S.c:(MODCOR[mod]||'#2f6fb8'));
 }
 function layoutPlaceholder(ms){
   capaMostrar(false);
-  $('side').innerHTML=railHtml(ms);
+  $('side').innerHTML=railHtml(ms);subnavAtualiza();
   const {S}=setorAtual();
   $('h-titulo').textContent=S?S.nome:'';
   document.documentElement.style.setProperty('--c',S?S.c:MODCOR.inicio);
@@ -2757,8 +2761,25 @@ document.addEventListener('click',e=>{
   if(b.dataset.setor){const S=setoresOk().find(x=>x.id===b.dataset.setor);if(S){SETOR=S.id;irItem(S.itens[0])}}
   else{const {S}=setorAtual();if(S)irItem(S.itens[Number(b.dataset.sitem)])}
 },true);
+function subnavHtml(){
+  if(typeof setorAtual!=='function')return '';
+  const {S}=setorAtual();if(!S)return '';
+  const it=S.itens.find(x=>x.subs&&itemAtual(x));if(!it||it.subs.length<2)return '';
+  return '<div class="subnav">'+it.subs.map(s=>`<button class="${(s.t===tab&&s.m===mod)?'on':''}" data-psub="${s.m}|${s.t}">${esc(s.l)}</button>`).join('')+'</div>';
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest&&e.target.closest('[data-psub]');
+  if(!b||typeof usuario==='undefined'||!usuario)return;
+  e.stopPropagation();const [mm,tt]=b.dataset.psub.split('|');mod=mm;tab=tt;render();
+},true);
+function subnavAtualiza(){
+  const m=document.querySelector('main');if(!m)return;
+  let el=document.getElementById('subnav');
+  if(!el){el=document.createElement('div');el.id='subnav';m.insertBefore(el,m.firstChild)}
+  el.innerHTML=(mod==='inicio'||mod==='ph')?'':subnavHtml();
+}
 function layoutInicio(ms){
-  capaMostrar(true);
+  capaMostrar(true);subnavAtualiza();
   $('side').innerHTML=railHtml(ms);
   $('h-titulo').textContent='';
   $('tabs').innerHTML='';
