@@ -455,11 +455,9 @@ tbody tr[data-menu]{cursor:context-menu}
     <div class="nav-item" data-page="fornecedores"><span class="nav-icon">🏭</span>Fornecedores<span class="nav-badge" id="badge-fornecedores">0</span></div>
     <div class="nav-item" data-page="cadastro"><span class="nav-icon">🏷️</span>Cadastro Extra<span class="nav-badge" id="badge-cadastro">0</span></div>
     <div class="nav-item" data-page="sinapi"><span class="nav-icon">💲</span>Base SINAPI<span class="nav-badge" id="badge-sinapi">0</span></div>
-    <div class="nav-group-label">RH · Passagens <span style="text-transform:none; opacity:.7;">(todos os CDs)</span></div>
-    <div class="nav-item" data-page="pass-solic"><span class="nav-icon">🎫</span>Solicitações<span class="nav-badge" id="badge-pass-solic">0</span></div>
-    <div class="nav-item" data-page="pass-financeiro"><span class="nav-icon">💰</span>Financeiro<span class="nav-badge" id="badge-pass-financeiro">0</span></div>
-    <div class="nav-item" data-page="pass-historico"><span class="nav-icon">🗂️</span>Histórico<span class="nav-badge" id="badge-pass-historico">0</span></div>
-    <div class="nav-item" data-page="pass-conferidos"><span class="nav-icon">✅</span>Conferidos<span class="nav-badge" id="badge-pass-conferidos">0</span></div>
+    <div class="nav-group-label">RH · Passagens</div>
+    <a class="nav-item" href="Sistema_RH.html" target="_blank" rel="noopener" style="text-decoration:none;color:inherit" title="Passagens agora ficam no Sistema RH"><span class="nav-icon">✈️</span>Passagens → Sistema RH</a>
+    <span hidden><span id="badge-pass-solic">0</span><span id="badge-pass-financeiro">0</span><span id="badge-pass-historico">0</span><span id="badge-pass-conferidos">0</span></span>
     <div class="nav-group-label">RH · Alimentação <span style="text-transform:none; opacity:.7;">(todos os CDs)</span></div>
     <div class="nav-item" data-page="alim-nova"><span class="nav-icon">🍽️</span>Nova Solicitação</div>
     <div class="nav-item" data-page="alim-tickets"><span class="nav-icon">🎟️</span>Tickets Gerados<span class="nav-badge" id="badge-alim-tickets">0</span></div>
@@ -7593,9 +7591,7 @@ async function loadCdCounts(){
       if(res.error){ console.error(res.error); return; }
       (res.data||[]).forEach(r=>{ if(r.obra) counts[r.obra] = (counts[r.obra]||0) + 1; });
     });
-    (STATE.passagens||[]).filter(p=>p.status==='pendente').forEach(p=>{
-      if(p.cd) counts[p.cd] = (counts[p.cd]||0) + 1;
-    });
+    /* Passagens agora são tratadas no Sistema RH: não entram mais na contagem dos CDs deste sistema. */
     STATE.cdCounts = counts;
     renderObraSwitchOptions();
   }catch(e){ console.error(e); }
@@ -7618,7 +7614,7 @@ function wireMenuMobile(){
 }
 
 function wireNav(){
-  document.querySelectorAll('.nav-item').forEach(item=>{
+  document.querySelectorAll('.nav-item[data-page]').forEach(item=>{
     item.addEventListener('click', ()=>{
       document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
       item.classList.add('active');
