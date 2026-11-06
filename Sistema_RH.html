@@ -154,7 +154,7 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
 <header>
   <img id="h-logo" alt="Brasil Pontes" style="height:34px;display:block">
   <div><h1 id="h-titulo">ERP Brasil Pontes</h1><div class="sub" id="h-sub">Brasil Pontes Engenharia</div></div>
-  <div class="perfil"><div id="usr"></div><button class="hbtn" id="btn-sair">Sair</button></div>
+  <div class="perfil"><button class="hbtn" id="btn-sino" title="Avisos">🔔<span id="sino-n" style="display:none"></span></button><div id="usr"></div><button class="hbtn" id="btn-sair">Sair</button></div>
 </header>
 <nav id="side"></nav>
 <div class="aviso" id="aviso"></div>
@@ -1353,6 +1353,7 @@ async function entrarSessao(session){
   auditar({acao:'Entrou no sistema'});
   render();
   ligarTempoReal();
+  sinoIniciar();
 }
 async function tentarLogin(){
   const em=$('lg-email').value.trim(),sn=$('lg-senha').value,err=$('login-erro');
@@ -1375,6 +1376,7 @@ async function sair(){
   clearTimeout(syncTimer);
   try{await sync()}catch(_){}
   try{if(chan)sb.removeChannel(chan)}catch(_){}
+  try{sinoParar()}catch(_){}
   try{await sb.auth.signOut()}catch(_){}
   location.reload();
 }
@@ -2502,6 +2504,92 @@ document.addEventListener('change',ev=>{
   if(t.dataset&&t.dataset.passSel!==undefined){const id=Number(t.dataset.passSel);if(t.checked)PASS.sel.add(id);else PASS.sel.delete(id);const s=$('pass-selinfo');if(s)s.textContent=PASS.sel.size+' selecionada(s)';return}
   if(t.dataset&&t.dataset.passSelall!==undefined){passLinhas('pconf').forEach(r=>{if(t.checked)PASS.sel.add(r.id);else PASS.sel.delete(r.id)});passAtualiza()}
 });
+
+/* ---------- Sino de avisos (dentro do sistema) ----------
+   Os avisos nascem no banco (gatilhos em passagens + lembrete diário) e chegam por perfil.
+   Cada usuário só vê avisos dos módulos a que tem acesso; "lida" é individual. */
+const SINO={lista:[],lidas:new Set(),ch:null,poll:null,primeira:true};
+function sinoEstilo(){
+  if(document.getElementById('sino-css'))return;
+  const s=document.createElement('style');s.id='sino-css';
+  s.textContent='#btn-sino{position:relative;font-size:16px;padding:4px 10px}#sino-n{position:absolute;top:-6px;right:-6px;background:#c2571a;color:#fff;border-radius:10px;font-size:10px;font-weight:700;min-width:17px;height:17px;line-height:17px;text-align:center;padding:0 3px}'
+  +'#sino-box{position:fixed;top:56px;right:16px;width:360px;max-width:calc(100vw - 24px);max-height:70vh;overflow:auto;background:#fff;color:#1c2b3f;border:1px solid #cfd8e3;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:60;display:none}'
+  +'#sino-box.on{display:block}#sino-box .sh{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #e3e8ef;font-weight:700;position:sticky;top:0;background:#fff}'
+  +'#sino-box .si{padding:10px 12px;border-bottom:1px solid #eef1f5;cursor:pointer;font-size:13px}#sino-box .si:hover{background:#f3f7fc}#sino-box .si.nova{background:#eef5ff;border-left:3px solid #2f6fb8}'
+  +'#sino-box .si b{display:block}#sino-box .si span{color:#52657e;font-size:12px}#sino-box .vz{padding:22px;text-align:center;color:#52657e;font-size:13px}'
+  +'#sino-box button.lk{background:none;border:0;color:#2f6fb8;cursor:pointer;font-size:12px}';
+  document.head.appendChild(s);
+}
+const sinoVisiveis=()=>{
+  let ok;try{ok=new Set(modsOk().map(m=>m.id))}catch(e){ok=null}
+  return SINO.lista.filter(n=>!ok||!n.modulo||ok.has(n.modulo));
+};
+const sinoNaoLidas=()=>sinoVisiveis().filter(n=>!SINO.lidas.has(n.id));
+function sinoQuando(t){const d=new Date(t),m=Math.round((Date.now()-d)/60000);if(m<1)return'agora';if(m<60)return m+' min';if(m<1440)return Math.round(m/60)+' h';return d.toLocaleDateString('pt-BR')}
+function sinoRender(){
+  const b=document.getElementById('sino-n');if(!b)return;
+  const n=sinoNaoLidas().length;b.textContent=n>99?'99+':n;b.style.display=n?'block':'none';
+  const box=document.getElementById('sino-box');if(!box)return;
+  const v=sinoVisiveis();
+  box.innerHTML='<div class="sh"><span>🔔 Avisos</span>'+(n?'<button class="lk" data-sino="todas">Marcar todas como lidas</button>':'')+'</div>'
+   +(v.length?v.map(x=>`<div class="si ${SINO.lidas.has(x.id)?'':'nova'}" data-sino="abrir:${x.id}"><b>${esc(x.titulo)}</b>${x.texto?`<div>${esc(x.texto)}</div>`:''}<span>${sinoQuando(x.created_at)}</span></div>`).join(''):'<div class="vz">Nenhum aviso por enquanto.</div>');
+}
+async function sinoCarregar(){
+  if(!usuario)return;
+  try{
+    const [a,b]=await Promise.all([
+      sb.from('notificacoes').select('*').order('created_at',{ascending:false}).limit(40),
+      sb.from('notificacoes_lidas').select('notif_id').eq('user_id',usuario.id)]);
+    const antes=new Set(SINO.lista.map(x=>x.id));
+    SINO.lista=(a&&a.data)||[];SINO.lidas=new Set(((b&&b.data)||[]).map(x=>x.notif_id));
+    if(!SINO.primeira){
+      const novas=sinoVisiveis().filter(x=>!antes.has(x.id)&&!SINO.lidas.has(x.id));
+      if(novas.length)toast('🔔 '+novas[0].titulo+(novas.length>1?' (+'+(novas.length-1)+')':''));
+    }
+    SINO.primeira=false;
+  }catch(e){console.warn('sino',e)}
+  sinoRender();
+}
+async function sinoMarcar(ids){
+  if(!ids.length)return;
+  ids.forEach(i=>SINO.lidas.add(i));sinoRender();
+  try{await sb.from('notificacoes_lidas').upsert(ids.map(i=>({notif_id:i,user_id:usuario.id})),{onConflict:'notif_id,user_id'})}catch(e){console.warn('sino',e)}
+}
+function sinoIniciar(){
+  try{
+    sinoEstilo();
+    if(!document.getElementById('sino-box')){const d=document.createElement('div');d.id='sino-box';document.body.appendChild(d);
+      document.addEventListener('click',e=>{
+        const box=document.getElementById('sino-box');if(!box)return;
+        const bt=e.target.closest&&e.target.closest('#btn-sino');
+        if(bt){box.classList.toggle('on');return}
+        const it=e.target.closest&&e.target.closest('[data-sino]');
+        if(it){
+          const k=it.dataset.sino;
+          if(k==='todas'){sinoMarcar(sinoNaoLidas().map(x=>x.id));return}
+          if(k.startsWith('abrir:')){
+            const id=Number(k.slice(6)),n=SINO.lista.find(x=>x.id===id);
+            if(n){sinoMarcar([id]);
+              const m=modsOk().find(x=>x.id===n.modulo);
+              if(m&&abasOk(m).some(a=>a[0]===n.aba)){mod=m.id;tab=n.aba;box.classList.remove('on');render()}
+              else if(m){mod=m.id;box.classList.remove('on');render()}}
+          }
+          return;
+        }
+        if(!box.contains(e.target))box.classList.remove('on');
+      });
+    }
+    sinoCarregar();
+    if(SINO.ch){try{sb.removeChannel(SINO.ch)}catch(e){}}
+    SINO.ch=sb.channel('sino').on('postgres_changes',{event:'INSERT',schema:'public',table:'notificacoes'},()=>sinoCarregar()).subscribe();
+    clearInterval(SINO.poll);SINO.poll=setInterval(sinoCarregar,90000);
+  }catch(e){console.warn('sino',e)}
+}
+function sinoParar(){
+  clearInterval(SINO.poll);SINO.lista=[];SINO.lidas=new Set();SINO.primeira=true;
+  try{if(SINO.ch)sb.removeChannel(SINO.ch)}catch(e){}SINO.ch=null;
+  const b=document.getElementById('sino-box');if(b)b.classList.remove('on');
+}
 
 const diffDias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
 const mesesTxt=n=>{const m=Math.floor(n/30.4375);return m>=1?` (~${m} ${m===1?'mês':'meses'})`:''};
