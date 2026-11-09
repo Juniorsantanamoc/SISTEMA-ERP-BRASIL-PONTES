@@ -224,7 +224,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const DIVISOR=220;
 
 /* ---------- perfis e permissões (por seção) ---------- */
-const PERFIS={rh:'RH',grh:'Gestor do RH',fin:'Financeiro',sst:'Saúde e Segurança',cmp:'Compras',pmo:'PMO',dir:'Diretoria / consulta'};
+const PERFIS={rh:'RH',grh:'Gestor do RH',fin:'Financeiro',sst:'Saúde e Segurança',cmp:'Compras',pmo:'PMO',plan:'Planejamento',dir:'Diretoria / consulta'};
 const EMPRESAS=['Brasil Pontes','G&L'];
 const FUNCOES=['Administrador','Ajudante','Almoxarife','Eletricista','Encarregado','Engenheiro','Motorista','Operador de Máquinas','Pedreiro','Soldador','Técnico de Segurança','Topógrafo','Outra'];
 const CDS=['CD 48 DOM PEDRO','CD 51 PEDRO LEOPOLDO','CD 53 ITABIRITO','CD 54 RIBEIRÃO PRETO','CD 55 CORINTO','CD 56 RIO RELÓGIO - SERRA/ES','CD GALPÃO MONTES CLAROS','CD ESCRITORIO MONTES CLAROS','CD ESCRITORIO BH'];
@@ -412,7 +412,7 @@ function colunas(){
    sst:[['ASO',e=>{const s=asoStatus(e);return`<span class="badge ${s[1]}">${s[0]}</span>`}],['Documentos',e=>{const v=e.docs.filter(d=>{const x=diasAte(d.val);return x!==null&&x<=30}).length;return e.docs.length+' anexo(s)'+(v?` <span class="badge w">${v} a vencer</span>`:'')}],['CNH',e=>{const s=cnhStatus(e);return`<span class="badge ${s[1]}">${s[0]}</span>`}],['Bota / Camisa',e=>esc(e.bota)+' / '+esc(e.camisa)]],
    pmo:[['Cidade de origem',e=>esc(e.cidade)+'/'+esc(e.uf)+(e.transpExcl==='Sim'?' <span class="badge w">transp. exclusivo</span>':'')],['Baixada prevista',e=>{const p=prevBaixada(e);const d=diasAte(p);return p?fmtD(p)+` <span class="badge ${d<=7?'r':d<=21?'w':'g'}">${d<0?'atrasada':d+' d'}</span>`:'—'}],['Férias',e=>e.feriasIni?fmtD(e.feriasIni):'—']]
   };
-  ext.grh=ext.rh;ext.dir=[];ext.cmp=ext.pmo;
+  ext.grh=ext.rh;ext.dir=[];ext.plan=[];ext.cmp=ext.pmo;
   return base.concat(ext[perfil]);
 }
 function renderTabela(){
@@ -549,14 +549,14 @@ const MODS=[
  {id:'sst',nome:'Saúde e Segurança',ico:'🦺',abas:[['painel','Alertas',['sst','grh']],['colab','Colaboradores · ASO e documentos',['sst']],['trein','Treinamentos',['sst','grh']],['mob','Mobilização · treinamentos e EPI',['sst']],['pgr','PGR / EPIs',['sst','rh','grh']]]},
  {id:'compras',nome:'Compras',ico:'🛒',abas:[['painel','Alertas',['cmp','grh']],['colab','Colaboradores · baixada e férias',['cmp']],['mob','Mobilização · passagens e chegada',['cmp']],['passagens','Passagens',['cmp','grh','dir']],['alim','Alimentação',['cmp','grh','dir']],['pgr','EPIs a comprar',['cmp','grh','dir']]]},
  {id:'wpp',nome:'WhatsApp',ico:'💬',abas:[['atend','Atendimento',['rh','grh']],['aval','Avaliações',['rh','grh']],['wpp','Número e simulador',['rh','grh']]]},
- {id:'pmo',nome:'PMO',ico:'🏗',abas:[['painel','Alertas',['pmo','grh']],['mob','Mobilização',['pmo','grh']],['colab','Colaboradores · baixada e férias',['pmo']]]},
- {id:'contratos',nome:'Contratos',ico:'📑',abas:[['contratos','Contratos',['pmo','grh','dir','rh']]]},
+ {id:'pmo',nome:'PMO',ico:'🏗',abas:[['painel','Alertas',['pmo','plan','grh']],['mob','Mobilização',['pmo','plan','grh']],['colab','Colaboradores · baixada e férias',['pmo']]]},
+ {id:'contratos',nome:'Contratos',ico:'📑',abas:[['contratos','Contratos',['pmo','plan','grh','dir','rh']]]},
  {id:'pass',nome:'Passagens',ico:'✈️',abas:[['psol','Solicitações',['rh','grh','cmp']],['pfin','Financeiro',['fin','grh','cmp']],['phist','Histórico',['rh','grh','cmp','fin']],['pconf','Conferir',['grh','cmp']]]},
  {id:'admin',nome:'Administração',ico:'⚙️',abas:[['usuarios','Usuários e acessos',['grh']],['audit','Auditoria',['grh','rh']],['acessos','Matriz de perfis',['grh']]]}
 ];
 const ABAS=[...new Set(MODS.flatMap(m=>m.abas.map(a=>a[0])))].map(x=>[x]);
 let mod='rh';
-const MODROLES={wpp:['rh'],rh:['rh','grh','dir'],fin:['fin'],sst:['sst'],compras:['cmp'],pmo:['pmo'],contratos:['pmo','dir'],pass:['rh','grh','cmp','fin']};
+const MODROLES={wpp:['rh'],rh:['rh','grh','dir'],fin:['fin'],sst:['sst'],compras:['cmp'],pmo:['pmo','plan'],contratos:['pmo','plan','dir'],pass:['rh','grh','cmp','fin']};
 const MODNOME_={wpp:'WhatsApp',rh:'RH',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',contratos:'Contratos',pass:'Passagens',admin:'Administração'};
 const alertasMod=()=>gerarAlertas().filter(a=>roleOk(a.roles)&&a.roles.some(r=>(MODROLES[mod]||[]).includes(r)));
 const modLiberado=m=>m.id!=='admin'||!!(usuario&&usuario.mestre);
@@ -934,7 +934,7 @@ function alertasGlobais(A){
   const nv=d=>d<=2?'r':'w';
   PROJ.forEach(P=>{const r=resumoProj(P),dRh=diasAte(r.rhFim),dT=diasAte(r.fimTotal);
     if(dRh<=5&&(r.hired<P.prev||r.docs<r.hired))A.push({k:'mrh'+P.id,e:GLOB,nivel:nv(dRh),roles:['dir','sst','rh','pmo'],tipo:'🧱 Mobilização · etapa do RH',goto:'mob',cta:'Ciente',txt:`${P.nome} · contratados ${r.hired}/${P.prev} · docs+ASO prontos ${r.docs}/${r.hired} · prazo do RH ${fmtD(r.rhFim)} (${dRh>=0?'faltam '+dRh+' dias':'atrasado '+(-dRh)+' dias'})`});
-    if(dT<=10&&r.cheg<P.prev)A.push({k:'mtot'+P.id,e:GLOB,nivel:dT<=3?'r':'w',roles:['dir','pmo','rh'],tipo:'🧱 Mobilização · prazo total',goto:'mob',cta:'Ciente',txt:`${P.nome} · ${r.cheg}/${P.prev} na obra · mobilização termina em ${fmtD(r.fimTotal)} (${dT>=0?'faltam '+dT+' dias':'atrasado'})`});
+    if(dT<=10&&r.cheg<P.prev)A.push({k:'mtot'+P.id,e:GLOB,nivel:dT<=3?'r':'w',roles:['dir','pmo','plan','rh'],tipo:'🧱 Mobilização · prazo total',goto:'mob',cta:'Ciente',txt:`${P.nome} · ${r.cheg}/${P.prev} na obra · mobilização termina em ${fmtD(r.fimTotal)} (${dT>=0?'faltam '+dT+' dias':'atrasado'})`});
     P.pessoas.forEach((p,i)=>{
       if(p.tipo==='Existente'){const d=diasAte(p.prazo);if(d<=5&&(!p.etapas.docs||!p.etapas.trein))A.push({k:'mex'+P.id+i,e:GLOB,nivel:nv(d),roles:['sst','rh'],tipo:'🧱 Mobilização · colaborador existente',goto:'mob',cta:'Ciente',txt:`${p.nome} · prazo ${fmtD(p.prazo)} (${d>=0?'faltam '+d+' dias':'atrasado'}) · pendente: ${['docs','trein'].filter(k=>!p.etapas[k]).map(k=>ETAPAS[k][0]).join(', ')}`})}
       if(!p.etapas.pass&&!travada(p,'pass'))A.push({k:'mpa'+P.id+i,e:GLOB,nivel:'w',roles:['cmp'],tipo:'🚌 Comprar passagem · mobilização',goto:'mob',cta:null,txt:`${p.nome} (${p.funcao}) liberado: RH e Saúde e Segurança concluídos · destino ${P.obra}`});
@@ -1151,10 +1151,10 @@ async function exportarAudit(){
    ===================================================================== */
 const SB_URL='https://nlitnenswxdpwtlhdpwd.supabase.co',SB_KEY='sb_publishable_1648rfGAwh29GpHK5sagFQ_Sxi0PAv2';
 const sb=window.supabase?window.supabase.createClient(SB_URL,SB_KEY):null;
-const TODOS=['rh','grh','fin','sst','cmp','pmo','dir'];
+const TODOS=['rh','grh','fin','sst','cmp','pmo','dir','plan'];
 /* A ficha do colaborador é gravada em 3 faixas, cada uma com a sua regra de acesso no banco */
 const TIERS={
- func:{tab:'rh_funcionarios',ler:TODOS,ins:['rh','grh'],upd:['rh','grh','fin','sst','cmp','pmo']},
+ func:{tab:'rh_funcionarios',ler:TODOS,ins:['rh','grh'],upd:['rh','grh','fin','sst','cmp','pmo','plan']},
  pess:{tab:'rh_func_pessoal',ler:['rh','grh','sst','pmo','cmp'],ins:['rh','grh','sst'],upd:['rh','grh','sst']},
  rem:{tab:'rh_remuneracao',ler:['rh','grh','fin'],ins:['rh','grh','fin'],upd:['rh','grh','fin']}};
 const PESS_KEYS=['cpf','rg','nasc','estCivil','tel','emergNome','emergTel','logradouro','bairro','cidade','uf','cep','transpExcl','obsEnd','sangue','alergias'];
@@ -1194,7 +1194,7 @@ const cfgApply={
  aval:d=>{AVAL.ativo=d.ativo!==false;AVAL.limite=Number(d.limite)||3;AVAL.email=String(d.email||'')},
  secoes:d=>{SECOES.forEach(s=>{if(d.ver&&d.ver[s.id])s.ver=d.ver[s.id].slice();if(d.edit&&d.edit[s.id])s.edit=d.edit[s.id].slice();if(!s.ver.includes('grh'))s.ver.push('grh');if(s.edit.length&&!s.edit.includes('grh'))s.edit.push('grh')})}
 };
-const CFG_ESCREVE=k=>k==='glob'?TODOS:(k==='secoes'||k==='wpp'||k==='aval')?['grh']:['rh','grh','fin','sst','cmp','pmo'];
+const CFG_ESCREVE=k=>k==='glob'?TODOS:(k==='secoes'||k==='wpp'||k==='aval')?['grh']:['rh','grh','fin','sst','cmp','pmo','plan'];
 
 /* ---------- gravação (compara com o que veio do banco e envia só o que mudou) ---------- */
 let syncTimer=null,syncBusy=false,syncAgain=false,syncPromise=null;
@@ -1225,9 +1225,9 @@ async function syncUma(){
     }})});
   PROJ.forEach(P=>{
     const cur=canon(P),base=SNAP.proj.get(P.id);
-    if(base===undefined){if(['grh','pmo'].includes(perfil))reg('rh_contratos','ins',{id:P.id,dados:P},()=>SNAP.proj.set(P.id,cur))}
+    if(base===undefined){if(['grh','pmo','plan'].includes(perfil))reg('rh_contratos','ins',{id:P.id,dados:P},()=>SNAP.proj.set(P.id,cur))}
     else if(cur!==base){
-      if(!['rh','grh','sst','cmp','pmo'].includes(perfil)){falhas.push({message:'sem permissão'});return}
+      if(!['rh','grh','sst','cmp','pmo','plan'].includes(perfil)){falhas.push({message:'sem permissão'});return}
       reg('rh_contratos','upd',{id:P.id,dados:P},()=>SNAP.proj.set(P.id,cur))}});
   ENVIOS.forEach(x=>{
     const s=envSer(x),cur=canon(s),base=SNAP.env.get(x._id);
@@ -1450,7 +1450,7 @@ async function excluirColab(id){
 }
 
 /* ---------- aba Contratos ---------- */
-const podeContratos=()=>perfil==='pmo'||perfil==='grh';
+const podeContratos=()=>perfil==='pmo'||perfil==='plan'||perfil==='grh';
 function renderContratos(){
   const el=$('v-contratos');if(!el)return;
   const ed=podeContratos();
@@ -1495,7 +1495,7 @@ async function excluirContrato(id){
 
 /* ---------- Administração · Usuários e acessos (por e-mail, só Mestre) ---------- */
 const USR={lista:null,carregando:false,q:''};
-const RH_PERFIS_OPC=[['grh','Gestor do RH'],['rh','RH'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['dir','Diretoria'],['nenhum','Bloquear acesso ao RH']];
+const RH_PERFIS_OPC=[['grh','Gestor do RH'],['rh','RH'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['plan','Planejamento'],['dir','Diretoria'],['nenhum','Bloquear acesso ao RH']];
 async function carregarUsuarios(){
   USR.carregando=true;
   const r=await sb.rpc('rh_listar_usuarios');
@@ -2977,8 +2977,8 @@ function enviarEPI(P,p){
 
 function alertasExtras(A){
   PROJ.forEach(P=>{if(!P.cronOficial){
-    if(P.kickoff){const k=diasAte(P.kickoff);if(k<=7)A.push({k:'kick'+P.id+P.kickoff,e:GLOB,nivel:k<0?'r':'w',roles:['pmo','dir'],tipo:'🎯 Cronograma oficial pendente',goto:'contratos',cta:null,txt:`${P.nome}: kickoff ${k>=0?'em '+k+' dias':'foi há '+(-k)+' dias'} (${fmtD(P.kickoff)}). Anexe o cronograma oficial: o prazo oficial é menor e substitui a vigência do contrato (${fmtD(P.vigIni)} a ${fmtD(P.vigFim)}).`})}
-    else A.push({k:'kick0'+P.id,e:GLOB,nivel:'i',roles:['pmo'],tipo:'🎯 Defina o kickoff',goto:'contratos',cta:null,txt:`${P.nome}: sem data de kickoff. Informe para acompanhar o cronograma oficial.`})}});
+    if(P.kickoff){const k=diasAte(P.kickoff);if(k<=7)A.push({k:'kick'+P.id+P.kickoff,e:GLOB,nivel:k<0?'r':'w',roles:['pmo','plan','dir'],tipo:'🎯 Cronograma oficial pendente',goto:'contratos',cta:null,txt:`${P.nome}: kickoff ${k>=0?'em '+k+' dias':'foi há '+(-k)+' dias'} (${fmtD(P.kickoff)}). Anexe o cronograma oficial: o prazo oficial é menor e substitui a vigência do contrato (${fmtD(P.vigIni)} a ${fmtD(P.vigFim)}).`})}
+    else A.push({k:'kick0'+P.id,e:GLOB,nivel:'i',roles:['pmo','plan'],tipo:'🎯 Defina o kickoff',goto:'contratos',cta:null,txt:`${P.nome}: sem data de kickoff. Informe para acompanhar o cronograma oficial.`})}});
   ENVIOS.forEach((x,i)=>{if(diasAte(fmtISO(x.t))<-3)return;const txt=`${x.pessoa} (${x.funcao}) · ${x.contrato} · EPIs do PGR: ${x.itens.join(', ')}`;
     A.push({k:'epis'+i+x.pessoa,e:GLOB,nivel:'w',roles:['sst'],tipo:'🦺 Lista de EPI (PGR) · Saúde e Segurança',goto:'pgr',cta:'Ciente',txt});
     A.push({k:'epic'+i+x.pessoa,e:GLOB,nivel:'i',roles:['cmp'],tipo:'🛒 Lista de EPI enviada ao Compras',goto:'pgr',cta:'Ciente',txt})});
@@ -3021,7 +3021,7 @@ function renderPassagens(){
 
 
 /* ---------- Comunicação entre módulos ---------- */
-const MODPERFIL={rh:'rh',grh:'rh',fin:'fin',sst:'sst',cmp:'compras',pmo:'pmo',dir:'dir'};
+const MODPERFIL={rh:'rh',grh:'rh',fin:'fin',sst:'sst',cmp:'compras',pmo:'pmo',plan:'pmo',dir:'dir'};
 const MODNOME={rh:'RH',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',dir:'Diretoria'};
 function renderFeed(){
   if(!$('feed'))return;
