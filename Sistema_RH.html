@@ -2798,7 +2798,8 @@ function abaInicial(id){
 /* ---------- Recuperar senha (esqueci minha senha) ----------
    1) "Esqueci minha senha" na tela de login → pede o e-mail → função recuperar-senha envia o link (Resend).
    2) Ao abrir o link, a página chega com #type=recovery: mostra "Criar nova senha" em vez de entrar no sistema. */
-window.__recuperacao=/[#&]type=recovery/.test(location.hash);
+window.__recToken=(new URLSearchParams(location.search).get('type')==='recovery')?new URLSearchParams(location.search).get('token_hash'):null;
+window.__recuperacao=/[#&]type=recovery/.test(location.hash)||!!window.__recToken;
 window.__linkInvalido=/error_code=otp_expired|error=access_denied/.test(location.hash);
 function senhaMsg(t,ok){const e=$('login-erro');if(!e)return;e.textContent=t||'';e.style.color=ok?'#1f6b3f':''}
 function senhaMostrar(qual){
@@ -2860,6 +2861,15 @@ async function senhaSalvar(){
 function senhaModoRecuperacao(){
   senhaIniciarTela();
   if(window.__linkInvalido){history.replaceState(null,'',location.pathname+location.search);senhaMostrar('form-login');senhaMsg('O link expirou ou já foi usado. Clique em "Esqueci minha senha" para receber outro.');return true}
+  if(window.__recToken){
+    const th=window.__recToken;window.__recToken=null;
+    history.replaceState(null,'',location.pathname);
+    senhaMostrar('form-novasenha');
+    Promise.resolve().then(()=>sb.auth.verifyOtp({token_hash:th,type:'recovery'})).then(v=>{
+      if(v&&v.error){window.__recuperacao=false;senhaMostrar('form-login');senhaMsg('O link expirou ou já foi usado. Clique em "Esqueci minha senha" para receber outro.')}
+    }).catch(()=>{senhaMostrar('form-login');senhaMsg('Não consegui validar o link. Peça um novo em "Esqueci minha senha".')});
+    return true;
+  }
   if(window.__recuperacao){senhaMostrar('form-novasenha');return true}
   return false;
 }

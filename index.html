@@ -2098,7 +2098,8 @@ function aplicarPermissoesNav(){
 
 /* ============== auth ============== */
 /* ---- Recuperar senha: "Esqueci minha senha" envia o link por e-mail; o link volta aqui com #type=recovery ---- */
-const RECUPERACAO = /[#&]type=recovery/.test(location.hash);
+const RECUP_TOKEN = (new URLSearchParams(location.search).get('type')==='recovery') ? new URLSearchParams(location.search).get('token_hash') : null;
+const RECUPERACAO = /[#&]type=recovery/.test(location.hash) || !!RECUP_TOKEN;
 const LINK_INVALIDO = /error_code=otp_expired|error=access_denied/.test(location.hash);
 function senhaMsg(t, ok){
   const b = document.getElementById('login-error');
@@ -2150,6 +2151,14 @@ async function initAuthGate(){
     document.getElementById('loading-screen').classList.add('hidden');
     document.getElementById('login-wrap').classList.remove('hidden');
     if(LINK_INVALIDO){ history.replaceState(null, '', location.pathname + location.search); senhaForm('form-login'); senhaMsg('O link expirou ou já foi usado. Clique em "Esqueci minha senha" para receber outro.'); }
+    else if(RECUP_TOKEN){
+      senhaForm('form-novasenha');
+      history.replaceState(null, '', location.pathname);
+      try{
+        const v = await sb.auth.verifyOtp({ token_hash: RECUP_TOKEN, type: 'recovery' });
+        if(v.error){ senhaForm('form-login'); senhaMsg('O link expirou ou já foi usado. Clique em "Esqueci minha senha" para receber outro.'); }
+      }catch(err){ senhaForm('form-login'); senhaMsg('Não consegui validar o link. Peça um novo em "Esqueci minha senha".'); }
+    }
     else senhaForm('form-novasenha');
     return;
   }
