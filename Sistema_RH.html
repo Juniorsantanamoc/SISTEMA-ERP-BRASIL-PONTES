@@ -1386,6 +1386,7 @@ async function sair(){
   location.reload();
 }
 async function iniciar(){
+  if(typeof senhaModoRecuperacao==='function'&&senhaModoRecuperacao())return;
   if(!sb){$('login-erro').textContent='Não foi possível carregar o sistema (sem internet?). Recarregue a página.';return}
   CDS_BASE=CDS.slice();
   Object.keys(cfgObj).forEach(k=>{CFG_BASE[k]=canon(cfgObj[k]())});
@@ -2793,6 +2794,76 @@ function abaInicial(id){
   if(id==='inicio')return 'painel';
   const M=MODS.find(m=>m.id===id);return M?abasOk(M)[0][0]:'painel';
 }
+
+/* ---------- Recuperar senha (esqueci minha senha) ----------
+   1) "Esqueci minha senha" na tela de login → pede o e-mail → função recuperar-senha envia o link (Resend).
+   2) Ao abrir o link, a página chega com #type=recovery: mostra "Criar nova senha" em vez de entrar no sistema. */
+window.__recuperacao=/[#&]type=recovery/.test(location.hash);
+window.__linkInvalido=/error_code=otp_expired|error=access_denied/.test(location.hash);
+function senhaMsg(t,ok){const e=$('login-erro');if(!e)return;e.textContent=t||'';e.style.color=ok?'#1f6b3f':''}
+function senhaMostrar(qual){
+  ['form-login','form-solicitar','form-recuperar','form-novasenha'].forEach(id=>{const el=$(id);if(el)el.style.display=(id===qual)?'':'none'});
+  const l=$('lnk-solicitar');if(l)l.style.display=(qual==='form-login'||qual==='form-solicitar')?'':'none';
+}
+function senhaIniciarTela(){
+  const fl=$('form-login');if(!fl||$('form-recuperar'))return;
+  const esq=document.createElement('div');esq.style.marginTop='10px';
+  esq.innerHTML='<a href="#" id="lnk-esqueci" style="color:var(--blue);font-size:13px">Esqueci minha senha</a>';
+  fl.appendChild(esq);
+  const fr=document.createElement('div');fr.id='form-recuperar';fr.style.display='none';
+  fr.innerHTML='<div class="ro" style="margin-top:6px">Informe o e-mail do seu cadastro. Vamos enviar um link para você criar uma nova senha.</div>'
+   +'<label for="rc-email">E-mail</label><input id="rc-email" type="email" autocomplete="username">'
+   +'<button class="btn" id="rc-ok" type="button" style="width:100%;padding:10px;margin-top:10px">Enviar link para criar nova senha</button>'
+   +'<div style="margin-top:10px"><a href="#" id="rc-voltar" style="color:var(--blue);font-size:13px">← Voltar para entrar</a></div>';
+  const fn=document.createElement('div');fn.id='form-novasenha';fn.style.display='none';
+  fn.innerHTML='<div class="ro" style="margin-top:6px">Escolha a sua nova senha (mínimo 8 caracteres).</div>'
+   +'<label for="ns-1">Nova senha</label><input id="ns-1" type="password" autocomplete="new-password">'
+   +'<label for="ns-2">Repita a nova senha</label><input id="ns-2" type="password" autocomplete="new-password">'
+   +'<button class="btn" id="ns-ok" type="button" style="width:100%;padding:10px;margin-top:10px">Salvar nova senha</button>';
+  fl.parentNode.insertBefore(fr,fl.nextSibling);fl.parentNode.insertBefore(fn,fr.nextSibling);
+  $('lnk-esqueci').addEventListener('click',e=>{e.preventDefault();$('rc-email').value=$('lg-email').value.trim();senhaMsg('');senhaMostrar('form-recuperar')});
+  $('rc-voltar').addEventListener('click',e=>{e.preventDefault();senhaMsg('');senhaMostrar('form-login')});
+  $('rc-email').addEventListener('keydown',e=>{if(e.key==='Enter')senhaPedir()});
+  $('rc-ok').addEventListener('click',senhaPedir);
+  $('ns-ok').addEventListener('click',senhaSalvar);
+  $('ns-2').addEventListener('keydown',e=>{if(e.key==='Enter')senhaSalvar()});
+}
+async function senhaPedir(){
+  const em=$('rc-email').value.trim();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){senhaMsg('Informe um e-mail válido.');return}
+  const b=$('rc-ok');b.disabled=true;b.textContent='Enviando…';senhaMsg('');
+  try{
+    const r=await sb.functions.invoke('recuperar-senha',{body:{email:em,redirect:location.origin+location.pathname}});
+    const d=r&&r.data;
+    if(r&&r.error&&!(d&&d.aviso))senhaMsg((d&&d.error)||'Não consegui enviar agora. Tente de novo em alguns minutos.');
+    else if(d&&d.ok===false)senhaMsg(d.error||'Não consegui enviar agora.');
+    else senhaMsg((d&&d.aviso)||'Se o e-mail estiver cadastrado, você receberá um link para criar uma nova senha.',true);
+  }catch(e){senhaMsg('Não consegui enviar agora. Tente de novo em alguns minutos.')}
+  b.disabled=false;b.textContent='Enviar link para criar nova senha';
+}
+async function senhaSalvar(){
+  const s1=$('ns-1').value,s2=$('ns-2').value;
+  if(s1.length<8){senhaMsg('A senha precisa ter pelo menos 8 caracteres.');return}
+  if(s1!==s2){senhaMsg('As senhas não conferem.');return}
+  const b=$('ns-ok');b.disabled=true;b.textContent='Salvando…';senhaMsg('');
+  try{
+    await sb.auth.getSession();
+    const r=await sb.auth.updateUser({password:s1});
+    if(r.error){senhaMsg(/session|expired|token/i.test(String(r.error.message))?'O link expirou ou já foi usado. Peça um novo em "Esqueci minha senha".':String(r.error.message));b.disabled=false;b.textContent='Salvar nova senha';return}
+    try{await sb.auth.signOut()}catch(_){}
+    history.replaceState(null,'',location.pathname+location.search);window.__recuperacao=false;
+    $('ns-1').value=$('ns-2').value='';senhaMostrar('form-login');
+    senhaMsg('✅ Senha alterada! Entre com o seu e-mail e a nova senha.',true);
+  }catch(e){senhaMsg('Não consegui salvar a nova senha. Peça um novo link.')}
+  b.disabled=false;b.textContent='Salvar nova senha';
+}
+function senhaModoRecuperacao(){
+  senhaIniciarTela();
+  if(window.__linkInvalido){history.replaceState(null,'',location.pathname+location.search);senhaMostrar('form-login');senhaMsg('O link expirou ou já foi usado. Clique em "Esqueci minha senha" para receber outro.');return true}
+  if(window.__recuperacao){senhaMostrar('form-novasenha');return true}
+  return false;
+}
+try{senhaIniciarTela()}catch(e){console.warn('senha',e)}
 
 const diffDias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
 const mesesTxt=n=>{const m=Math.floor(n/30.4375);return m>=1?` (~${m} ${m===1?'mês':'meses'})`:''};

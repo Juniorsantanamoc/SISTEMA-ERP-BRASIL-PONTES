@@ -405,6 +405,19 @@ tbody tr[data-menu]{cursor:context-menu}
       <div class="form-row"><label>E-mail</label><input type="email" id="login-email" required autocomplete="username"></div>
       <div class="form-row"><label>Senha</label><input type="password" id="login-senha" required autocomplete="current-password"></div>
       <button type="submit" class="btn btn-primary" id="btn-login">Entrar</button>
+      <div style="margin-top:10px;text-align:center;"><a href="#" id="lnk-esqueci" style="color:var(--blue);font-size:13px;">Esqueci minha senha</a></div>
+    </form>
+    <form id="form-recuperar" style="display:none;">
+      <div class="hint" style="margin-bottom:8px;">Informe o e-mail do seu cadastro. Vamos enviar um link para você criar uma nova senha.</div>
+      <div class="form-row"><label>E-mail</label><input type="email" id="rc-email" required autocomplete="username"></div>
+      <button type="submit" class="btn btn-primary" id="rc-ok">Enviar link para criar nova senha</button>
+      <div style="margin-top:10px;text-align:center;"><a href="#" id="rc-voltar" style="color:var(--blue);font-size:13px;">← Voltar para entrar</a></div>
+    </form>
+    <form id="form-novasenha" style="display:none;">
+      <div class="hint" style="margin-bottom:8px;">Escolha a sua nova senha (mínimo 8 caracteres).</div>
+      <div class="form-row"><label>Nova senha</label><input type="password" id="ns-1" required minlength="8" maxlength="72" autocomplete="new-password"></div>
+      <div class="form-row"><label>Repita a nova senha</label><input type="password" id="ns-2" required minlength="8" maxlength="72" autocomplete="new-password"></div>
+      <button type="submit" class="btn btn-primary" id="ns-ok">Salvar nova senha</button>
     </form>
     <form id="form-solicitar" style="display:none;">
       <div class="form-row"><label>Nome completo</label><input type="text" id="sol-nome" required minlength="3" maxlength="80" autocomplete="name"></div>
@@ -2084,7 +2097,62 @@ function aplicarPermissoesNav(){
 }
 
 /* ============== auth ============== */
+/* ---- Recuperar senha: "Esqueci minha senha" envia o link por e-mail; o link volta aqui com #type=recovery ---- */
+const RECUPERACAO = /[#&]type=recovery/.test(location.hash);
+const LINK_INVALIDO = /error_code=otp_expired|error=access_denied/.test(location.hash);
+function senhaMsg(t, ok){
+  const b = document.getElementById('login-error');
+  b.textContent = t || ''; b.classList.toggle('show', !!t);
+  b.style.color = ok ? '#1f6b3f' : ''; b.style.background = ok ? '#e4f3ea' : '';
+}
+function senhaForm(qual){
+  ['form-login','form-solicitar','form-recuperar','form-novasenha'].forEach(id=>{ document.getElementById(id).style.display = (id===qual) ? '' : 'none'; });
+  const foot = document.querySelector('.login-foot'); if(foot) foot.style.display = (qual==='form-login'||qual==='form-solicitar') ? '' : 'none';
+}
+document.getElementById('lnk-esqueci').addEventListener('click', e=>{
+  e.preventDefault(); document.getElementById('rc-email').value = document.getElementById('login-email').value.trim(); senhaMsg(''); senhaForm('form-recuperar');
+});
+document.getElementById('rc-voltar').addEventListener('click', e=>{ e.preventDefault(); senhaMsg(''); senhaForm('form-login'); });
+document.getElementById('lnk-solicitar').addEventListener('click', ()=>{ ['form-recuperar','form-novasenha'].forEach(id=>document.getElementById(id).style.display='none'); });
+document.getElementById('form-recuperar').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const em = document.getElementById('rc-email').value.trim();
+  const b = document.getElementById('rc-ok'); b.disabled = true; b.textContent = 'Enviando…'; senhaMsg('');
+  try{
+    const r = await sb.functions.invoke('recuperar-senha', { body:{ email: em, redirect: location.origin + location.pathname } });
+    const d = r && r.data;
+    if(r && r.error && !(d && d.aviso)) senhaMsg((d && d.error) || 'Não consegui enviar agora. Tente de novo em alguns minutos.');
+    else if(d && d.ok===false) senhaMsg(d.error || 'Não consegui enviar agora.');
+    else senhaMsg((d && d.aviso) || 'Se o e-mail estiver cadastrado, você receberá um link para criar uma nova senha.', true);
+  }catch(err){ senhaMsg('Não consegui enviar agora. Tente de novo em alguns minutos.'); }
+  b.disabled = false; b.textContent = 'Enviar link para criar nova senha';
+});
+document.getElementById('form-novasenha').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const s1 = document.getElementById('ns-1').value, s2 = document.getElementById('ns-2').value;
+  if(s1.length < 8){ senhaMsg('A senha precisa ter pelo menos 8 caracteres.'); return; }
+  if(s1 !== s2){ senhaMsg('As senhas não conferem.'); return; }
+  const b = document.getElementById('ns-ok'); b.disabled = true; b.textContent = 'Salvando…'; senhaMsg('');
+  try{
+    await sb.auth.getSession();
+    const r = await sb.auth.updateUser({ password: s1 });
+    if(r.error){ senhaMsg(/session|expired|token/i.test(String(r.error.message)) ? 'O link expirou ou já foi usado. Peça um novo em "Esqueci minha senha".' : String(r.error.message)); b.disabled = false; b.textContent = 'Salvar nova senha'; return; }
+    try{ await sb.auth.signOut(); }catch(_){}
+    history.replaceState(null, '', location.pathname + location.search);
+    document.getElementById('ns-1').value = ''; document.getElementById('ns-2').value = '';
+    senhaForm('form-login'); senhaMsg('✅ Senha alterada! Entre com o seu e-mail e a nova senha.', true);
+  }catch(err){ senhaMsg('Não consegui salvar a nova senha. Peça um novo link.'); }
+  b.disabled = false; b.textContent = 'Salvar nova senha';
+});
+
 async function initAuthGate(){
+  if(RECUPERACAO || LINK_INVALIDO){
+    document.getElementById('loading-screen').classList.add('hidden');
+    document.getElementById('login-wrap').classList.remove('hidden');
+    if(LINK_INVALIDO){ history.replaceState(null, '', location.pathname + location.search); senhaForm('form-login'); senhaMsg('O link expirou ou já foi usado. Clique em "Esqueci minha senha" para receber outro.'); }
+    else senhaForm('form-novasenha');
+    return;
+  }
   const { data: { session } } = await sb.auth.getSession();
   document.getElementById('loading-screen').classList.add('hidden');
   if(session){
