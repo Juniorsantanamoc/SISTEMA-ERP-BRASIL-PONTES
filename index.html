@@ -2334,7 +2334,7 @@ async function loadLookupData(){
     }
     SINAPI_ALL = sinapiRows;
 
-    const { data: cadastro, error: errCad } = await sb.from('cadastro_extra').select('*').order('descricao');
+    const { data: cadastro, error: errCad } = await carregarCadastroExtraTodos();
     if(errCad) throw errCad;
     STATE.cadastro = cadastro || [];
 
@@ -2350,10 +2350,23 @@ async function loadLookupData(){
     toast('Erro ao carregar SINAPI/Cadastro Extra: ' + e.message, true);
   }
 }
+/* Carrega o Cadastro Extra INTEIRO em páginas de 1000. O banco só devolve 1000 linhas por consulta;
+   passou disso, os itens do fim da ordem alfabética sumiam da lista e o próximo código (MAT-XXX)
+   era calculado errado, repetindo o mesmo código a cada novo item. */
+async function carregarCadastroExtraTodos(){
+  const pageSize = 1000; let todos = [];
+  for(let from=0; ; from+=pageSize){
+    const { data, error } = await sb.from('cadastro_extra').select('*').order('descricao').order('id').range(from, from+pageSize-1);
+    if(error) return { data:null, error };
+    todos = todos.concat(data||[]);
+    if(!data || data.length < pageSize) break;
+  }
+  return { data: todos, error: null };
+}
 /* Reconstrói STATE.cadastro + LOOKUP após criar/editar item no Cadastro Extra,
    sem precisar recarregar a página inteira. */
 async function refreshLookup(){
-  const { data: cadastro, error } = await sb.from('cadastro_extra').select('*').order('descricao');
+  const { data: cadastro, error } = await carregarCadastroExtraTodos();
   if(error){ toast('Erro ao atualizar cadastro: ' + error.message, true); return; }
   STATE.cadastro = cadastro || [];
   const l1 = SINAPI_ALL.map(s=>({codigo:s.codigo, descricao:s.descricao, unidade:s.unidade, preco:s.preco, fonte:'SINAPI'}));
