@@ -167,7 +167,7 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
     <div class="card" style="margin-top:16px"><h2>🔄 Atividade de outros módulos <span class="ro">· atualiza na hora, sem sair do seu módulo</span></h2><div id="feed"></div></div></section>
   <section id="v-colab" hidden>
     <div class="card"><h2>Colaboradores</h2>
-      <div class="tools"><input id="busca" placeholder="Buscar por nome, matrícula ou função..."><select id="fobra"></select><select id="fempresa"></select><button class="btn" id="btn-export">⬇ Exportar para Excel</button><button class="btn sec" id="btn-novo" hidden>➕ Novo colaborador</button><button class="btn sec" id="btn-imp-erp" hidden>⬇ Importar do cadastro do Compras</button></div>
+      <div class="tools"><input id="busca" placeholder="Buscar por nome, matrícula ou função..."><select id="fobra"></select><select id="fempresa"></select><button class="btn" id="btn-export">⬇ Exportar para Excel</button><button class="btn sec" id="btn-novo" hidden>➕ Novo colaborador</button><button class="btn sec" id="btn-imp-erp" hidden>⬇ Importar do cadastro do Compras</button><button class="btn" id="btn-imp-xls" hidden>📥 Importar planilha (IA)</button></div>
       <div style="overflow:auto"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></div></section>
   <section id="v-mob" hidden></section>
   <section id="v-pgr" hidden></section>
@@ -191,8 +191,8 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
   <section id="v-fatdash" hidden></section>
   <section id="v-acessos" hidden>
     <div class="card"><h2>Quem enxerga o quê</h2><table class="matriz" id="matriz"></table></div>
-    <div class="card" style="margin-top:16px"><h2>O que o RH envia para os outros módulos</h2>
-      <div class="ro" style="line-height:1.7">🍽 <b>Alimentação (Compras):</b> colaborador inscrito na mobilização ou que chegou na obra entra na lista sozinho.<br>🦺 <b>EPIs do PGR (Saúde e Segurança e Compras):</b> ao registrar a contratação, a lista de EPIs da função sai para os dois ao mesmo tempo.<br>🚌 <b>Passagens (Compras):</b> baixada, férias e mobilização liberada (RH e Saúde e Segurança concluídos) geram o pedido de passagem.<br>💰 <b>Financeiro:</b> folha do 5º dia útil com hora extra e bonificação aprovadas.<br>🦺 <b>Saúde e Segurança:</b> ASO, documentos, treinamentos e CNH a vencer.</div></div>
+    <div class="card" style="margin-top:16px"><h2>O que o Departamento Pessoal envia para os outros módulos</h2>
+      <div class="ro" style="line-height:1.7">🍽 <b>Alimentação (Compras):</b> colaborador inscrito na mobilização ou que chegou na obra entra na lista sozinho.<br>🦺 <b>EPIs do PGR (Saúde e Segurança e Compras):</b> ao registrar a contratação, a lista de EPIs da função sai para os dois ao mesmo tempo.<br>🚌 <b>Passagens (Compras):</b> baixada, férias e mobilização liberada (Departamento Pessoal e Saúde e Segurança concluídos) geram o pedido de passagem.<br>💰 <b>Financeiro:</b> folha do 5º dia útil com hora extra e bonificação aprovadas.<br>🦺 <b>Saúde e Segurança:</b> ASO, documentos, treinamentos e CNH a vencer.</div></div>
     <div class="card" style="margin-top:16px"><h2>Registro de exportações</h2><div id="logexp"></div></div></section>
 </main>
 <div id="login"><div class="loginbox"><div class="top"><img id="login-logo" alt="Brasil Pontes"></div><div class="corpo"><h2 style="margin:0 0 2px;font-size:18px;color:var(--navy)">Sistema do RH</h2><div class="ro">Use o mesmo e-mail e senha do sistema de Compras. Tudo o que for alterado fica registrado com nome e hora.</div>
@@ -224,7 +224,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const DIVISOR=220;
 
 /* ---------- perfis e permissões (por seção) ---------- */
-const PERFIS={rh:'RH',grh:'Gestor do RH',fin:'Financeiro',sst:'Saúde e Segurança',cmp:'Compras',pmo:'PMO',plan:'Planejamento',dir:'Diretoria / consulta'};
+const PERFIS={rh:'Departamento Pessoal',grh:'Gestor do Departamento Pessoal',fin:'Financeiro',sst:'Saúde e Segurança',cmp:'Compras',pmo:'PMO',plan:'Planejamento',dir:'Diretoria / consulta'};
 const EMPRESAS=['Brasil Pontes','G&L'];
 const FUNCOES=['Administrador','Ajudante','Almoxarife','Eletricista','Encarregado','Engenheiro','Motorista','Operador de Máquinas','Pedreiro','Soldador','Técnico de Segurança','Topógrafo','Outra'];
 const CDS=['CD 48 DOM PEDRO','CD 51 PEDRO LEOPOLDO','CD 53 ITABIRITO','CD 54 RIBEIRÃO PRETO','CD 55 CORINTO','CD 56 RIO RELÓGIO - SERRA/ES','CD GALPÃO MONTES CLAROS','CD ESCRITORIO MONTES CLAROS','CD ESCRITORIO BH'];
@@ -242,7 +242,7 @@ const SECOES=[
    ['motorista','Além da função, é motorista?','select',['Não','Sim']],['cnhNum','Nº da CNH','text'],['cnhCat','Categoria','select',['A','B','C','D','E','AB','AC','AD','AE']],['cnhVal','Vencimento da CNH','date']],calc:'cnh'},
  {id:'admissao',titulo:'Checklist de admissão',ver:['rh','sst'],edit:['rh','sst'],especial:'check'},
  {id:'pessoal',titulo:'Dados pessoais',ver:['rh','sst'],edit:['rh'],campos:[
-   ['cpf','CPF','text'],['rg','RG','text'],['nasc','Nascimento','date'],['estCivil','Estado civil','select',['Solteiro(a)','Casado(a)','União estável','Divorciado(a)','Viúvo(a)']],['tel','Telefone','text'],['dependentes','Dependentes','number'],['emergNome','Contato de emergência','text'],['emergTel','Telefone de emergência','text']]},
+   ['cpf','CPF','text'],['pis','PIS/PASEP/NIT','text'],['rg','RG','text'],['nasc','Nascimento','date'],['estCivil','Estado civil','select',['Solteiro(a)','Casado(a)','União estável','Divorciado(a)','Viúvo(a)']],['tel','Telefone','text'],['dependentes','Dependentes','number'],['emergNome','Contato de emergência','text'],['emergTel','Telefone de emergência','text']]},
  {id:'endereco',titulo:'Endereço e deslocamento',ver:['rh','pmo'],edit:['rh'],campos:[
    ['logradouro','Logradouro','text',1],['bairro','Bairro','text'],['cidade','Cidade','text'],['uf','UF','text'],['cep','CEP','text'],['transpExcl','Precisa de transporte exclusivo até cidade próxima?','select',['Não','Sim'],1],['obsEnd','Observação do endereço (ex.: pegar van até a cidade vizinha)','textarea',1]]},
  {id:'salario',titulo:'Salário',ver:['rh','fin'],edit:['rh','fin'],campos:[
@@ -267,7 +267,7 @@ const SECOES=[
  {id:'docs',titulo:'Documentos e treinamentos',ver:['rh','sst'],edit:['rh','sst'],especial:'docs'},
  {id:'mob',titulo:'Mobilização e transferência',ver:['rh','pmo'],edit:['rh','pmo'],especial:'mob'}
 ];
-/* Gestor do RH enxerga e edita tudo que o RH faz, e é o único que aprova hora extra */
+/* Gestor do Departamento Pessoal enxerga e edita tudo que o Departamento Pessoal faz, e é o único que aprova hora extra */
 SECOES.forEach(s=>{
   if(s.ver.includes('pmo'))s.ver.push('cmp');if(s.edit.includes('pmo')&&s.id==='mob')s.edit.push('cmp');
   if(!s.ver.includes('grh'))s.ver.push('grh');if(s.edit.length&&!s.edit.includes('grh'))s.edit.push('grh')});
@@ -331,8 +331,8 @@ function gerarAlertas(){
     e.faltas.forEach((f,i)=>{if(f.tipo==='Atestado médico'&&!f.anexo)A.push({k:'at'+e.id+i,e,nivel:'w',roles:['rh','sst'],tipo:'🩹 Atestado sem anexo',txt:`${e.nome} · atestado de ${fmtD(f.data)} (${f.dias} dia(s)) sem arquivo anexado`,cta:'Ciente'})});
     if(heTot(e)>0&&e.heAprov.status==='Pendente')A.push({k:'he'+e.id+e.mesRef,e,nivel:'w',roles:['grh'],tipo:'⏱ Hora extra aguardando aprovação',txt:`${e.nome} · ${e.h50||0} h a 50% + ${e.h100||0} h a 100% = ${brl(heTot(e))} (${e.mesRef})`,cta:null});
     if(bonTot(e)>0&&e.bonAprov.status==='Pendente')A.push({k:'bo'+e.id+e.bonMes+e.bonValor,e,nivel:'w',roles:['grh'],tipo:'🎁 Bonificação aguardando aprovação',txt:`${e.nome} · ${brl(bonTot(e))} (${e.bonMes})${e.bonMotivo?' · '+e.bonMotivo:''}`,cta:null});
-    if(bonTot(e)>0&&e.bonAprov.status==='Reprovada')A.push({k:'bor'+e.id+e.bonMes,e,nivel:'w',roles:['rh'],tipo:'🎁 Bonificação reprovada',txt:`${e.nome} · reprovada pelo Gestor do RH${e.bonAprov.obs?': '+e.bonAprov.obs:''}`,cta:'Ciente'});
-    if(heTot(e)>0&&e.heAprov.status==='Reprovada')A.push({k:'her'+e.id+e.mesRef,e,nivel:'w',roles:['rh'],tipo:'⏱ Hora extra reprovada',txt:`${e.nome} · reprovada pelo Gestor do RH${e.heAprov.obs?': '+e.heAprov.obs:''}. Ajuste as horas e reenvie.`,cta:'Ciente'})
+    if(bonTot(e)>0&&e.bonAprov.status==='Reprovada')A.push({k:'bor'+e.id+e.bonMes,e,nivel:'w',roles:['rh'],tipo:'🎁 Bonificação reprovada',txt:`${e.nome} · reprovada pelo Gestor do Departamento Pessoal${e.bonAprov.obs?': '+e.bonAprov.obs:''}`,cta:'Ciente'});
+    if(heTot(e)>0&&e.heAprov.status==='Reprovada')A.push({k:'her'+e.id+e.mesRef,e,nivel:'w',roles:['rh'],tipo:'⏱ Hora extra reprovada',txt:`${e.nome} · reprovada pelo Gestor do Departamento Pessoal${e.heAprov.obs?': '+e.heAprov.obs:''}. Ajuste as horas e reenvie.`,cta:'Ciente'})
     if(!e.asoConf){const d=diasAte(e.asoPrev);
       if(d!==null&&d<=30)A.push({k:'aso'+e.id+e.asoPrev,e,nivel:d<0?'r':'w',roles:['sst'],tipo:'🩺 ASO',txt:`${e.nome} · ${e.asoTipo} previsto ${fmtD(e.asoPrev)} (${d<0?'atrasado '+(-d):'em '+d} dias), sem data confirmada`,cta:'ASO confirmado'})}
     e.docs.forEach((x,i)=>{const d=diasAte(x.val);
@@ -354,12 +354,12 @@ function podeEditar(s){return s.edit.includes(perfil)}
 function render(){
   renderHeader();
   $('aviso').innerHTML=`Perfil atual: <b>${PERFIS[perfil]}</b>. ${{
-    rh:'Vê e edita tudo e lança hora extra e bonificação, mas quem aprova é o Gestor do RH.',
+    rh:'Vê e edita tudo e lança hora extra e bonificação, mas quem aprova é o Gestor do Departamento Pessoal.',
     grh:'MESTRE: acessa e edita todos os módulos. Vê e edita tudo, lança e também aprova ou reprova hora extra e bonificação, e gera a folha de pagamento.',
     fin:'Vê apenas identificação, salário, hora extra e bonificação aprovadas, dados bancários, faltas e férias, e gera a folha de pagamento.',
     sst:'Vê apenas identificação, dados pessoais, checklist de admissão, CNH, ASO, faltas/atestados, saúde, uniforme/EPI, documentos e treinamentos. Não vê salário nem endereço.',
     cmp:'Módulo Compras: vê só o necessário para comprar passagens e EPIs e controlar a lista de alimentação.',
-    pmo:'Módulo PMO: cria e edita contratos e CDs na aba Contratos, anexa o cronograma oficial e monitora a mobilização feita por RH, Saúde e Segurança e Compras.',
+    pmo:'Módulo PMO: cria e edita contratos e CDs na aba Contratos, anexa o cronograma oficial e monitora a mobilização feita por Departamento Pessoal, Saúde e Segurança e Compras.',
     dir:'Vê o painel (quadro de colaboradores) e o andamento da mobilização dos contratos. Não acessa dados pessoais nem salários.'}[perfil]}`;
   if(CHAT.abrir)renderChat();
   renderTabs();renderKpis();renderDash();renderAlertas();renderTabela();renderMob();renderContratos();renderFolha();renderPgr();renderImp();renderWpp();renderTrein();renderFeed();renderAlim();renderPassagens();renderAudit();renderAcessosExtra();renderUsuarios();renderFat();renderFatDash();renderAtend(true);renderAval();renderPass();
@@ -386,7 +386,7 @@ function renderKpis(){
     }
   }else if(mod==='fin'){
     const apr=EMP.filter(e=>e.heAprov.status==='Aprovada').reduce((s,e)=>s+heTot(e),0);
-    k.push(['HE aprovada (liberada p/ pagamento)',brl(apr),''],['HE aguardando aprovação do Gestor RH',EMP.filter(e=>heTot(e)>0&&e.heAprov.status!=='Aprovada').length,'w'],
+    k.push(['HE aprovada (liberada p/ pagamento)',brl(apr),''],['HE aguardando aprovação do Gestor do Departamento Pessoal',EMP.filter(e=>heTot(e)>0&&e.heAprov.status!=='Aprovada').length,'w'],
       ['Bonificação aprovada (a pagar)',brl(EMP.filter(e=>e.bonAprov.status==='Aprovada').reduce((s,e)=>s+bonTot(e),0)),''],
       ['Bonificação aguardando aprovação',EMP.filter(e=>bonTot(e)>0&&e.bonAprov.status!=='Aprovada').length,'w'],
       ['Previsão de 13º em dezembro (todos)',brl(EMP.reduce((s,e)=>s+prev13(e),0)),''],['Férias a pagar (35 dias)',n(/Pagamento/),'w'],
@@ -399,7 +399,7 @@ function renderKpis(){
   }else if(mod==='compras'){
     k.push(['Passagens a comprar',n(/passagem/),'w'],['Baixadas nos próximos 30 dias',bx,'w'],['EPIs a comprar (listas)',ENVIOS.filter(x=>!x.compra).length,'w'],['Colaboradores na lista de alimentação',listaAlim().length,'']);
   }else if(mod==='pmo'){
-    k.push(['Contratos em andamento',PROJ.length,''],['Cronogramas oficiais pendentes',PROJ.filter(P=>!P.cronOficial).length,'w'],['Contratados / previstos',hh+'/'+pp,'w'],['Chegaram na obra',cheg+'/'+pp,'ok'],['Mobilizações atrasadas ou com atenção do RH',PROJ.filter(P=>['Atrasada','Atenção RH'].includes(statusProj(P)[0])).length,'w'],['Baixadas nos próximos 30 dias',bx,'w']);
+    k.push(['Contratos em andamento',PROJ.length,''],['Cronogramas oficiais pendentes',PROJ.filter(P=>!P.cronOficial).length,'w'],['Contratados / previstos',hh+'/'+pp,'w'],['Chegaram na obra',cheg+'/'+pp,'ok'],['Mobilizações atrasadas ou com atenção do Departamento Pessoal',PROJ.filter(P=>['Atrasada','Atenção Departamento Pessoal'].includes(statusProj(P)[0])).length,'w'],['Baixadas nos próximos 30 dias',bx,'w']);
   }
   $('kpis').innerHTML=k.map(x=>`<div class="kpi ${x[2]}"><b>${x[1]}</b><span>${x[0]}</span></div>`).join('');
 }
@@ -417,7 +417,7 @@ function colunas(){
 }
 function renderTabela(){
   const cols=colunas();
-  if($('btn-novo')){$('btn-novo').hidden=!isRH();$('btn-imp-erp').hidden=!isRH()}
+  if($('btn-novo')){$('btn-novo').hidden=!isRH();$('btn-imp-erp').hidden=!isRH();if($('btn-imp-xls'))$('btn-imp-xls').hidden=!isRH()}
   $('thead').innerHTML='<tr>'+cols.map(c=>`<th>${c[0]}</th>`).join('')+'</tr>';
   const lista=filtrados();
   $('tbody').innerHTML=lista.map(e=>`<tr class="row" data-id="${e.id}">`+cols.map(c=>`<td>${c[1](e)}</td>`).join('')+'</tr>').join('')||`<tr><td colspan="${cols.length}" class="empty">Nenhum colaborador encontrado.</td></tr>`;
@@ -457,17 +457,17 @@ function calcHtml(e,tipo){
     if(B.ferias)r+=`<div class="calc">${brl(vf)}<small>férias (${dias} dias)</small></div>`+(B.terco?`<div class="calc">${brl(terco)}<small>1/3 constitucional</small></div><div class="calc" style="grid-column:1/-1">${brl(vf+terco)}<small>total de férias + 1/3 (sem abono pecuniário)</small></div>`:'');
     return r+`<div class="ro" style="grid-column:1/-1">Estimativa sobre salário + hora extra do último mês. O valor final depende da folha.</div>`}
   if(tipo==='bonus'){const a=e.bonAprov,t=bonTot(e);const st=a.status==='Aprovada'?'<span class="badge ok">Aprovada</span>':a.status==='Reprovada'?'<span class="badge r">Reprovada</span>':'<span class="badge w">Pendente de aprovação</span>';
-    let r=`<div class="calc" style="grid-column:1/-1">${brl(t)} ${t?st:''}<small>${a.status!=='Pendente'&&t?esc(a.por)+' em '+fmtD(a.em)+(a.obs?' · '+esc(a.obs):''):'Aprovação do Gestor do RH'}</small></div>`;
+    let r=`<div class="calc" style="grid-column:1/-1">${brl(t)} ${t?st:''}<small>${a.status!=='Pendente'&&t?esc(a.por)+' em '+fmtD(a.em)+(a.obs?' · '+esc(a.obs):''):'Aprovação do Gestor do Departamento Pessoal'}</small></div>`;
     if(perfil==='grh'&&t)r+=`<div class="full" style="grid-column:1/-1"><label>Observação da decisão</label><input id="bon-obs" value="${esc(a.obs)}" placeholder="Obrigatória se reprovar"></div><div style="grid-column:1/-1"><button class="btn" data-bonaprov="Aprovada">✔ Aprovar bonificação</button> <button class="btn sec" data-bonaprov="Reprovada">✖ Reprovar</button></div>`;
-    else if(perfil==='fin')r+=`<div class="calc full" style="grid-column:1/-1;background:${a.status==='Aprovada'?'var(--okbg)':'var(--wbg)'}">${a.status==='Aprovada'?'Liberada para pagamento: '+brl(t):'Não liberada: aguardando aprovação do Gestor do RH'}</div>`;
+    else if(perfil==='fin')r+=`<div class="calc full" style="grid-column:1/-1;background:${a.status==='Aprovada'?'var(--okbg)':'var(--wbg)'}">${a.status==='Aprovada'?'Liberada para pagamento: '+brl(t):'Não liberada: aguardando aprovação do Gestor do Departamento Pessoal'}</div>`;
     return r}
   if(tipo==='he'){const h=valHE(e),a=e.heAprov,tot=heTot(e);
     const st=a.status==='Aprovada'?'<span class="badge ok">Aprovada</span>':a.status==='Reprovada'?'<span class="badge r">Reprovada</span>':'<span class="badge w">Pendente de aprovação</span>';
     let r=`<div class="calc">${brl(h.t50)}<small>${e.h50||0} h × ${brl(h.v50)}</small></div><div class="calc">${brl(h.t100)}<small>${e.h100||0} h × ${brl(h.v100)}</small></div>
     <div class="calc" style="grid-column:1/-1">Total de HE: ${brl(tot)} ${tot?st:''}<small>${a.status!=='Pendente'&&tot?esc(a.por)+' em '+fmtD(a.em)+(a.obs?' · '+esc(a.obs):''):'Pronto para conciliar com o sistema de ponto (importação das horas na próxima fase)'}</small></div>`;
     if(perfil==='grh'&&tot)r+=`<div class="full" style="grid-column:1/-1"><label>Observação da decisão</label><input id="he-obs" value="${esc(a.obs)}" placeholder="Obrigatória se reprovar"></div><div style="grid-column:1/-1"><button class="btn" data-heaprov="Aprovada">✔ Aprovar hora extra</button> <button class="btn sec" data-heaprov="Reprovada">✖ Reprovar</button></div>`;
-    else if(perfil==='fin')r+=`<div class="calc full" style="grid-column:1/-1;background:${a.status==='Aprovada'?'var(--okbg)':'var(--wbg)'}">${a.status==='Aprovada'?'Liberada para pagamento: '+brl(tot):'Não liberada: aguardando aprovação do Gestor do RH'}</div>`;
-    else r+=`<div class="ro" style="grid-column:1/-1">O RH lança as horas; a aprovação é do Gestor do RH. Alterar as horas volta o status para Pendente.</div>`;
+    else if(perfil==='fin')r+=`<div class="calc full" style="grid-column:1/-1;background:${a.status==='Aprovada'?'var(--okbg)':'var(--wbg)'}">${a.status==='Aprovada'?'Liberada para pagamento: '+brl(tot):'Não liberada: aguardando aprovação do Gestor do Departamento Pessoal'}</div>`;
+    else r+=`<div class="ro" style="grid-column:1/-1">O Departamento Pessoal lança as horas; a aprovação é do Gestor do Departamento Pessoal. Alterar as horas volta o status para Pendente.</div>`;
     return r}
   if(tipo==='ferias'){const l=limiteConc(e);const dl=diasAte(l);return `<div class="calc">${e.feriasIni?fmtD(feriasFim(e)):'—'}<small>fim das férias</small></div><div class="calc">${fmtD(l)}<small>limite para conceder${dl!==null?' ('+dl+' dias)':''}</small></div>`}
   if(tipo==='baixada'){const p=prevBaixada(e);const d=diasAte(p);return `<div class="calc">${fmtD(p)}<small>previsão da baixada</small></div><div class="calc">${p?(d<0?'atrasada '+(-d)+' dias':d+' dias'):'—'}<small>faltam</small></div>`}
@@ -544,7 +544,7 @@ const GLOB={id:0,nome:'Geral',done:{}};
 const MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 let tab='painel';
 const MODS=[
- {id:'rh',nome:'RH',ico:'👥',abas:[['painel','Painel',['rh','grh','dir']],['colab','Colaboradores',['rh','grh']],['mob','Mobilização de contratos',['rh','grh','dir']],['imp','Impostos e encargos',['rh','grh']]]},
+ {id:'rh',nome:'Departamento Pessoal',ico:'👥',abas:[['painel','Painel',['rh','grh','dir']],['colab','Colaboradores',['rh','grh']],['mob','Mobilização de contratos',['rh','grh','dir']],['imp','Impostos e encargos',['rh','grh']]]},
  {id:'fin',nome:'Financeiro',ico:'💲',abas:[['painel','Alertas',['fin','grh']],['fatdash','Faturamento · Dashboard',['fin','grh','dir']],['fat','Medições e NFs',['fin','grh','dir']],['colab','Colaboradores · salário e HE',['fin']],['folha','Folha de pagamento',['fin','grh']],['imp','Impostos e encargos',['fin','grh']]]},
  {id:'sst',nome:'Saúde e Segurança',ico:'🦺',abas:[['painel','Alertas',['sst','grh']],['colab','Colaboradores · ASO e documentos',['sst']],['trein','Treinamentos',['sst','grh']],['mob','Mobilização · treinamentos e EPI',['sst']],['pgr','PGR / EPIs',['sst','rh','grh']]]},
  {id:'compras',nome:'Compras',ico:'🛒',abas:[['painel','Alertas',['cmp','grh']],['colab','Colaboradores · baixada e férias',['cmp']],['mob','Mobilização · passagens e chegada',['cmp']],['passagens','Passagens',['cmp','grh','dir']],['alim','Alimentação',['cmp','grh','dir']],['pgr','EPIs a comprar',['cmp','grh','dir']]]},
@@ -557,7 +557,7 @@ const MODS=[
 const ABAS=[...new Set(MODS.flatMap(m=>m.abas.map(a=>a[0])))].map(x=>[x]);
 let mod='rh';
 const MODROLES={wpp:['rh'],rh:['rh','grh','dir'],fin:['fin'],sst:['sst'],compras:['cmp'],pmo:['pmo','plan'],contratos:['pmo','plan','dir'],pass:['rh','grh','cmp','fin']};
-const MODNOME_={wpp:'WhatsApp',rh:'RH',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',contratos:'Contratos',pass:'Passagens',admin:'Administração'};
+const MODNOME_={wpp:'WhatsApp',rh:'Departamento Pessoal',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',contratos:'Contratos',pass:'Passagens',admin:'Administração'};
 const alertasMod=()=>gerarAlertas().filter(a=>roleOk(a.roles)&&a.roles.some(r=>(MODROLES[mod]||[]).includes(r)));
 const modLiberado=m=>m.id!=='admin'||!!(usuario&&usuario.mestre);
 const rhPag=()=>usuario&&!usuario.mestre&&Array.isArray(usuario.paginas)?new Set(usuario.paginas):null;
@@ -815,7 +815,7 @@ function renderFolha(){
    <div class="tools"><label>Competência <select id="fo-comp">${opcoes.map(o=>`<option value="${o}" ${o===c?'selected':''}>${compLabel(o)}</option>`).join('')}</select></label>
     <label><input type="checkbox" id="fo-sab" ${FOLHA.sab?'checked':''}> contar sábado como dia útil</label></div>
    <div class="calc" style="margin-bottom:10px">Pagamento no 5º dia útil: ${fmtD(fmtISO(pg))} (${DSEM[pg.getDay()]}) · faltam ${diasAte(fmtISO(pg))} dias<small>Competência ${compLabel(c)}. Feriados nacionais considerados.${g?' · Folha gerada em '+g.em+' por '+g.por:''}</small></div>
-   ${L.some(l=>l.pend)?`<div class="alert w"><div class="t">⚠ Há horas extras ou bonificações não aprovadas (ou de outro mês) fora da folha</div><div class="d">${L.filter(l=>l.pend).map(l=>esc(l.e.nome)).join(', ')}. Peça ao Gestor do RH para aprovar.</div></div>`:''}
+   ${L.some(l=>l.pend)?`<div class="alert w"><div class="t">⚠ Há horas extras ou bonificações não aprovadas (ou de outro mês) fora da folha</div><div class="d">${L.filter(l=>l.pend).map(l=>esc(l.e.nome)).join(', ')}. Peça ao Gestor do Departamento Pessoal para aprovar.</div></div>`:''}
    <div style="overflow:auto"><table><thead><tr><th>Colaborador</th><th>Modalidade</th><th>Função</th><th>Salário / contrato</th><th>HE aprovada</th><th>Bonificação</th><th>Desc. faltas</th><th>Bruto</th><th>INSS / retenções</th><th>IRRF</th><th>Líquido a pagar</th><th>Custo da empresa</th><th>Banco / PIX</th></tr></thead>
    <tbody>${Object.entries(porEmp).map(([emp,a])=>`<tr class="grp"><td colspan="12">${esc(emp)} · ${a.length} colaborador(es)</td></tr>`+a.map(l=>`<tr><td><b>${esc(l.e.nome)}</b><div class="ro">Mat. ${esc(l.e.matricula)}${l.fator<1?' · proporcional':''}</div></td><td>${esc(l.e.contrato)}</td><td>${esc(l.e.funcao)}</td><td>${brl(l.base)}</td><td>${l.he?brl(l.he):'—'}</td><td>${l.bon?brl(l.bon):'—'}</td><td>${l.desc?'− '+brl(l.desc)+' <span class="ro">('+l.fi+' dia)</span>':'—'}</td><td>${brl(l.total)}</td><td title="${esc(l.det||'')}">${l.ded1?'− '+brl(l.ded1):'—'}</td><td>${l.ded2?'− '+brl(l.ded2):'—'}</td><td><b>${brl(l.liq)}</b></td><td>${brl(l.custo)}</td><td class="ro">${esc(l.e.banco)} ${esc(l.e.agencia)}/${esc(l.e.conta)}<br>PIX: ${esc(l.e.pix)}</td></tr>`).join('')+`<tr><td colspan="7" style="text-align:right"><b>Subtotal ${esc(emp)}</b></td><td><b>${brl(soma(a,'total'))}</b></td><td>${brl(soma(a,'ded1'))}</td><td>${brl(soma(a,'ded2'))}</td><td><b>${brl(soma(a,'liq'))}</b></td><td><b>${brl(soma(a,'custo'))}</b></td><td></td></tr>`).join('')}</tbody>
    <tfoot><tr><td colspan="7" style="text-align:right">Total geral da folha</td><td>${brl(soma(L,'total'))}</td><td>${brl(soma(L,'ded1'))}</td><td>${brl(soma(L,'ded2'))}</td><td>${brl(soma(L,'liq'))}</td><td>${brl(soma(L,'custo'))}</td><td></td></tr></tfoot></table></div>
@@ -851,7 +851,7 @@ function renderAlim(){
 }
 
 /* ---------- Mobilização por contrato ---------- */
-const ETAPAS={docs:['Docs + ASO','RH',['rh']],trein:['Treinamentos','Saúde e Seg.',['sst']],epi:['Uniforme/EPI','Saúde e Seg.',['sst']],pass:['Passagem','Compras',['cmp']],cheg:['Chegada na obra','PMO',['pmo']]};
+const ETAPAS={docs:['Docs + ASO','Departamento Pessoal',['rh']],trein:['Treinamentos','Saúde e Seg.',['sst']],epi:['Uniforme/EPI','Saúde e Seg.',['sst']],pass:['Passagem','Compras',['cmp']],cheg:['Chegada na obra','PMO',['pmo']]};
 const stepsDe=p=>p.tipo==='Existente'?['docs','trein','pass','cheg']:['docs','trein','epi','pass','cheg'];
 const travada=(p,k)=>{const st=stepsDe(p),i=st.indexOf(k);if(k==='pass')return st.slice(0,i).some(x=>!p.etapas[x]);if(k==='cheg')return !p.etapas.pass;return false};
 const mkP=(nome,funcao,contr,et)=>({nome,funcao,tipo:'Contratação',contr,etapas:Object.assign({docs:null,trein:null,epi:null,pass:null,cheg:null},et||{})});
@@ -875,14 +875,14 @@ function statusProj(P){
   const feito=r.cheg>=P.prev&&r.X.every(p=>p.etapas.cheg);
   if(feito)return['Concluída','ok',3];
   if(dT<0)return['Atrasada','r',0];
-  if(dRh<=5&&(r.hired<P.prev||r.docs<r.hired))return['Atenção RH','w',1];
+  if(dRh<=5&&(r.hired<P.prev||r.docs<r.hired))return['Atenção Departamento Pessoal','w',1];
   return['Em andamento','',2];
 }
 function renderMob(){
   const edita=roleOk(['rh']);
   if(!PROJ.some(x=>x.id===mobSel))mobSel=(PROJ.slice().sort((a,b)=>statusProj(a)[2]-statusProj(b)[2])[0]||{}).id||null;
-  $('v-mob').innerHTML=`<div class="card" style="margin-bottom:16px"><h2>Mobilização por contrato</h2><div class="ro">Contratos e CDs são criados na aba <b>Contratos</b> (PMO e Gestor do RH). Aqui você acompanha e executa a parte do seu módulo: contratações, documentos, treinamentos, passagens e chegada. A passagem só é liberada para Compras depois que RH e Saúde e Segurança concluem o colaborador.</div></div>`
-  +`<div class="card" style="margin-bottom:16px"><div class="tools"><label>Contrato <select id="mob-sel">${PROJ.map(P=>`<option value="${P.id}" ${P.id===mobSel?'selected':''}>${esc(P.nome)}</option>`).join('')}</select></label><input id="mob-busca" placeholder="Buscar contrato ou obra..." value="${esc(mobBusca)}"><select id="mob-status"><option value="">Todos os status</option>${['Atrasada','Atenção RH','Em andamento','Concluída'].map(s=>`<option ${s===mobStatus?'selected':''}>${s}</option>`).join('')}</select></div><div id="mob-lista" style="overflow:auto;max-height:300px"></div></div><div id="mob-det"></div>`;
+  $('v-mob').innerHTML=`<div class="card" style="margin-bottom:16px"><h2>Mobilização por contrato</h2><div class="ro">Contratos e CDs são criados na aba <b>Contratos</b> (PMO e Gestor do Departamento Pessoal). Aqui você acompanha e executa a parte do seu módulo: contratações, documentos, treinamentos, passagens e chegada. A passagem só é liberada para Compras depois que Departamento Pessoal e Saúde e Segurança concluem o colaborador.</div></div>`
+  +`<div class="card" style="margin-bottom:16px"><div class="tools"><label>Contrato <select id="mob-sel">${PROJ.map(P=>`<option value="${P.id}" ${P.id===mobSel?'selected':''}>${esc(P.nome)}</option>`).join('')}</select></label><input id="mob-busca" placeholder="Buscar contrato ou obra..." value="${esc(mobBusca)}"><select id="mob-status"><option value="">Todos os status</option>${['Atrasada','Atenção Departamento Pessoal','Em andamento','Concluída'].map(s=>`<option ${s===mobStatus?'selected':''}>${s}</option>`).join('')}</select></div><div id="mob-lista" style="overflow:auto;max-height:300px"></div></div><div id="mob-det"></div>`;
   renderMobLista();renderMobDet();
 }
 function renderMobLista(){
@@ -898,7 +898,7 @@ function mobDetHtml(P,edita){
   const r=resumoProj(P),dRh=diasAte(r.rhFim),dTot=diasAte(r.fimTotal);
   return `<div class="pcard"><h2>${esc(P.nome)}</h2><div class="ro">Assinado em ${fmtD(P.assinatura)} · dia <b>${r.dia}</b> de ${P.prazoTotal} · 📎 ${esc(P.cronograma||'sem cronograma')}${P.cronogramaPath?` <button class="btn sec" data-abrir="${esc(P.cronogramaPath)}">abrir</button>`:''} · ${esc(P.empresa)}</div>${vigHtml(P,false)}
    <div class="dashgrid" style="margin-top:10px">
-    <div><div class="sub2"><b>Etapa 1 · RH</b> · prazo ${fmtD(r.rhFim)} (${dRh>=0?'faltam '+dRh+' dias':'atrasado '+(-dRh)+' dias'})</div>
+    <div><div class="sub2"><b>Etapa 1 · Departamento Pessoal</b> · prazo ${fmtD(r.rhFim)} (${dRh>=0?'faltam '+dRh+' dias':'atrasado '+(-dRh)+' dias'})</div>
       <div class="prow"><span>Contratados / previstos</span>${barra(r.hired,P.prev,r.hired<P.prev&&dRh<=5?'w':'')}<span>${r.hired}/${P.prev}</span></div>
       <div class="prow"><span>Docs + ASO prontos</span>${barra(r.docs,r.hired,r.docs<r.hired&&dRh<=5?'w':'')}<span>${r.docs}/${r.hired}</span></div></div>
     <div><div class="sub2"><b>Demais etapas</b> (sobre os contratados) · mobilização total até ${fmtD(r.fimTotal)} (${dTot>=0?'faltam '+dTot+' dias':'atrasado'})</div>
@@ -907,12 +907,12 @@ function mobDetHtml(P,edita){
       <div class="prow"><span>Passagens compradas</span>${barra(r.pass,r.hired)}<span>${r.pass}/${r.hired}</span></div>
       <div class="prow"><span>Chegaram na obra</span>${barra(r.cheg,P.prev,'ok')}<span>${r.cheg}/${P.prev}</span></div></div></div>
    <div style="overflow:auto"><table><thead><tr><th>Colaborador</th><th>Tipo</th><th>Função</th><th>Prazo</th><th>Etapas (clique para concluir, se for sua)</th></tr></thead><tbody>
-    ${P.pessoas.map((p,i)=>`<tr><td><b>${esc(p.nome)}</b></td><td><span class="badge ${p.tipo==='Existente'?'g':''}">${p.tipo}</span></td><td>${esc(p.funcao)}${p.epis?`<div class="ro">🦺 ${p.epis.length} EPIs (PGR)</div>`:''}</td><td>${p.tipo==='Existente'?fmtD(p.prazo):'até '+fmtD(r.rhFim)+' (RH)'}</td><td>${chipsHtml(P,i,p)}</td></tr>`).join('')}</tbody></table></div>
+    ${P.pessoas.map((p,i)=>`<tr><td><b>${esc(p.nome)}</b></td><td><span class="badge ${p.tipo==='Existente'?'g':''}">${p.tipo}</span></td><td>${esc(p.funcao)}${p.epis?`<div class="ro">🦺 ${p.epis.length} EPIs (PGR)</div>`:''}</td><td>${p.tipo==='Existente'?fmtD(p.prazo):'até '+fmtD(r.rhFim)+' (Departamento Pessoal)'}</td><td>${chipsHtml(P,i,p)}</td></tr>`).join('')}</tbody></table></div>
    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">${edita?`<button class="btn" data-addhire="${P.id}">➕ Registrar contratação</button><button class="btn sec" data-addex="${P.id}">➕ Alocar colaborador existente</button>`:''}<button class="btn sec" data-email="${P.id}">📧 Resumo por e-mail (Diretoria e Saúde e Segurança)</button></div></div>`;
 }
 function resumoEmailTxt(P){
   const r=resumoProj(P),dRh=diasAte(r.rhFim);
-  return `Mobilização ${P.nome}\nAssinatura: ${fmtD(P.assinatura)} · dia ${r.dia} de ${P.prazoTotal}\n\nETAPA RH (prazo ${fmtD(r.rhFim)}, ${dRh>=0?'faltam '+dRh+' dias':'atrasado '+(-dRh)+' dias'})\n- Contratados: ${r.hired} de ${P.prev} previstos\n- Docs + ASO prontos: ${r.docs} de ${r.hired}\n\nDEMAIS ETAPAS\n- Treinamentos: ${r.trein}/${r.hired}\n- Uniforme/EPI: ${r.epi}/${r.hired}\n- Passagens compradas: ${r.pass}/${r.hired}\n- Chegaram na obra: ${r.cheg}/${P.prev}\n\nEXISTENTES (${r.X.length}): docs ${r.xd}/${r.X.length}, treinamentos ${r.xt}/${r.X.length}, passagens ${r.xp}/${r.X.length}, chegada ${r.xc}/${r.X.length}\n\nPRÓXIMOS PASSOS\n${P.pessoas.filter(p=>!p.etapas.cheg).slice(0,8).map(p=>'- '+p.nome+': '+(stepsDe(p).filter(k=>!p.etapas[k]).map(k=>ETAPAS[k][0]).join(' → ')||'—')).join('\n')}`;
+  return `Mobilização ${P.nome}\nAssinatura: ${fmtD(P.assinatura)} · dia ${r.dia} de ${P.prazoTotal}\n\nETAPA Departamento Pessoal (prazo ${fmtD(r.rhFim)}, ${dRh>=0?'faltam '+dRh+' dias':'atrasado '+(-dRh)+' dias'})\n- Contratados: ${r.hired} de ${P.prev} previstos\n- Docs + ASO prontos: ${r.docs} de ${r.hired}\n\nDEMAIS ETAPAS\n- Treinamentos: ${r.trein}/${r.hired}\n- Uniforme/EPI: ${r.epi}/${r.hired}\n- Passagens compradas: ${r.pass}/${r.hired}\n- Chegaram na obra: ${r.cheg}/${P.prev}\n\nEXISTENTES (${r.X.length}): docs ${r.xd}/${r.X.length}, treinamentos ${r.xt}/${r.X.length}, passagens ${r.xp}/${r.X.length}, chegada ${r.xc}/${r.X.length}\n\nPRÓXIMOS PASSOS\n${P.pessoas.filter(p=>!p.etapas.cheg).slice(0,8).map(p=>'- '+p.nome+': '+(stepsDe(p).filter(k=>!p.etapas[k]).map(k=>ETAPAS[k][0]).join(' → ')||'—')).join('\n')}`;
 }
 function abrirEmail(id){
   const P=PROJ.find(x=>x.id===id),t=resumoEmailTxt(P);
@@ -933,11 +933,11 @@ function abrirAddEx(id){
 function alertasGlobais(A){
   const nv=d=>d<=2?'r':'w';
   PROJ.forEach(P=>{const r=resumoProj(P),dRh=diasAte(r.rhFim),dT=diasAte(r.fimTotal);
-    if(dRh<=5&&(r.hired<P.prev||r.docs<r.hired))A.push({k:'mrh'+P.id,e:GLOB,nivel:nv(dRh),roles:['dir','sst','rh','pmo'],tipo:'🧱 Mobilização · etapa do RH',goto:'mob',cta:'Ciente',txt:`${P.nome} · contratados ${r.hired}/${P.prev} · docs+ASO prontos ${r.docs}/${r.hired} · prazo do RH ${fmtD(r.rhFim)} (${dRh>=0?'faltam '+dRh+' dias':'atrasado '+(-dRh)+' dias'})`});
+    if(dRh<=5&&(r.hired<P.prev||r.docs<r.hired))A.push({k:'mrh'+P.id,e:GLOB,nivel:nv(dRh),roles:['dir','sst','rh','pmo'],tipo:'🧱 Mobilização · etapa do Departamento Pessoal',goto:'mob',cta:'Ciente',txt:`${P.nome} · contratados ${r.hired}/${P.prev} · docs+ASO prontos ${r.docs}/${r.hired} · prazo do Departamento Pessoal ${fmtD(r.rhFim)} (${dRh>=0?'faltam '+dRh+' dias':'atrasado '+(-dRh)+' dias'})`});
     if(dT<=10&&r.cheg<P.prev)A.push({k:'mtot'+P.id,e:GLOB,nivel:dT<=3?'r':'w',roles:['dir','pmo','plan','rh'],tipo:'🧱 Mobilização · prazo total',goto:'mob',cta:'Ciente',txt:`${P.nome} · ${r.cheg}/${P.prev} na obra · mobilização termina em ${fmtD(r.fimTotal)} (${dT>=0?'faltam '+dT+' dias':'atrasado'})`});
     P.pessoas.forEach((p,i)=>{
       if(p.tipo==='Existente'){const d=diasAte(p.prazo);if(d<=5&&(!p.etapas.docs||!p.etapas.trein))A.push({k:'mex'+P.id+i,e:GLOB,nivel:nv(d),roles:['sst','rh'],tipo:'🧱 Mobilização · colaborador existente',goto:'mob',cta:'Ciente',txt:`${p.nome} · prazo ${fmtD(p.prazo)} (${d>=0?'faltam '+d+' dias':'atrasado'}) · pendente: ${['docs','trein'].filter(k=>!p.etapas[k]).map(k=>ETAPAS[k][0]).join(', ')}`})}
-      if(!p.etapas.pass&&!travada(p,'pass'))A.push({k:'mpa'+P.id+i,e:GLOB,nivel:'w',roles:['cmp'],tipo:'🚌 Comprar passagem · mobilização',goto:'mob',cta:null,txt:`${p.nome} (${p.funcao}) liberado: RH e Saúde e Segurança concluídos · destino ${P.obra}`});
+      if(!p.etapas.pass&&!travada(p,'pass'))A.push({k:'mpa'+P.id+i,e:GLOB,nivel:'w',roles:['cmp'],tipo:'🚌 Comprar passagem · mobilização',goto:'mob',cta:null,txt:`${p.nome} (${p.funcao}) liberado: Departamento Pessoal e Saúde e Segurança concluídos · destino ${P.obra}`});
       const st=stepsDe(p),feitos=st.filter(k=>p.etapas[k]);
       if(feitos.length){const ult=feitos[feitos.length-1],d=diasAte(p.etapas[ult]);if(d>=-3&&ult!=='cheg')A.push({k:'mev'+P.id+i+ult,e:GLOB,nivel:'i',roles:['dir','sst','rh','pmo'],tipo:'✅ Etapa concluída',goto:'mob',cta:'Ciente',txt:`${p.nome}: ${ETAPAS[ult][0]} concluído em ${fmtD(p.etapas[ult])}. Passo a passo: ${st.map(k=>(p.etapas[k]?'✔ ':'⏳ ')+ETAPAS[k][0]).join(' → ')}`})}
     })});
@@ -1124,7 +1124,7 @@ function histHtml(alvoId,titulo){
   return `<div class="sec" style="grid-column:1/-1"><h3>🕘 ${titulo}</h3>${L.length?`<div style="overflow:auto"><table class="matriz" style="width:100%"><tr><th>Data e hora</th><th>Quem alterou</th><th>O que mudou</th></tr>${L.map(a=>`<tr><td>${fmtDH(a.t)}</td><td style="text-align:left">${esc(a.quem)}<div class="ro">${PERFIS[a.perfil]||''}</div></td><td style="text-align:left"><b>${esc(a.acao)}</b>${a.campo||a.depois!=null?' · ':''}${mudanca(a)}</td></tr>`).join('')}</table></div>`:'<div class="empty">Nenhuma alteração registrada ainda.</div>'}</div>`;
 }
 
-/* ---------- Aba Auditoria (Gestor do RH e Diretoria) ---------- */
+/* ---------- Aba Auditoria (Gestor do Departamento Pessoal e Diretoria) ---------- */
 let auQ='',auU='',auA='';
 function auditFiltrada(){const q=norm(auQ);return AUDIT.filter(a=>(!auU||a.quem===auU)&&(!auA||a.acao===auA)&&(!q||norm([a.quem,a.acao,a.alvo,a.campo].join(' ')).includes(q)))}
 function renderAudit(){
@@ -1157,7 +1157,7 @@ const TIERS={
  func:{tab:'rh_funcionarios',ler:TODOS,ins:['rh','grh'],upd:['rh','grh','fin','sst','cmp','pmo','plan']},
  pess:{tab:'rh_func_pessoal',ler:['rh','grh','sst','pmo','cmp'],ins:['rh','grh','sst'],upd:['rh','grh','sst']},
  rem:{tab:'rh_remuneracao',ler:['rh','grh','fin'],ins:['rh','grh','fin'],upd:['rh','grh','fin']}};
-const PESS_KEYS=['cpf','rg','nasc','estCivil','tel','emergNome','emergTel','logradouro','bairro','cidade','uf','cep','transpExcl','obsEnd','sangue','alergias'];
+const PESS_KEYS=['cpf','pis','rg','nasc','estCivil','tel','emergNome','emergTel','logradouro','bairro','cidade','uf','cep','transpExcl','obsEnd','sangue','alergias'];
 const REM_KEYS=['salario','dependentes','h50','h100','mesRef','heAprov','bonMes','bonValor','bonMotivo','bonAprov','banco','agencia','conta','pix'];
 const pick=(e,keys)=>{const o={};keys.forEach(k=>{if(e[k]!==undefined)o[k]=e[k]});return o};
 const canon=v=>JSON.stringify(v,(k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort().reduce((o,kk)=>(o[kk]=x[kk],o),{}):x);
@@ -1346,11 +1346,11 @@ async function entrarSessao(session){
   perfil=pf;
   if(!modsOk().length){
     usuario=null;await sb.auth.signOut();document.body.classList.add('out');
-    $('login-erro').textContent='Nenhuma página do RH foi liberada para você. Fale com o gestor.';return;
+    $('login-erro').textContent='Nenhuma página do Departamento Pessoal foi liberada para você. Fale com o gestor.';return;
   }
   try{await carregarTudo()}catch(e){
     console.error(e);usuario=null;await sb.auth.signOut();
-    $('login-erro').textContent='Não consegui carregar os dados do RH. Tente de novo em instantes.';return;
+    $('login-erro').textContent='Não consegui carregar os dados do Departamento Pessoal. Tente de novo em instantes.';return;
   }
   $('login-erro').textContent='';$('lg-senha').value='';
   tab='painel';mod='inicio';CHAT.abrir=false;CHAT.msgs=[];abertoId=null;
@@ -1419,10 +1419,10 @@ async function abrirImportErp(){
   if(r.error){alert('Não consegui ler o cadastro do Compras: '+r.error.message);return}
   const jaCpf=new Set(EMP.map(e=>dig(e.cpf)).filter(Boolean)),jaNome=new Set(EMP.map(e=>norm(e.nome)));
   IMPERP=(r.data||[]).filter(f=>!(dig(f.cpf)&&jaCpf.has(dig(f.cpf)))&&!jaNome.has(norm(f.nome)));
-  abrirCustom(`<div class="mh"><div><h2>Importar do cadastro do Compras</h2><div class="ro">${IMPERP.length} funcionário(s) ativo(s) ainda não estão no RH. Vêm nome, função, CPF, admissão e obra. Funções com "(PJ)" entram como contrato PJ.</div></div><button class="x" data-close="1">×</button></div>
+  abrirCustom(`<div class="mh"><div><h2>Importar do cadastro do Compras</h2><div class="ro">${IMPERP.length} funcionário(s) ativo(s) ainda não estão no Departamento Pessoal. Vêm nome, função, CPF, admissão e obra. Funções com "(PJ)" entram como contrato PJ.</div></div><button class="x" data-close="1">×</button></div>
    <div class="sec"><div class="f" style="grid-template-columns:1fr 1fr"><div><label>Empresa dos importados</label><select id="imp-emp">${EMPRESAS.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
    <div style="align-self:end"><label style="display:flex;gap:6px;align-items:center;color:var(--txt);font-size:13px"><input type="checkbox" id="imp-todos" checked> Selecionar todos</label></div></div>
-   <div style="overflow:auto;max-height:340px;margin-top:8px"><table><thead><tr><th></th><th>Nome</th><th>Função</th><th>Obra</th><th>Admissão</th></tr></thead><tbody>${IMPERP.map((f,i)=>`<tr><td><input type="checkbox" data-impc="${i}" checked></td><td>${esc(f.nome)}</td><td>${esc(titulo(f.funcao))}</td><td>${esc(f.obra||'')}</td><td>${f.data_admissao?fmtD(f.data_admissao):'—'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Todos os funcionários ativos do Compras já estão no RH.</td></tr>'}</tbody></table></div>
+   <div style="overflow:auto;max-height:340px;margin-top:8px"><table><thead><tr><th></th><th>Nome</th><th>Função</th><th>Obra</th><th>Admissão</th></tr></thead><tbody>${IMPERP.map((f,i)=>`<tr><td><input type="checkbox" data-impc="${i}" checked></td><td>${esc(f.nome)}</td><td>${esc(titulo(f.funcao))}</td><td>${esc(f.obra||'')}</td><td>${f.data_admissao?fmtD(f.data_admissao):'—'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Todos os funcionários ativos do Compras já estão no Departamento Pessoal.</td></tr>'}</tbody></table></div>
    <div class="ro" style="margin-top:6px">Os importados entram como "já estava na empresa": o checklist de admissão não gera alerta. Complete salário, ASO e demais dados na ficha de cada um.</div></div>
    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-close="1">Cancelar</button><button class="btn" id="imp-ok" ${IMPERP.length?'':'disabled'}>Importar selecionados</button></div>`);
 }
@@ -1455,7 +1455,7 @@ function renderContratos(){
   const el=$('v-contratos');if(!el)return;
   const ed=podeContratos();
   const L=PROJ.slice().sort((a,b)=>statusProj(a)[2]-statusProj(b)[2]||a.nome.localeCompare(b.nome));
-  el.innerHTML=`<div class="card"><h2>Contratos</h2><div class="ro" style="margin-bottom:8px">Aqui nascem os contratos e os CDs. Cada contrato novo cria o CD (obra) e libera a mobilização, que o RH, a Saúde e Segurança e o Compras executam nas suas abas. Quem cria e edita: PMO e Gestor do RH.</div>${ed?'<button class="btn" id="mob-novo">➕ Novo contrato (cria um novo CD)</button>':''}</div>
+  el.innerHTML=`<div class="card"><h2>Contratos</h2><div class="ro" style="margin-bottom:8px">Aqui nascem os contratos e os CDs. Cada contrato novo cria o CD (obra) e libera a mobilização, que o Departamento Pessoal, a Saúde e Segurança e o Compras executam nas suas abas. Quem cria e edita: PMO e Gestor do Departamento Pessoal.</div>${ed?'<button class="btn" id="mob-novo">➕ Novo contrato (cria um novo CD)</button>':''}</div>
    <div class="card" style="margin-top:16px"><div style="overflow:auto"><table><thead><tr><th>Contrato</th><th>Empresa</th><th>Assinatura</th><th>Vigência</th><th>Prazo oficial (kickoff)</th><th>Mobilização</th><th>Status</th><th></th></tr></thead><tbody>${L.map(P=>{
      const r=resumoProj(P),st=statusProj(P),vig=P.vigIni?fmtD(P.vigIni)+' a '+fmtD(P.vigFim)+'<div class="ro">'+diffDias(P.vigIni,P.vigFim)+' dias</div>':'—';
      const of=P.cronOficial?fmtD(P.cronOficial.ini)+' a '+fmtD(P.cronOficial.fim)+'<div class="ro">'+diffDias(P.cronOficial.ini,P.cronOficial.fim)+' dias · 📎 '+esc(P.cronOficial.arquivo)+'</div>':'<span class="badge w">pendente</span>'+(P.kickoff?'<div class="ro">kickoff '+fmtD(P.kickoff)+'</div>':'');
@@ -1469,7 +1469,7 @@ function abrirEditContrato(id){
    <div><label>Empresa (CNPJ)</label><select id="ce-emp">${EMPRESAS.map(c=>`<option ${c===P.empresa?'selected':''}>${esc(c)}</option>`).join('')}</select></div><div><label>Data de assinatura</label><input type="date" id="ce-ass" value="${esc(P.assinatura||'')}"></div>
    <div><label>Vigência · início</label><input type="date" id="ce-vini" value="${esc(P.vigIni||'')}"></div><div><label>Vigência · fim</label><input type="date" id="ce-vfim" value="${esc(P.vigFim||'')}"></div>
    <div><label>Data do kickoff</label><input type="date" id="ce-kick" value="${esc(P.kickoff||'')}"></div><div><label>Contratações previstas</label><input type="number" id="ce-prev" value="${P.prev}"></div>
-   <div><label>Prazo total de mobilização (dias)</label><input type="number" id="ce-total" value="${P.prazoTotal}"></div><div><label>Prazo do RH (dias)</label><input type="number" id="ce-rh" value="${P.rhDias}"></div></div>
+   <div><label>Prazo total de mobilização (dias)</label><input type="number" id="ce-total" value="${P.prazoTotal}"></div><div><label>Prazo do Departamento Pessoal (dias)</label><input type="number" id="ce-rh" value="${P.rhDias}"></div></div>
    <div class="ro" style="margin-top:6px">O CD (${esc(P.obra)}) não muda por aqui.</div></div>
    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-close="1">Cancelar</button><button class="btn" id="ct-ok" data-proj="${P.id}">Salvar</button></div>`);
 }
@@ -1478,7 +1478,7 @@ function salvarEditContrato(id){
   const nv={nome:$('ce-nome').value.trim(),empresa:$('ce-emp').value,assinatura:$('ce-ass').value,vigIni:$('ce-vini').value,vigFim:$('ce-vfim').value,kickoff:$('ce-kick').value,prev:Number($('ce-prev').value)||1,prazoTotal:Number($('ce-total').value)||45,rhDias:Number($('ce-rh').value)||10};
   if(!nv.nome||!nv.assinatura){alert('Informe o nome e a data de assinatura.');return}
   if(nv.vigIni&&nv.vigFim&&nv.vigFim<nv.vigIni){alert('O fim da vigência não pode ser antes do início.');return}
-  const rot={nome:'Nome',empresa:'Empresa',assinatura:'Assinatura',vigIni:'Vigência · início',vigFim:'Vigência · fim',kickoff:'Kickoff',prev:'Contratações previstas',prazoTotal:'Prazo total (dias)',rhDias:'Prazo do RH (dias)'};
+  const rot={nome:'Nome',empresa:'Empresa',assinatura:'Assinatura',vigIni:'Vigência · início',vigFim:'Vigência · fim',kickoff:'Kickoff',prev:'Contratações previstas',prazoTotal:'Prazo total (dias)',rhDias:'Prazo do Departamento Pessoal (dias)'};
   Object.keys(nv).forEach(k=>{if(String(P[k]==null?'':P[k])!==String(nv[k])){auditar({acao:'Editou contrato',alvo:P.nome,alvoId:'proj'+P.id,sec:'proj',campo:rot[k],antes:fmtV(P[k]),depois:fmtV(nv[k])});P[k]=nv[k]}});
   fecharModal();render();
 }
@@ -1495,7 +1495,7 @@ async function excluirContrato(id){
 
 /* ---------- Administração · Usuários e acessos (por e-mail, só Mestre) ---------- */
 const USR={lista:null,carregando:false,q:''};
-const RH_PERFIS_OPC=[['grh','Gestor do RH'],['rh','RH'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['plan','Planejamento'],['dir','Diretoria'],['nenhum','Bloquear acesso ao RH']];
+const RH_PERFIS_OPC=[['grh','Gestor do Departamento Pessoal'],['rh','Departamento Pessoal'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['plan','Planejamento'],['dir','Diretoria'],['nenhum','Bloquear acesso ao Departamento Pessoal']];
 async function carregarUsuarios(){
   USR.carregando=true;
   const r=await sb.rpc('rh_listar_usuarios');
@@ -1516,7 +1516,7 @@ function renderUsuarios(){
   const el=$('v-usuarios');if(!el)return;
   if(!usuario||!usuario.mestre||tab!=='usuarios'){if(tab!=='usuarios')return;el.innerHTML='';return}
   if(USR.lista===null&&!USR.carregando&&tab==='usuarios'){carregarUsuarios();}
-  el.innerHTML=`<div class="card"><h2>Usuários e acessos do RH</h2><div class="ro" style="margin-bottom:8px">São as mesmas pessoas do sistema de Compras (mesmo e-mail e senha). Aqui você define, por e-mail, o <b>perfil</b> (quais dados a pessoa lê) e as <b>páginas</b> que aparecem no menu dela. Quem não tem perfil definido entra só para consulta; o Gestor Mestre entra como Gestor do RH.</div>
+  el.innerHTML=`<div class="card"><h2>Usuários e acessos do Departamento Pessoal</h2><div class="ro" style="margin-bottom:8px">São as mesmas pessoas do sistema de Compras (mesmo e-mail e senha). Aqui você define, por e-mail, o <b>perfil</b> (quais dados a pessoa lê) e as <b>páginas</b> que aparecem no menu dela. Quem não tem perfil definido entra só para consulta; o Gestor Mestre entra como Gestor do Departamento Pessoal.</div>
    <div class="tools"><input id="usr-q" placeholder="Buscar por e-mail ou nome..." value="${esc(USR.q)}"><button class="btn sec" id="usr-recarregar">↻ Atualizar lista</button></div><div id="usr-lista" style="overflow:auto"></div></div>`;
   renderUsuariosLista();
 }
@@ -1524,11 +1524,11 @@ function renderUsuariosLista(){
   const box=$('usr-lista');if(!box)return;
   if(USR.lista===null){box.innerHTML='<div class="empty">Carregando usuários...</div>';return}
   const q=norm(USR.q),L=USR.lista.filter(u=>!q||norm((u.email||'')+' '+(u.nome||'')).includes(q));
-  box.innerHTML=`<table><thead><tr><th>E-mail</th><th>Nome</th><th>Papel no Compras</th><th>Perfil no RH</th><th>Páginas do RH</th><th>Acesso efetivo</th></tr></thead><tbody>${L.map(u=>{
+  box.innerHTML=`<table><thead><tr><th>E-mail</th><th>Nome</th><th>Papel no Compras</th><th>Perfil no Departamento Pessoal</th><th>Páginas do Departamento Pessoal</th><th>Acesso efetivo</th></tr></thead><tbody>${L.map(u=>{
     const ef=acessoEfetivo(u),trava=u.mestre;
     const opts=RH_PERFIS_OPC.map(([v,l])=>`<option value="${v}" ${u.rh_perfil===v?'selected':''}>${l}</option>`).join('');
     return `<tr><td><b>${esc(u.email)}</b>${u.id===usuario.id?' <span class="badge">Você</span>':''}</td><td>${esc(u.nome||'')}</td><td>${u.mestre?'<span class="badge">👑 Mestre</span>':esc(u.papel||'')}</td>
-     <td>${trava?'<span class="ro">Gestor do RH (Mestre)</span>':`<select data-usrperfil="${u.id}"><option value="" ${!u.rh_perfil?'selected':''}>Padrão (só consulta)</option>${opts}</select>`}</td>
+     <td>${trava?'<span class="ro">Gestor do Departamento Pessoal (Mestre)</span>':`<select data-usrperfil="${u.id}"><option value="" ${!u.rh_perfil?'selected':''}>Padrão (só consulta)</option>${opts}</select>`}</td>
      <td>${trava?'<span class="ro">todas</span>':`<button class="btn sec" data-usrpag="${u.id}">🔒 ${Array.isArray(u.rh_paginas)?u.rh_paginas.length+' liberada(s)':'Sem restrição'}</button>`}</td>
      <td><span class="badge ${ef[1]}">${esc(ef[0])}</span></td></tr>`}).join('')||'<tr><td colspan="6" class="empty">Nenhum usuário encontrado.</td></tr>'}</tbody></table><div class="ro" style="margin-top:4px">${L.length} de ${USR.lista.length} usuário(s)</div>`;
 }
@@ -1536,7 +1536,7 @@ async function alterarPerfilUsuario(id,valor){
   const u=USR.lista.find(x=>x.id===id);if(!u)return;
   const r=await sb.from('profiles').update({rh_perfil:valor||null}).eq('id',id);
   if(r.error){toast('Não consegui alterar: '+r.error.message);await carregarUsuarios();return}
-  auditar({acao:'Alterou perfil de acesso',alvo:u.email,sec:'acesso',campo:'Perfil no RH',antes:u.rh_perfil||'padrão',depois:valor||'padrão'});
+  auditar({acao:'Alterou perfil de acesso',alvo:u.email,sec:'acesso',campo:'Perfil no Departamento Pessoal',antes:u.rh_perfil||'padrão',depois:valor||'padrão'});
   toast('Perfil de '+u.email+' atualizado.');await carregarUsuarios();
 }
 function abrirPaginasUsuario(id){
@@ -1546,7 +1546,7 @@ function abrirPaginasUsuario(id){
     if(p.grupo!==g){if(g!==null)html+='</div>';g=p.grupo;html+=`<div style="margin-bottom:10px"><div class="ro" style="font-weight:700;margin-bottom:4px">${esc(p.grupo)}</div>`}
     html+=`<label style="display:flex;gap:8px;align-items:center;padding:3px 0;font-size:13px"><input type="checkbox" class="usrp-chk" value="${p.key}" ${set.has(p.key)?'checked':''}> ${esc(p.label)}</label>`});
   html+='</div>';
-  abrirCustom(`<div class="mh"><div><h2>Páginas do RH</h2><div class="ro">${esc(u.email)}</div></div><button class="x" data-close="1">×</button></div>
+  abrirCustom(`<div class="mh"><div><h2>Páginas do Departamento Pessoal</h2><div class="ro">${esc(u.email)}</div></div><button class="x" data-close="1">×</button></div>
    <div class="sec"><label style="display:flex;gap:8px;align-items:center;margin-bottom:10px;padding:8px;background:var(--lb);border-radius:8px"><input type="checkbox" id="usrp-sem" ${!tem?'checked':''}> <b>Sem restrição (vê todas as páginas que o perfil permite)</b></label>
    <div id="usrp-lista" style="max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px;${!tem?'display:none':''}">${html}</div></div>
    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-close="1">Cancelar</button><button class="btn" id="usrp-ok" data-uid="${u.id}">Salvar</button></div>`);
@@ -1557,7 +1557,7 @@ async function salvarPaginasUsuario(id){
   if(!$('usrp-sem').checked){v=[...document.querySelectorAll('.usrp-chk:checked')].map(c=>c.value);if(!v.length){alert('Marque pelo menos uma página, ou deixe "Sem restrição".');return}}
   const r=await sb.from('profiles').update({rh_paginas:v}).eq('id',id);
   if(r.error){alert('Não consegui salvar: '+r.error.message);return}
-  auditar({acao:'Alterou páginas do RH',alvo:u.email,sec:'acesso',campo:'Páginas liberadas',antes:Array.isArray(u.rh_paginas)?u.rh_paginas.length+' página(s)':'sem restrição',depois:v?v.length+' página(s)':'sem restrição'});
+  auditar({acao:'Alterou páginas do Departamento Pessoal',alvo:u.email,sec:'acesso',campo:'Páginas liberadas',antes:Array.isArray(u.rh_paginas)?u.rh_paginas.length+' página(s)':'sem restrição',depois:v?v.length+' página(s)':'sem restrição'});
   fecharModal();toast('Páginas de '+u.email+' salvas.');await carregarUsuarios();
 }
 
@@ -1600,7 +1600,7 @@ const STAT_OPC=[['atrasada','NF em atraso'],['aprovAtraso','Aprovação atrasada
 function renderFat(){
   const el=$('v-fat');if(!el||tab!=='fat')return;
   const ed=podeFat();
-  el.innerHTML=`<div class="card"><h2>Medições e notas fiscais</h2><div class="ro" style="margin-bottom:8px">Cada linha é uma medição de um contrato, com a nota fiscal emitida e o pagamento da contratante. ${ed?'Lance a medição, anexe a medição aprovada quando a contratante aprovar, depois registre a NF e, por fim, o recebimento.':'Somente consulta (edição: Financeiro e Gestor do RH).'}</div>
+  el.innerHTML=`<div class="card"><h2>Medições e notas fiscais</h2><div class="ro" style="margin-bottom:8px">Cada linha é uma medição de um contrato, com a nota fiscal emitida e o pagamento da contratante. ${ed?'Lance a medição, anexe a medição aprovada quando a contratante aprovar, depois registre a NF e, por fim, o recebimento.':'Somente consulta (edição: Financeiro e Gestor do Departamento Pessoal).'}</div>
    <div class="tools"><input id="fat-q" placeholder="Buscar por cliente, contrato, medição ou nº da NF..." value="${esc(FATQ.q)}"><select id="fat-cli"><option value="">Todos os clientes</option>${fatClientes().map(c=>`<option ${c===FATQ.cli?'selected':''}>${esc(c)}</option>`).join('')}</select><select id="fat-st"><option value="">Todas as situações</option>${STAT_OPC.map(s=>`<option value="${s[0]}" ${s[0]===FATQ.st?'selected':''}>${s[1]}</option>`).join('')}</select>${ed?'<button class="btn" id="fat-novo">➕ Nova medição</button>':''}</div>
    <div id="fat-lista" style="overflow:auto"></div></div>`;
   renderFatLista();
@@ -1740,7 +1740,7 @@ async function perguntarIA(pergunta,fallback){
   }catch(e){return '⚠️ A IA não respondeu agora. Tente de novo em instantes.'+(fallback?'<br><br>'+fallback:'')}
 }
 
-/* ---------- WhatsApp real (número do RH, pedidos de atendimento e conversas) ---------- */
+/* ---------- WhatsApp real (número do Departamento Pessoal, pedidos de atendimento e conversas) ---------- */
 const WPPR={tickets:[],log:[],ult:{},carregado:false,carregando:false};
 const ATD={novo:false,busca:'',iniciando:false,sel:null,filtro:'abertos',msgs:[],enviando:false,rascunho:'',timer:null};
 const fmtFone=n=>{const d=dig(n).replace(/^55(?=\d{10,11}$)/,'');return d.length===11?`(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`:d.length===10?`(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`:String(n||'')};
@@ -1825,7 +1825,7 @@ function atdNovoHtml(){
 }
 async function atdIniciar(id){
   const e=EMP.find(x=>x.id===id);if(!e||ATD.iniciando)return;
-  if(!confirm('Enviar mensagem do RH para '+e.nome+' ('+fmtFone(e.tel)+')?\nO colaborador receberá: "Olá, '+String(e.nome).split(' ')[0]+'! Há uma atualização sobre o seu cadastro no RH... Podemos continuar o atendimento por aqui?"'))return;
+  if(!confirm('Enviar mensagem do RH para '+e.nome+' ('+fmtFone(e.tel)+')?\nO colaborador receberá: "Olá, '+String(e.nome).split(' ')[0]+'! Há uma atualização sobre o seu cadastro no Departamento Pessoal... Podemos continuar o atendimento por aqui?"'))return;
   ATD.iniciando=true;
   let d=null;
   try{
@@ -2020,7 +2020,7 @@ function avalHtml(){
     <div><label>Alertar se nota ≤</label><select id="aval-limite" ${ed?'':'disabled'}>${[1,2,3,4].map(n=>`<option value="${n}" ${n===lim?'selected':''}>${n}</option>`).join('')}</select></div>
     <div><label>E-mails que recebem o alerta (separe por vírgula)</label><input id="aval-email" placeholder="fulano@brasilpontes.com.br, ciclano@brasilpontes.com.br" value="${esc(AVAL.email||'')}" ${ed?'':'disabled'}></div>
    </div>
-   <div class="ro" style="margin-top:6px;line-height:1.6">Ao encerrar um atendimento, o assistente avisa o colaborador e pede uma nota de 1 a 5 e um comentário. Se a nota for igual ou menor que o limite, o gerente recebe um e-mail com o resumo e a conversa. ${ed?'':'(somente o Gestor do RH altera)'}${AVAL.email?'':'<br><b style="color:#d32f2f">⚠ Informe pelo menos um e-mail para que os alertas sejam enviados.</b>'}</div></div>
+   <div class="ro" style="margin-top:6px;line-height:1.6">Ao encerrar um atendimento, o assistente avisa o colaborador e pede uma nota de 1 a 5 e um comentário. Se a nota for igual ou menor que o limite, o gerente recebe um e-mail com o resumo e a conversa. ${ed?'':'(somente o Gestor do Departamento Pessoal altera)'}${AVAL.email?'':'<br><b style="color:#d32f2f">⚠ Informe pelo menos um e-mail para que os alertas sejam enviados.</b>'}</div></div>
   <div class="card"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><h2 style="margin:0;flex:1">⭐ Avaliações</h2>${chip('todas','Todas')}${chip('baixas','Notas baixas')}${chip('aguardando','Aguardando')}</div>
    ${vis.length?`<div style="overflow:auto"><table><thead><tr><th>Data</th><th>Colaborador</th><th>Atendente</th><th>Nota</th><th>Comentário</th><th>Situação</th></tr></thead><tbody>${vis.map(a=>`<tr><td>${atdHora(a.t)}</td><td><b>${esc(a.nome||fmtFone(a.telefone))}</b><div class="ro">${esc(fmtFone(a.telefone))}</div></td><td>${esc(a.atendente||'—')}</td><td style="white-space:nowrap;color:${a.nota!=null&&a.nota<=lim?'#d32f2f':'#f9a825'}" title="${a.nota!=null?a.nota+' de 5':''}">${avalEstrelas(a.nota)}</td><td style="max-width:340px;white-space:normal">${a.comentario?esc(a.comentario):'<span class="ro">—</span>'}${a.motivo?`<div class="ro">Assunto: ${esc(a.motivo)}</div>`:''}</td><td>${stTxt(a)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhuma avaliação ainda.</div>'}</div>`;
 }
@@ -2040,19 +2040,19 @@ document.addEventListener('change',ev=>{
   renderAval();
 });
 
-/* ---------- aba WhatsApp (número do RH + simulador): enxuta ---------- */
+/* ---------- aba WhatsApp (número do Departamento Pessoal + simulador): enxuta ---------- */
 function wppRealHtml(){
   if(!WPPR.carregado&&!WPPR.carregando&&PODE_ATENDER())setTimeout(carregarWppReal,0);
   const num=dig(WPP.numero),ed=perfil==='grh';
   const abertos=WPPR.tickets.filter(x=>!x.atendido).length;
-  return `<div class="card" style="border-color:#2e7d32"><h2>📱 Número do WhatsApp do RH</h2>
-   <div class="f" style="grid-template-columns:1fr auto;align-items:end"><div><label>Número do WhatsApp do RH (com DDD)</label><input id="wpp-numero" placeholder="(38) 99999-0000" value="${esc(fmtFone(WPP.numero))}" ${ed?'':'disabled'}></div>${num?`<a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/55${num.replace(/^55/,'')}?text=oi">Abrir conversa</a>`:''}</div>
-   <div class="ro" style="margin-top:6px;line-height:1.6">O colaborador cadastrado (telefone na ficha) manda <b>oi</b>, confirma os 4 últimos dígitos do CPF e conversa com o assistente sobre os <b>próprios</b> dados. Quem não tem cadastro não recebe nada. ${ed?'':'(somente o Gestor do RH altera o número)'}</div>
+  return `<div class="card" style="border-color:#2e7d32"><h2>📱 Número do WhatsApp do Departamento Pessoal</h2>
+   <div class="f" style="grid-template-columns:1fr auto;align-items:end"><div><label>Número do WhatsApp do Departamento Pessoal (com DDD)</label><input id="wpp-numero" placeholder="(38) 99999-0000" value="${esc(fmtFone(WPP.numero))}" ${ed?'':'disabled'}></div>${num?`<a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/55${num.replace(/^55/,'')}?text=oi">Abrir conversa</a>`:''}</div>
+   <div class="ro" style="margin-top:6px;line-height:1.6">O colaborador cadastrado (telefone na ficha) manda <b>oi</b>, confirma os 4 últimos dígitos do CPF e conversa com o assistente sobre os <b>próprios</b> dados. Quem não tem cadastro não recebe nada. ${ed?'':'(somente o Gestor do Departamento Pessoal altera o número)'}</div>
    <div style="margin-top:10px"><button class="btn" data-tab="atend">💬 Ir para o Atendimento${abertos?` (${abertos} em aberto)`:''}</button></div></div>`;
 }
 
 /* =====================================================================
-   PASSAGENS (RH solicita → Compras compra → Financeiro paga → Conferidos)
+   PASSAGENS (Departamento Pessoal solicita → Compras compra → Financeiro paga → Conferidos)
    Tabela única `passagens` do banco (a mesma do ERP de Compras).
    ===================================================================== */
 const PASS={lista:[],ref:[{key:'cafeM',nome:'Café da Manhã',hora:'06:30',valor:20},{key:'almoco',nome:'Almoço',hora:'12:00',valor:35},{key:'cafeT',nome:'Café da Tarde',hora:'15:30',valor:20},{key:'janta',nome:'Janta',hora:'20:00',valor:35}],obras:[],carregado:false,carregando:false,filtro:'andamento',conf:'pend',q:'',cd:'',sel:new Set()};
@@ -2194,7 +2194,7 @@ function passToolbar(t){
   if(t==='pconf'&&passPode(PASS_CONF))h+=`<span id="pass-selinfo" class="ro">${PASS.sel.size} selecionada(s)</span><button class="btn" data-pass="conferir">✔ Marcar como conferidas</button><button class="btn sec" data-pass="xlsx">⬇ Excel</button><button class="btn sec" data-pass="imprimir">🖨 Imprimir</button>`;
   return h+'</div>';
 }
-const PASS_TIT={psol:['✈️ Solicitações de passagem','O RH solicita, Compras compra e anexa a passagem, e o Financeiro paga. Acompanhe aqui cada etapa.'],pfin:['💰 Financeiro · passagens compradas','Passagens já compradas aguardando pagamento. Anexe o comprovante e marque como pago.'],phist:['📚 Histórico · passagens pagas',''],pconf:['✔ Conferir passagens','A Compras confere as passagens (extrato/fatura), marca como conferidas e exporta para subir o pedido de pagamento ao Financeiro.']};
+const PASS_TIT={psol:['✈️ Solicitações de passagem','O Departamento Pessoal solicita, Compras compra e anexa a passagem, e o Financeiro paga. Acompanhe aqui cada etapa.'],pfin:['💰 Financeiro · passagens compradas','Passagens já compradas aguardando pagamento. Anexe o comprovante e marque como pago.'],phist:['📚 Histórico · passagens pagas',''],pconf:['✔ Conferir passagens','A Compras confere as passagens (extrato/fatura), marca como conferidas e exporta para subir o pedido de pagamento ao Financeiro.']};
 function passTabHtml(t){
   if(!PASS.carregado&&!PASS.carregando)setTimeout(carregarPass,0);
   const T=PASS_TIT[t];
@@ -2308,7 +2308,7 @@ function passCompraModal(id){
   const r=PASS.lista.find(x=>x.id===id);if(!r||!passPode(PASS_COMPRA))return;
   passAbrir(`<div class="hd"><h2 style="margin:0">Registrar compra da passagem</h2></div><div class="secs" style="padding:12px 16px"><div class="ro" style="margin-bottom:8px">${esc(r.nome)} — ${esc(r.origem)} → ${esc(r.destino)}</div>
   <div class="f" style="grid-template-columns:1fr"><div><label>Valor da passagem (R$) *</label><input type="number" id="pc-valor" min="0" step="0.01"></div><div><label>Anexar passagem(ns) — PDF ou imagem (pode ser mais de uma: ida/volta)</label><input type="file" id="pc-anexos" accept="image/*,.pdf" multiple></div></div>
-  <div class="ro" style="margin:8px 0">Ao confirmar, a solicitação segue para o Financeiro e o RH passa a ver a passagem anexada.</div>
+  <div class="ro" style="margin:8px 0">Ao confirmar, a solicitação segue para o Financeiro e o Departamento Pessoal passa a ver a passagem anexada.</div>
   <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn sec" data-pass="fechar">Cancelar</button><button class="btn" data-pass="salvar-compra:${id}">✅ Comprado — enviar ao Financeiro</button></div></div>`);
 }
 async function passSalvarCompra(id,btn){
@@ -2377,7 +2377,7 @@ async function passSalvarExcl(id){
   const m=($('pe-motivo').value||'').trim();if(m.length<3){toast('Informe o motivo.');return}
   const u=await sb.from('passagens').update({exclusao_solicitada:true,exclusao_motivo:m,exclusao_solicitada_por:passNome(),exclusao_solicitada_em:new Date().toISOString()}).eq('id',id).select('id');
   if(u.error||!(u.data||[]).length){toast('Não consegui enviar o pedido.');return}
-  passFechar();toast('Pedido de exclusão enviado ao Gestor do RH.');await passRecarrega();
+  passFechar();toast('Pedido de exclusão enviado ao Gestor do Departamento Pessoal.');await passRecarrega();
 }
 async function passNegarExcl(id){
   if(perfil!=='grh')return;
@@ -2420,7 +2420,7 @@ function passImprimirLista(){
   passImprimir(`<div class="pass-rec" style="max-width:none"><img src="data:image/png;base64,${LOGO_BP_B64}" style="height:36px"><h3>Passagens conferidas · ${fmtD(passHoje())}</h3><table><tr>${['Nº','Colaborador','CD','Rota','Saída','Total (R$)','Pago em'].map(x=>`<th>${x}</th>`).join('')}</tr>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td>${esc(r.nome)}</td><td>${esc(r.cd)}</td><td>${esc(r.origem)} → ${esc(r.destino)}</td><td>${fmtD(r.data_saida)}</td><td>${brl(passTotal(r))}</td><td>${r.data_pagamento?fmtD(String(r.data_pagamento).slice(0,10)):'—'}</td></tr>`).join('')}<tr class="tot"><td colspan="5">TOTAL</td><td colspan="2">${brl(L.reduce((s,r)=>s+passTotal(r),0))}</td></tr></table></div>`);
 }
 
-/* ---------- recibo de refeições (o RH envia ao colaborador) ---------- */
+/* ---------- recibo de refeições (o Departamento Pessoal envia ao colaborador) ---------- */
 function passReciboHtml(r,logo){
   const ver=passVeValor();
   return `<div class="pass-rec">${logo?`<div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #1d3b6e;padding-bottom:8px;margin-bottom:8px"><img src="data:image/png;base64,${LOGO_BP_B64}" style="height:36px"><b style="font-size:15px">RECIBO DE REFEIÇÕES — VIAGEM</b></div>`:''}
@@ -2442,7 +2442,7 @@ function passReciboModal(id){
   passAbrir(`<div class="hd"><h2 style="margin:0">Recibo de refeições — viagem</h2></div><div class="secs" style="padding:12px 16px">${passReciboHtml(r,false)}<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap"><button class="btn sec" data-pass="fechar">Fechar</button><button class="btn sec" data-pass="copiar:${id}">📋 Copiar para WhatsApp</button><button class="btn" data-pass="imprimir-rec:${id}">🖨 Imprimir / PDF</button></div></div>`);
 }
 
-/* ---------- valores das refeições (Financeiro e Gestor do RH) ---------- */
+/* ---------- valores das refeições (Financeiro e Gestor do Departamento Pessoal) ---------- */
 function passValoresModal(){
   if(!passPode(PASS_FIN))return;
   passAbrir(`<div class="hd"><h2 style="margin:0">Valores e horários das refeições</h2></div><div class="secs" style="padding:12px 16px"><div class="ro" style="margin-bottom:8px">Usado para calcular as refeições de cada viagem. Vale para as próximas solicitações (as já criadas não mudam).</div><table><tr><th>Refeição</th><th>Horário de referência</th><th>Valor unit. (R$)</th></tr>${PASS.ref.map((r,i)=>`<tr><td>${esc(r.nome)}</td><td><input type="time" data-pass-ref="${i}|hora" value="${esc(r.hora)}"></td><td><input type="number" min="0" step="0.01" data-pass-ref="${i}|valor" value="${esc(r.valor)}" style="width:110px"></td></tr>`).join('')}</table><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-pass="fechar">Cancelar</button><button class="btn" data-pass="salvar-valores">Salvar valores</button></div></div>`);
@@ -2687,8 +2687,8 @@ function capaMostrar(on){
     CAPA.t=setInterval(()=>capaIr((CAPA.cur+1)%CAPAS_B64.length),7000)}
 }
 /* ---------- Setores: o menu lateral só tem SETORES; cada setor reúne abas de vários módulos ----------
-   (ex.: Passagens aparece em RH, Compras e Financeiro, cada um com a sua função).
-   Abas que ainda não existem no Sistema RH aparecem como "em migração" só para o Gestor do RH. */
+   (ex.: Passagens aparece em Departamento Pessoal, Compras e Financeiro, cada um com a sua função).
+   Abas que ainda não existem no Sistema RH aparecem como "em migração" só para o Gestor do Departamento Pessoal. */
 let SETOR=null,PH={l:''};
 const LBL={'wpp:wpp':'WhatsApp · número e simulador','compras:passagens':'Passagens · baixada e férias','contratos:contratos':'Contratos com clientes','pmo:painel':'PMO · Alertas','pmo:mob':'Contratos, CDs e mobilização','pmo:colab':'PMO · Colaboradores','wpp:atend':'WhatsApp · atendimento','wpp:aval':'WhatsApp · avaliações'};
 const SETORES_DEF=[
@@ -2700,7 +2700,7 @@ const SETORES_DEF=[
  {id:'obras',nome:'Obras',ico:'🏗',c:'#6b4fbb',mods:['pmo','contratos'],extras:[],ph:['CDs','Plano de ação','Painel geral']},
  {id:'sst',nome:'Saúde e Seg.',ico:'🦺',c:'#d9822b',mods:['sst'],extras:[],ph:[]},
  {id:'qual',nome:'Qualidade',ico:'✅',c:'#1b8a7a',mods:[],extras:[],ph:['Em definição']},
- {id:'rh',nome:'RH',ico:'👥',c:'#2f6fed',mods:['rh','wpp'],
+ {id:'rh',nome:'Dep. Pessoal',ico:'👥',c:'#2f6fed',mods:['rh','wpp'],
   grupos:[{m:'pass',l:'Passagens',subs:[['psol','Solicitar',['rh','grh']],['phist','Histórico',['rh','grh']]]}],ph:[]},
  {id:'fin',nome:'Financeiro',ico:'$',c:'#59b300',mods:['fin'],
   grupos:[{m:'pass',l:'Passagens',subs:[['pfin','Pagar',['fin','grh']],['phist','Histórico',['fin','grh']]]}],ph:['Contas a pagar','Reembolsos']},
@@ -2875,6 +2875,331 @@ function senhaModoRecuperacao(){
 }
 try{senhaIniciarTela()}catch(e){console.warn('senha',e)}
 
+/* =====================================================================
+   IMPORTAR PLANILHA (Departamento Pessoal)
+   A pessoa escolhe uma planilha (.xlsx ou .csv); a IA identifica o que é cada coluna
+   (a IA vê só os títulos e 3 linhas de exemplo, com os números trocados por 9);
+   o sistema mostra uma prévia e, ao confirmar, cria os colaboradores novos e completa as fichas dos que já existem.
+   ===================================================================== */
+const IMPX={arq:'',cab:[],linhas:[],mapa:[],orig:[],aviso:'',sobre:false,emp:'',prev:null,busy:false};
+const impxNorm=s=>String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9+\-]+/g,' ').replace(/[+\-]/g,m=>' '+m+' ').replace(/\s+/g,' ').trim();
+const impxTxt=s=>String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+const IMPX_SEC_FORA=['he','bonus','prov'];
+function impxCampos(){
+  const out=[];
+  SECOES.forEach(s=>{
+    if(IMPX_SEC_FORA.includes(s.id)||!s.campos||!s.campos.length||!roleOk(s.edit))return;
+    s.campos.forEach(c=>{if(out.some(o=>o.key===c[0]))return;out.push({key:c[0],label:c[1],tipo:c[2],opc:Array.isArray(c[3])?c[3]:null,sec:s.titulo})});
+  });
+  return out;
+}
+/* nomes comuns de coluna (sem acento e minúsculos) → campo da ficha */
+const IMPX_SIN={
+ nome:['nome','nome completo','colaborador','funcionario','empregado','nome do colaborador','nome do funcionario','nome do empregado','nome colaborador'],
+ cpf:['cpf','n cpf','numero cpf','cpf colaborador','cpf do colaborador'],
+ rg:['rg','identidade','registro geral','n rg','numero rg','rg identidade'],
+ pis:['pis','pasep','pis pasep','pis pasep nit','nit','n pis','numero pis','pis nit','n do pis'],
+ matricula:['matricula','mat','matr','n matricula','chapa','registro funcional','cod funcionario','codigo do funcionario'],
+ funcao:['funcao','cargo','ocupacao','cargo funcao','funcao cargo','cargo ocupacao','descricao do cargo'],
+ obra:['obra','cd','lotacao','local de trabalho','local','projeto','cd obra','obra atual','centro de distribuicao','posto de trabalho'],
+ empresa:['empresa','razao social','empregador','filial','cnpj da empresa','empresa cnpj'],
+ admissao:['admissao','data admissao','data de admissao','dt admissao','dt de admissao','admitido em','data de entrada','admissao data','inicio'],
+ contrato:['tipo de contrato','modalidade','modalidade de contrato','regime','vinculo','tipo contratacao','regime de contratacao','tipo de vinculo','tipo contrato'],
+ dataFimContrato:['fim do contrato','termino do contrato','data fim contrato','vigencia','vencimento do contrato','fim contrato','data termino'],
+ status:['situacao','status','situacao do colaborador'],
+ nasc:['nascimento','data nascimento','dt nascimento','data de nascimento','dt nasc','data nasc','nasc'],
+ estCivil:['estado civil','est civil'],
+ tel:['telefone','celular','fone','whatsapp','tel','telefone celular','n celular','contato'],
+ dependentes:['dependentes','n dependentes','qtd dependentes','numero de dependentes','dep'],
+ emergNome:['contato de emergencia','nome contato emergencia','emergencia nome','contato emergencia'],
+ emergTel:['telefone de emergencia','tel emergencia','fone emergencia','telefone emergencia'],
+ logradouro:['endereco','logradouro','rua','endereco completo','rua numero'],
+ bairro:['bairro'],
+ cidade:['cidade','municipio'],
+ uf:['uf','estado'],
+ cep:['cep','codigo postal'],
+ salario:['salario','salario base','remuneracao','vencimento','salario bruto','salario mensal','valor do salario'],
+ banco:['banco','nome do banco'],
+ agencia:['agencia','ag'],
+ conta:['conta','conta corrente','n conta','numero da conta','conta bancaria'],
+ pix:['pix','chave pix'],
+ cnhNum:['cnh','n cnh','numero cnh','n da cnh','registro cnh'],
+ cnhCat:['categoria cnh','cat cnh','categoria da cnh','categoria'],
+ cnhVal:['validade cnh','vencimento cnh','validade da cnh','vencimento da cnh'],
+ sangue:['tipo sanguineo','sangue','tipo de sangue','grupo sanguineo'],
+ alergias:['alergias','alergia','restricoes'],
+ camisa:['camisa','tamanho camisa','camiseta','uniforme camisa'],
+ calca:['calca','tamanho calca','uniforme calca'],
+ bota:['bota','botina','calcado','numero bota','n bota','numero do calcado'],
+ capacete:['capacete'],
+ asoPrev:['aso','data aso','proximo aso','aso previsto'],
+ aquisIni:['inicio periodo aquisitivo','periodo aquisitivo']
+};
+function impxMapaLocal(cab,campos){
+  const usados={};
+  return cab.map(h=>{
+    const n=impxTxt(h);if(!n)return null;
+    let k=null;
+    for(const c of campos){const sins=(IMPX_SIN[c.key]||[]).concat([impxTxt(c.label)]);if(sins.includes(n)){k=c.key;break}}
+    if(!k){for(const c of campos){const sins=IMPX_SIN[c.key]||[];if(sins.some(s=>s.length>=5&&n.includes(s))){k=c.key;break}}}
+    if(k&&usados[k])return null;
+    if(k)usados[k]=1;
+    return k;
+  });
+}
+/* ---------- leitura do arquivo ---------- */
+function impxCel(v){
+  if(v==null)return '';
+  if(Object.prototype.toString.call(v)==='[object Date]')return isNaN(v)?'':v.toISOString().slice(0,10);
+  if(typeof v==='object'){
+    if(v.richText)return v.richText.map(t=>t.text).join('');
+    if(v.result!==undefined)return impxCel(v.result);
+    if(v.text!==undefined)return impxCel(v.text);
+    if(v.hyperlink)return String(v.hyperlink);
+    return '';
+  }
+  return v;
+}
+function impxCsv(txt){
+  txt=String(txt).replace(/^﻿/,'');
+  const l1=txt.split(/\r?\n/)[0]||'';
+  const dl=[';',',','\t'].map(d=>[d,l1.split(d).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<txt.length;i++){
+    const ch=txt[i];
+    if(q){if(ch==='"'){if(txt[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}
+    else if(ch==='"')q=true;
+    else if(ch===dl){row.push(cur);cur=''}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&txt[i+1]==='\n')i++;row.push(cur);rows.push(row);row=[];cur=''}
+    else cur+=ch;
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row)}
+  return rows;
+}
+async function impxXlsx(buf){
+  if(!window.ExcelJS)throw new Error('A leitura de Excel não carregou (sem internet?). Salve a planilha como CSV e tente de novo.');
+  const wb=new ExcelJS.Workbook();await wb.xlsx.load(buf);
+  let best=null;wb.eachSheet(ws=>{const n=ws.actualRowCount||ws.rowCount;if(!best||n>best.n)best={ws,n}});
+  if(!best)throw new Error('A planilha está vazia.');
+  const ws=best.ws,rows=[],nc=ws.actualColumnCount||ws.columnCount;
+  ws.eachRow({includeEmpty:false},row=>{const a=[];for(let c=1;c<=nc;c++)a.push(impxCel(row.getCell(c).value));rows.push(a)});
+  return rows;
+}
+function impxTabela(rows){
+  rows=rows.filter(r=>r.some(c=>String(c==null?'':c).trim()!==''));
+  if(rows.length<2)throw new Error('Não encontrei linhas de dados na planilha.');
+  const ehTxt=c=>{const s=String(c==null?'':c).trim();return s!==''&&isNaN(Number(s.replace(',','.')))&&!/^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}$/.test(s)};
+  let h=0,best=-1;
+  rows.slice(0,15).forEach((r,i)=>{const n=r.filter(ehTxt).length;if(n>best){best=n;h=i}});
+  const cab=rows[h].map(c=>String(c==null?'':c).trim());
+  const linhas=rows.slice(h+1).slice(0,5000);
+  return {cab,linhas};
+}
+async function impxProcessar(nome,dado){
+  const ext=(String(nome).split('.').pop()||'').toLowerCase();
+  let rows;
+  if(ext==='xlsx'||ext==='xlsm')rows=await impxXlsx(dado);
+  else if(ext==='csv'||ext==='txt'){
+    let t=typeof dado==='string'?dado:new TextDecoder('utf-8').decode(dado);
+    if(t.includes('�')&&typeof dado!=='string')t=new TextDecoder('windows-1252').decode(dado);
+    rows=impxCsv(t);
+  }else if(ext==='xls')throw new Error('Arquivo .xls (Excel antigo) não é lido. Abra no Excel e salve como .xlsx ou .csv.');
+  else throw new Error('Use um arquivo .xlsx ou .csv.');
+  const T=impxTabela(rows);
+  IMPX.arq=nome;IMPX.cab=T.cab;IMPX.linhas=T.linhas;IMPX.prev=null;
+  const campos=impxCampos();
+  const loc=impxMapaLocal(IMPX.cab,campos);
+  IMPX.mapa=loc.slice();IMPX.orig=loc.map(k=>k?'auto':'');IMPX.aviso='';
+  try{
+    const ia=await impxIA(IMPX.cab,IMPX.linhas,campos);
+    if(ia){
+      const usados={};
+      IMPX.mapa=IMPX.cab.map((h,i)=>{
+        let k=ia[i];
+        if(k&&!campos.some(c=>c.key===k))k=null;
+        if(k)IMPX.orig[i]='ia';else k=loc[i];
+        if(k&&usados[k]){IMPX.orig[i]='';return null}
+        if(k)usados[k]=1;
+        return k||null;
+      });
+    }
+  }catch(e){IMPX.aviso='A IA não respondeu agora; usei o reconhecimento automático. Confira as colunas abaixo.'}
+}
+const impxMasc=v=>{if(v==null||v==='')return '';if(typeof v==='number')return String(v).replace(/\d/g,'9');return String(v).replace(/\d/g,'9').slice(0,40)};
+async function impxIA(cab,linhas,campos){
+  const colunas=cab.map((h,i)=>({n:i,coluna:h,exemplos:linhas.slice(0,3).map(r=>impxMasc(r[i])).filter(x=>x!=='')})).filter(c=>c.coluna);
+  const r=await sb.functions.invoke('mapear-planilha',{body:{colunas,campos:campos.map(c=>({key:c.key,rotulo:c.label,tipo:c.tipo,opcoes:c.opc?c.opc.slice(0,25):undefined}))}});
+  let d=r.data;
+  if(r.error&&r.error.context&&r.error.context.json){try{d=await r.error.context.json()}catch(e){}}
+  if(!d||!d.mapa)throw new Error((d&&d.error)||'sem resposta');
+  return d.mapa;
+}
+/* ---------- conversão dos valores ---------- */
+const impxOk=(y,m,d)=>{y=+y;m=+m;d=+d;if(m<1||m>12||d<1||d>31||y<1900||y>2100)return {aviso:'data inválida'};return {v:y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')}};
+function impxData(v){
+  if(v===''||v==null)return {v:''};
+  if(typeof v==='number'){if(v>20000&&v<80000)return {v:new Date(Date.UTC(1899,11,30)+Math.round(v)*86400000).toISOString().slice(0,10)};return {aviso:'data inválida'}}
+  const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return impxOk(m[1],m[2],m[3]);
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if(m){let a=+m[3];if(a<100)a+=a>50?1900:2000;return impxOk(a,m[2],m[1])}
+  return {aviso:'data inválida ("'+s.slice(0,20)+'")'};
+}
+function impxNum(v){
+  if(v===''||v==null)return {v:''};
+  if(typeof v==='number')return {v};
+  let s=String(v).replace(/R\$|\s/g,'');
+  if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',','.');else if(s.includes(','))s=s.replace(',','.');
+  const n=Number(s);return isNaN(n)?{aviso:'número inválido ("'+String(v).slice(0,15)+'")'}:{v:n};
+}
+function impxOpcao(v,opc){
+  const n=impxTxt(v);if(!n)return null;
+  const o=opc.map(x=>[x,impxTxt(x)]);
+  let r=o.filter(x=>x[1]===n);if(r.length===1)return r[0][0];
+  r=o.filter(x=>x[1]&&(x[1].startsWith(n)||n.startsWith(x[1])));if(r.length===1)return r[0][0];
+  r=o.filter(x=>x[1]&&(x[1].includes(n)||n.includes(x[1])));if(r.length===1)return r[0][0];
+  return null;
+}
+function impxConv(c,v){
+  if(v==null||String(v).trim()==='')return {v:''};
+  const k=c.key,t=c.tipo,s=typeof v==='string'?v.trim():v;
+  if(t==='date')return impxData(s);
+  if(t==='number')return impxNum(s);
+  if(k==='cpf'){let d=dig(s);if(d.length>=9&&d.length<11)d=d.padStart(11,'0');return d.length===11?{v:d.slice(0,3)+'.'+d.slice(3,6)+'.'+d.slice(6,9)+'-'+d.slice(9)}:{aviso:'CPF inválido ("'+String(s).slice(0,16)+'")'}}
+  if(k==='pis'){let d=dig(s);if(d.length>=8&&d.length<11)d=d.padStart(11,'0');return d.length===11?{v:d.slice(0,3)+'.'+d.slice(3,8)+'.'+d.slice(8,10)+'-'+d.slice(10)}:{aviso:'PIS inválido ("'+String(s).slice(0,16)+'")'}}
+  if(k==='cep'){let d=dig(s);if(d.length>=6&&d.length<8)d=d.padStart(8,'0');return d.length===8?{v:d.slice(0,5)+'-'+d.slice(5)}:{aviso:'CEP inválido'}}
+  if(k==='uf')return {v:String(s).trim().slice(0,2).toUpperCase()};
+  if(k==='motorista'){const n=impxTxt(s);return {v:['sim','s','x','1','true','yes'].includes(n)?'Sim':'Não'}}
+  if(k==='sangue'){const x=String(s).toUpperCase().replace(/\s+/g,'').replace('POSITIVO','+').replace('NEGATIVO','-');const o=(c.opc||[]).find(z=>z&&z===x);return o?{v:o}:{aviso:'tipo sanguíneo não reconhecido'}}
+  if(k==='funcao'){const o=impxOpcao(s,FUNCOES.filter(f=>f!=='Outra'));if(o)return {v:o};const f=titulo(String(s));return {v:f,novaFuncao:f}}
+  if(k==='obra'){
+    const o=impxOpcao(s,CDS);if(o)return {v:o};
+    const m=String(s).match(/(?:^|\D)0*(\d{1,3})(?!\d)/);
+    if(m){const ach=CDS.filter(x=>new RegExp('(?:^|\\D)0*'+m[1]+'(?!\\d)').test(x));if(ach.length===1)return {v:ach[0]}}
+    return {aviso:'obra "'+String(s).slice(0,20)+'" não existe nos CDs'};
+  }
+  if(c.opc){const o=impxOpcao(s,c.opc);return o?{v:o}:{aviso:c.label+': "'+String(s).slice(0,20)+'" não reconhecido'}}
+  return {v:String(s).trim()};
+}
+/* ---------- prévia ---------- */
+const impxVazio=(x,tipo)=>x===''||x==null||(tipo==='number'&&!Number(x));
+function impxPlanejar(){
+  const campos=impxCampos(),porKey={};campos.forEach(c=>porKey[c.key]=c);
+  const idx={};IMPX.mapa.forEach((k,i)=>{if(k&&!(k in idx))idx[k]=i});
+  const pCpf=new Map(),pMat=new Map(),pNome=new Map();
+  EMP.forEach(e=>{if(dig(e.cpf).length===11)pCpf.set(dig(e.cpf),e);if(e.matricula)pMat.set(impxTxt(e.matricula),e);pNome.set(norm(e.nome),e)});
+  const itens=[],vistos=new Set();
+  IMPX.linhas.forEach((r,li)=>{
+    const dados={},avisos=[];let novaFuncao='';
+    Object.keys(idx).forEach(k=>{
+      const c=porKey[k],x=impxConv(c,r[idx[k]]);
+      if(x.aviso)avisos.push(x.aviso);else if(x.v!==''&&x.v!=null){dados[k]=x.v;if(x.novaFuncao)novaFuncao=x.novaFuncao}
+    });
+    const nome=String(dados.nome||'').trim();
+    let ex=null;const cpf=dig(dados.cpf);
+    if(cpf.length===11)ex=pCpf.get(cpf)||null;
+    if(!ex&&dados.matricula)ex=pMat.get(impxTxt(dados.matricula))||null;
+    if(!ex&&nome)ex=pNome.get(norm(nome))||null;
+    const it={linha:li+2,nome:nome||(ex?ex.nome:''),dados,avisos,ex,novaFuncao,mudar:{},acao:'',motivo:''};
+    if(!nome&&!ex){it.acao='ignorar';it.motivo='sem nome';itens.push(it);return}
+    const chave=ex?'e'+ex.id:(cpf.length===11?'c'+cpf:'n'+norm(nome));
+    if(vistos.has(chave)){it.acao='ignorar';it.motivo='repetido na planilha';itens.push(it);return}
+    vistos.add(chave);
+    if(ex){
+      Object.keys(dados).forEach(k=>{
+        if(k==='nome')return;
+        const atual=ex[k],c=porKey[k];
+        if(String(atual)===String(dados[k]))return;
+        if(IMPX.sobre||impxVazio(atual,c.tipo))it.mudar[k]=dados[k];
+      });
+      it.acao=Object.keys(it.mudar).length?'atualiza':'igual';
+    }else it.acao='novo';
+    itens.push(it);
+  });
+  IMPX.prev={itens,n:{novo:itens.filter(i=>i.acao==='novo').length,atualiza:itens.filter(i=>i.acao==='atualiza').length,igual:itens.filter(i=>i.acao==='igual').length,ignorar:itens.filter(i=>i.acao==='ignorar').length}};
+}
+function impxAplicar(){
+  if(!isRH()||!IMPX.prev)return;
+  const emp=($('impx-emp')&&$('impx-emp').value)||IMPX.emp||EMPRESAS[0];
+  let nN=0,nA=0;
+  IMPX.prev.itens.forEach((it,i)=>{
+    if(it.novaFuncao)addFuncao(it.novaFuncao);
+    if(it.acao==='novo'){
+      const o=Object.assign({nome:it.nome,empresa:emp,legado:true},it.dados);
+      const e=mk(novoId()+i,o);EMP.push(e);nN++;
+      auditar({acao:'Cadastrou colaborador',alvo:e.nome,alvoId:e.id,sec:'ident',depois:'importado de planilha ('+IMPX.arq+')'});
+    }else if(it.acao==='atualiza'){
+      Object.keys(it.mudar).forEach(k=>{it.ex[k]=it.mudar[k]});nA++;
+      auditar({acao:'Atualizou ficha por planilha',alvo:it.ex.nome,alvoId:it.ex.id,sec:'ident',depois:Object.keys(it.mudar).length+' campo(s) · '+IMPX.arq});
+    }
+  });
+  fecharModal();agendarSync();render();
+  toast(nN+' colaborador(es) novo(s) e '+nA+' ficha(s) atualizada(s) pela planilha.');
+}
+/* ---------- telas ---------- */
+const impxCab=(t,sub)=>`<div class="mh"><div><h2>${t}</h2>${sub?`<div class="ro">${sub}</div>`:''}</div><button class="x" data-close="1">×</button></div>`;
+function impxAbrir(){
+  if(!isRH()){alert('Só o Departamento Pessoal pode importar planilhas.');return}
+  IMPX.arq='';IMPX.prev=null;IMPX.aviso='';IMPX.sobre=false;
+  abrirCustom(impxCab('Importar planilha','Escolha uma planilha com dados dos colaboradores. A IA identifica o que é cada coluna; você confere antes de salvar.')+
+   `<div class="sec"><label>Planilha (.xlsx ou .csv)</label><input type="file" id="impx-file" accept=".xlsx,.xlsm,.csv,.txt">
+   <div id="impx-msg" class="ro" style="margin-top:8px"></div>
+   <div class="ro" style="margin-top:10px">Não precisa ter todas as colunas: o que existir é preenchido (nome, CPF, RG, PIS, função, obra, admissão, salário, endereço, banco...). Colaboradores que já estão no sistema são reconhecidos pelo CPF, matrícula ou nome e só têm os campos vazios completados.<br><b>Privacidade:</b> a IA recebe apenas os títulos das colunas e 3 linhas de exemplo com os números trocados por 9. Os dados reais não saem do sistema.</div></div>
+   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-close="1">Cancelar</button></div>`);
+}
+async function impxArquivo(file){
+  const msg=$('impx-msg');if(!file)return;
+  if(file.size>8*1024*1024){msg.textContent='Arquivo grande demais (máx. 8 MB).';return}
+  msg.innerHTML='🔎 Lendo a planilha e identificando as colunas com a IA…';IMPX.busy=true;
+  try{
+    const dado=await new Promise((ok,er)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=()=>er(new Error('Não consegui ler o arquivo.'));fr.readAsArrayBuffer(file)});
+    await impxProcessar(file.name,dado);
+    impxMapeamento();
+  }catch(e){msg.textContent='⚠️ '+(e&&e.message||'Não consegui ler a planilha.')}
+  IMPX.busy=false;
+}
+function impxMapeamento(){
+  const campos=impxCampos();
+  const opts=k=>'<option value="">— ignorar esta coluna —</option>'+campos.map(c=>`<option value="${c.key}" ${k===c.key?'selected':''}>${esc(c.label)} (${esc(c.sec)})</option>`).join('');
+  const ex=i=>IMPX.linhas.slice(0,3).map(r=>String(r[i]==null?'':r[i])).filter(Boolean).map(x=>esc(x.slice(0,28))).join(' · ');
+  const n=IMPX.mapa.filter(Boolean).length;
+  $('modal').innerHTML=impxCab('Conferir colunas',`${esc(IMPX.arq)} · ${IMPX.linhas.length} linha(s) · ${n} coluna(s) reconhecida(s). Ajuste o que estiver errado.`)+
+   `<div class="sec">${IMPX.aviso?`<div class="ro" style="color:#a15c00;margin-bottom:6px">${esc(IMPX.aviso)}</div>`:''}
+   <div style="overflow:auto;max-height:380px"><table><thead><tr><th>Coluna da planilha</th><th>Exemplo</th><th>Vai para</th><th></th></tr></thead><tbody>
+   ${IMPX.cab.map((h,i)=>h?`<tr><td><b>${esc(h)}</b></td><td class="ro">${ex(i)}</td><td><select data-impxmap="${i}">${opts(IMPX.mapa[i])}</select></td><td>${IMPX.orig[i]==='ia'?'<span class="badge g">IA</span>':IMPX.orig[i]==='auto'?'<span class="badge">auto</span>':IMPX.orig[i]==='manual'?'<span class="badge">você</span>':''}</td></tr>`:'').join('')}
+   </tbody></table></div></div>
+   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-close="1">Cancelar</button><button class="btn" id="impx-prev">Ver prévia →</button></div>`;
+}
+function impxPrevia(){
+  if(!IMPX.mapa.some(k=>k==='nome'||k==='cpf')){alert('Indique qual coluna é o Nome (ou o CPF) para continuar.');return}
+  impxPlanejar();const P=IMPX.prev,N=P.n;
+  const rot={novo:'<span class="badge g">Novo</span>',atualiza:'<span class="badge w">Atualiza</span>',igual:'<span class="badge">Sem mudança</span>',ignorar:'<span class="badge r">Ignorada</span>'};
+  const det=it=>it.acao==='novo'?Object.keys(it.dados).filter(k=>k!=='nome').length+' campo(s)':it.acao==='atualiza'?Object.keys(it.mudar).length+' campo(s) a completar':it.acao==='ignorar'?it.motivo:'';
+  $('modal').innerHTML=impxCab('Prévia da importação',`${esc(IMPX.arq)} · ${N.novo} novo(s) · ${N.atualiza} para atualizar · ${N.igual} sem mudança · ${N.ignorar} ignorada(s)`)+
+   `<div class="sec"><div class="f" style="grid-template-columns:1fr 1fr">
+    <div><label>Empresa dos colaboradores novos</label><select id="impx-emp">${EMPRESAS.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
+    <div style="align-self:end"><label style="display:flex;gap:6px;align-items:center;color:var(--txt);font-size:13px"><input type="checkbox" id="impx-sobre" ${IMPX.sobre?'checked':''}> Sobrescrever campos já preenchidos</label></div></div>
+   <div style="overflow:auto;max-height:340px;margin-top:8px"><table><thead><tr><th>Linha</th><th>Nome</th><th>Ação</th><th>Detalhe</th><th>Avisos</th></tr></thead><tbody>
+   ${P.itens.slice(0,200).map(it=>`<tr><td>${it.linha}</td><td>${esc(it.nome||'—')}</td><td>${rot[it.acao]}</td><td class="ro">${esc(det(it))}</td><td class="ro" style="color:#a15c00">${esc(it.avisos.slice(0,3).join('; '))}</td></tr>`).join('')}
+   </tbody></table></div>${P.itens.length>200?`<div class="ro">Mostrando 200 de ${P.itens.length} linhas.</div>`:''}
+   <div class="ro" style="margin-top:6px">Novos colaboradores entram como "já estavam na empresa" (o checklist de admissão não gera alerta). Campos com aviso não são importados; confira depois na ficha. Quem já existe só recebe o que estava vazio, a não ser que você marque "Sobrescrever".</div></div>
+   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" id="impx-voltar">← Voltar</button><button class="btn" id="impx-ok" ${N.novo+N.atualiza?'':'disabled'}>Importar (${N.novo+N.atualiza})</button></div>`;
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest&&e.target.closest('[id]');if(!t)return;
+  if(t.id==='btn-imp-xls'){e.stopImmediatePropagation();impxAbrir()}
+  else if(t.id==='impx-prev'){e.stopImmediatePropagation();impxPrevia()}
+  else if(t.id==='impx-voltar'){e.stopImmediatePropagation();impxMapeamento()}
+  else if(t.id==='impx-ok'){e.stopImmediatePropagation();impxAplicar()}
+},true);
+document.addEventListener('change',e=>{
+  const t=e.target;if(!t)return;
+  if(t.id==='impx-file'&&t.files&&t.files[0])impxArquivo(t.files[0]);
+  else if(t.dataset&&t.dataset.impxmap!==undefined){const i=Number(t.dataset.impxmap);IMPX.mapa[i]=t.value||null;IMPX.orig[i]=t.value?'manual':'';
+    if(t.value)IMPX.mapa.forEach((k,j)=>{if(j!==i&&k===t.value){IMPX.mapa[j]=null;IMPX.orig[j]=''}});impxMapeamento()}
+  else if(t.id==='impx-sobre'){IMPX.sobre=t.checked;const emp=$('impx-emp').value;impxPrevia();$('impx-emp').value=emp}
+},true);
+
 const diffDias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
 const mesesTxt=n=>{const m=Math.floor(n/30.4375);return m>=1?` (~${m} ${m===1?'mês':'meses'})`:''};
 function refreshCDS(){const v=$('fobra').value;$('fobra').innerHTML='<option value="">Todas as obras</option>'+CDS.map(o=>`<option>${esc(o)}</option>`).join('');$('fobra').value=v}
@@ -2911,7 +3236,7 @@ function abrirNovoContrato(){
    <div><label>Vigência · início</label><input type="date" id="nc-vini"></div><div><label>Vigência · fim</label><input type="date" id="nc-vfim"></div>
    <div class="full"><label>Duração</label><div id="nc-dur" class="ro">Informe início e fim da vigência.</div></div>
    <div class="full"><label>Cronograma do contrato (anexo)</label><input type="file" id="nc-file"><div class="ro">O cronograma oficial, exigido a partir do kickoff, é anexado depois e reduz as datas de vigência.</div></div>
-   <div><label>Prazo total de mobilização (dias)</label><input type="number" id="nc-total" value="45"></div><div><label>Prazo do RH para contratar e deixar docs/ASO prontos (dias)</label><input type="number" id="nc-rh" value="10"></div>
+   <div><label>Prazo total de mobilização (dias)</label><input type="number" id="nc-total" value="45"></div><div><label>Prazo do Departamento Pessoal para contratar e deixar docs/ASO prontos (dias)</label><input type="number" id="nc-rh" value="10"></div>
    <div><label>Contratações previstas</label><input type="number" id="nc-prev" value="15"></div></div></div>
    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-close="1">Cancelar</button><button class="btn" id="nc-ok">Criar CD e contrato</button></div>`);
 }
@@ -2971,7 +3296,7 @@ const epiDe=fn=>(PGR.epis[fn]||BASE_EPI);
 const ENVIOS=[];
 function enviarEPI(P,p){
   p.epis=epiDe(p.funcao).slice();
-  ENVIOS.unshift({_id:novoId(),t:new Date(),quem:usuario?usuario.nome:'RH',pessoa:p.nome,funcao:p.funcao,contrato:P.nome,projId:P.id,itens:p.epis.slice(),p});
+  ENVIOS.unshift({_id:novoId(),t:new Date(),quem:usuario?usuario.nome:'Departamento Pessoal',pessoa:p.nome,funcao:p.funcao,contrato:P.nome,projId:P.id,itens:p.epis.slice(),p});
   auditar({acao:'Lista de EPI (PGR) enviada a Saúde e Segurança e Compras',alvo:p.nome+' · '+P.nome,alvoId:'proj'+P.id,sec:'proj',campo:p.funcao,depois:p.epis.length+' itens'});
 }
 
@@ -2990,9 +3315,9 @@ function renderPgr(){
   const pend=ENVIOS.filter(x=>!x.compra),cons={};pend.forEach(x=>x.itens.forEach(i=>cons[i]=(cons[i]||0)+1));
   const qt=fn=>EMP.filter(e=>e.funcao===fn&&e.status!=='Desligado').length;
   $('v-pgr').innerHTML=`<div class="card"><h2>PGR da empresa e EPIs por função</h2>
-   <div class="ro" style="margin-bottom:8px">Quando o RH registra uma contratação, o sistema consulta o PGR pela função e envia a lista de EPIs, ao mesmo tempo, para Saúde e Segurança e para o Compras.</div>
+   <div class="ro" style="margin-bottom:8px">Quando o Departamento Pessoal registra uma contratação, o sistema consulta o PGR pela função e envia a lista de EPIs, ao mesmo tempo, para Saúde e Segurança e para o Compras.</div>
    <div class="tools"><span>${PGR.arquivo?`📎 <b>${esc(PGR.arquivo)}</b> · ${esc(PGR.rev)} · anexado por ${esc(PGR.por)}${PGR.path?` <button class="btn sec" data-abrir="${esc(PGR.path)}">abrir</button>`:''}`:'Nenhum PGR anexado ainda. Os EPIs abaixo são uma sugestão inicial: ajuste conforme o PGR da empresa.'}</span>${ed?'<input type="file" id="pgr-file"><span class="ro">Arquivo .txt com linhas "Função: item, item" é lido na hora. PDF: anexe e ajuste a tabela abaixo.</span>':''}</div>
-   <div style="overflow:auto"><table><thead><tr><th>Função</th><th>EPIs exigidos pelo PGR</th><th>Colaboradores</th></tr></thead><tbody>${fns.map(fn=>`<tr><td><b>${esc(fn)}</b></td><td>${ed?`<input data-pgr="${esc(fn)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px" value="${esc(epiDe(fn).join(', '))}">`:esc(epiDe(fn).join(', '))}</td><td>${qt(fn)}</td></tr>`).join('')}</tbody></table></div>${ed?'':'<div class="ro" style="margin-top:6px">Somente leitura. Quem altera o PGR é Saúde e Segurança ou o Gestor do RH.</div>'}</div>
+   <div style="overflow:auto"><table><thead><tr><th>Função</th><th>EPIs exigidos pelo PGR</th><th>Colaboradores</th></tr></thead><tbody>${fns.map(fn=>`<tr><td><b>${esc(fn)}</b></td><td>${ed?`<input data-pgr="${esc(fn)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px" value="${esc(epiDe(fn).join(', '))}">`:esc(epiDe(fn).join(', '))}</td><td>${qt(fn)}</td></tr>`).join('')}</tbody></table></div>${ed?'':'<div class="ro" style="margin-top:6px">Somente leitura. Quem altera o PGR é Saúde e Segurança ou o Gestor do Departamento Pessoal.</div>'}</div>
    <div class="card" style="margin-top:16px"><h2>Consolidado para o Compras <span class="ro">· EPIs de contratados que ainda não receberam o kit (Saúde e Segurança)</span></h2>${Object.keys(cons).length?`<table class="matriz"><tr><th>Item</th><th>Quantidade</th></tr>${Object.entries(cons).sort((a,b)=>b[1]-a[1]).map(([i,n])=>`<tr><td style="text-align:left">${esc(i)}</td><td>${n}</td></tr>`).join('')}</table>`:'<div class="empty">Nenhum EPI pendente.</div>'}</div>
    <div class="card" style="margin-top:16px"><h2>Listas enviadas</h2><div style="overflow:auto"><table><thead><tr><th>Data</th><th>Colaborador</th><th>Função</th><th>Contrato</th><th>EPIs</th><th>Compras</th><th>Saúde e Segurança</th></tr></thead><tbody>${ENVIOS.map((x,xi)=>`<tr><td style="white-space:nowrap">${fmtDH(x.t)}</td><td>${esc(x.pessoa)}<div class="ro">por ${esc(x.quem)}</div></td><td>${esc(x.funcao)}</td><td>${esc(x.contrato)}</td><td>${esc(x.itens.join(', '))}</td><td>${x.compra?`<span class="badge ok">comprado por ${esc(x.compra)}</span>`:((perfil==='cmp'||perfil==='grh')&&mod==='compras'?`<button class="btn" data-epicomp="${xi}">✔ EPIs comprados</button>`:'<span class="badge w">a comprar</span>')}</td><td><span class="badge ${x.p.etapas.epi?'ok':'w'}">${x.p.etapas.epi?'kit entregue':'aguardando'}</span></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Nenhuma lista enviada.</td></tr>'}</tbody></table></div></div>`;
 }
@@ -3012,9 +3337,9 @@ function renderPassagens(){
   const ed=perfil==='cmp'||perfil==='grh',lib=[],pend=[],comp=[];
   PROJ.forEach(P=>P.pessoas.forEach((p,pi)=>{if(p.etapas.pass)comp.push({nome:p.nome,det:P.nome+' → '+P.obra,dt:p.etapas.pass});else if(!travada(p,'pass'))lib.push({nome:p.nome,funcao:p.funcao,det:P.obra,step:P.id+'|'+pi+'|pass'})}));
   EMP.forEach(e=>e.mob.forEach((m,i)=>{if(m.status==='Comprada')comp.push({nome:e.nome,det:m.tipo+': '+m.origem+' → '+m.destino,dt:m.data});else pend.push({e,m,i})}));
-  $('v-passagens').innerHTML=`<div class="card"><h2>Passagens · liberadas pela mobilização</h2><div class="ro" style="margin-bottom:8px">A passagem só aparece aqui depois que RH e Saúde e Segurança concluem o colaborador.</div>
+  $('v-passagens').innerHTML=`<div class="card"><h2>Passagens · liberadas pela mobilização</h2><div class="ro" style="margin-bottom:8px">A passagem só aparece aqui depois que Departamento Pessoal e Saúde e Segurança concluem o colaborador.</div>
    <div style="overflow:auto"><table><thead><tr><th>Colaborador</th><th>Função</th><th>Destino</th><th></th></tr></thead><tbody>${lib.map(x=>`<tr><td><b>${esc(x.nome)}</b></td><td>${esc(x.funcao)}</td><td>${esc(x.det)}</td><td>${ed?`<button class="btn" data-step="${x.step}">✔ Passagem comprada</button>`:''}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Nenhuma passagem liberada no momento.</td></tr>'}</tbody></table></div></div>
-   <div class="card" style="margin-top:16px"><h2>Passagens · baixada, férias e transferência <span class="ro">(pedidos do RH)</span></h2>
+   <div class="card" style="margin-top:16px"><h2>Passagens · baixada, férias e transferência <span class="ro">(pedidos do Departamento Pessoal)</span></h2>
    <div style="overflow:auto"><table><thead><tr><th>Colaborador</th><th>Tipo</th><th>Trecho</th><th>Data</th><th></th></tr></thead><tbody>${pend.map(x=>`<tr><td><b>${esc(x.e.nome)}</b></td><td>${esc(x.m.tipo)}</td><td>${esc(x.m.origem)} → ${esc(x.m.destino)}</td><td>${fmtD(x.m.data)}</td><td>${ed?`<button class="btn" data-mobokp="${x.e.id}|${x.i}">✔ Comprada</button>`:''}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Nenhum pedido pendente.</td></tr>'}</tbody></table></div></div>
    <div class="card" style="margin-top:16px"><h2>Já compradas</h2>${comp.map(x=>`<div class="item" style="padding:4px 0;border-bottom:1px solid var(--line)"><b>${esc(x.nome)}</b> · ${esc(x.det)} · ${fmtD(x.dt)}</div>`).join('')||'<div class="empty">Nada comprado ainda.</div>'}</div>`;
 }
@@ -3022,7 +3347,7 @@ function renderPassagens(){
 
 /* ---------- Comunicação entre módulos ---------- */
 const MODPERFIL={rh:'rh',grh:'rh',fin:'fin',sst:'sst',cmp:'compras',pmo:'pmo',plan:'pmo',dir:'dir'};
-const MODNOME={rh:'RH',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',dir:'Diretoria'};
+const MODNOME={rh:'Departamento Pessoal',fin:'Financeiro',sst:'Saúde e Segurança',compras:'Compras',pmo:'PMO',dir:'Diretoria'};
 function renderFeed(){
   if(!$('feed'))return;
   const cardF=$('feed').closest('.card');if(cardF)cardF.style.display=['rh','grh'].includes(perfil)?'':'none';
@@ -3038,7 +3363,7 @@ function renderTrein(){
   const ed=podeTrein();
   const L=EMP.filter(e=>e.status!=='Desligado');
   const tr=e=>e.docs.filter(d=>d.cat==='Treinamento');
-  $('v-trein').innerHTML=`<div class="card"><h2>Treinamentos · colaboradores</h2><div class="ro" style="margin-bottom:8px">O que a Saúde e Segurança lança aqui aparece na ficha do RH (Documentos e treinamentos) na mesma hora, com o nome de quem lançou.</div>
+  $('v-trein').innerHTML=`<div class="card"><h2>Treinamentos · colaboradores</h2><div class="ro" style="margin-bottom:8px">O que a Saúde e Segurança lança aqui aparece na ficha do Departamento Pessoal (Documentos e treinamentos) na mesma hora, com o nome de quem lançou.</div>
    <div style="overflow:auto"><table><thead><tr><th>Colaborador</th><th>Função</th><th>Obra</th><th>Treinamentos</th><th>Próximo vencimento</th><th></th></tr></thead><tbody>${L.map(e=>{const t=tr(e),v=t.map(d=>d.val).filter(Boolean).sort()[0],d=v?diasAte(v):null;
      return`<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.funcao)}</td><td>${esc(e.obra)}</td><td>${t.length}</td><td>${v?fmtD(v)+` <span class="badge ${d<0?'r':d<=30?'w':'g'}">${d<0?'vencido':d+' d'}</span>`:'—'}</td><td>${ed?`<button class="btn" data-trn="${e.id}">➕ Lançar treinamento</button>`:''}</td></tr>`}).join('')}</tbody></table></div></div>
    <div class="card" style="margin-top:16px"><h2>Contratados em mobilização · treinamentos e EPI</h2><div style="overflow:auto"><table><thead><tr><th>Colaborador</th><th>Função</th><th>Contrato</th><th>Etapas (clique para concluir)</th></tr></thead><tbody>${PROJ.flatMap(P=>P.pessoas.map((p,i)=>({P,p,i})).filter(x=>x.p.tipo==='Contratação')).map(x=>`<tr><td><b>${esc(x.p.nome)}</b></td><td>${esc(x.p.funcao)}</td><td>${esc(x.P.nome)}</td><td>${chipsHtml(x.P,x.i,x.p)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Nenhum contratado em mobilização.</td></tr>'}</tbody></table></div></div>`;
@@ -3057,7 +3382,7 @@ async function salvarTrein(id){
   let ax=null;if(f){ax=await anexar(f,'emp'+e.id);if(!ax)return}
   e.docs.push({cat:'Treinamento',nome:n+(f?' · '+f.name:'')+' · lançado por '+por+' (Saúde e Segurança) em '+fmtD($('tr-data').value),val,path:ax?ax.path:''});
   auditar({acao:'Lançou treinamento',alvo:e.nome,alvoId:e.id,sec:'docs',campo:'Treinamento',depois:n+(val?' · validade '+fmtD(val):'')});
-  fecharModal();render();toast('Treinamento lançado e já aparece na ficha do RH.');
+  fecharModal();render();toast('Treinamento lançado e já aparece na ficha do Departamento Pessoal.');
 }
 
 
@@ -3074,14 +3399,14 @@ const W_MENU='Escolha uma opção:\n*1* · Meu salário do mês\n*2* · Minhas h
 function wLog(e,campo,sec){auditar({acao:'Consulta via WhatsApp',quem:e.nome,email:e.tel,perfil:'',alvo:e.nome,alvoId:e.id,sec:sec||null,campo})}
 function wppRespostas(num,raw){
   const e=wEmp(num),t=norm(raw).trim();
-  if(!e)return['Este número não está cadastrado no RH da Brasil Pontes. Procure o RH da sua obra para atualizar seu cadastro.'];
+  if(!e)return['Este número não está cadastrado no RH da Brasil Pontes. Procure o Departamento Pessoal da sua obra para atualizar seu cadastro.'];
   const S=WPP.sess[num]=WPP.sess[num]||{ok:false,tries:0,ask:false,bloq:false};
-  if(S.bloq)return['Acesso bloqueado por tentativas incorretas. Procure o RH para liberar.'];
+  if(S.bloq)return['Acesso bloqueado por tentativas incorretas. Procure o Departamento Pessoal para liberar.'];
   if(!S.ok){
     if(!S.ask){S.ask=true;return['Olá, *'+e.nome.split(' ')[0]+'*! Sou o assistente do RH da Brasil Pontes. 👋\nPara sua segurança, digite os *4 últimos dígitos do seu CPF*.']}
     const cpf=dig(e.cpf).slice(-4);
     if(dig(raw)===cpf&&cpf){S.ok=true;S.tries=0;wLog(e,'Acesso confirmado (CPF)');return['Tudo certo! ✅\n'+W_MENU]}
-    S.tries++;if(S.tries>=3){S.bloq=true;wLog(e,'Acesso bloqueado (3 tentativas)');return['Muitas tentativas incorretas. Acesso bloqueado, procure o RH.']}
+    S.tries++;if(S.tries>=3){S.bloq=true;wLog(e,'Acesso bloqueado (3 tentativas)');return['Muitas tentativas incorretas. Acesso bloqueado, procure o Departamento Pessoal.']}
     return['Não confere. Digite os 4 últimos dígitos do seu CPF. (tentativa '+S.tries+' de 3)']}
   const op=/^[0-7]$/.test(t)?t:(/hora extra|\bhe\b/.test(t)?'2':/sal[aá]rio|holerite|contracheque|pagamento|quanto/.test(t)?'1':/f[eé]rias/.test(t)?'3':/baixada|folga/.test(t)?'4':/aso|treinamento|exame/.test(t)?'5':/passagem|viagem|transfer/.test(t)?'6':/rh|atendente|humano|falar/.test(t)?'7':/^(menu|oi|ola|bom dia|boa tarde|boa noite)/.test(t)?'m':'');
   const B=BENEF(e);
@@ -3090,18 +3415,18 @@ function wppRespostas(num,raw){
   if(op==='1'){const c=FOLHA.comp,l=linhaFolha(e,c);wLog(e,'Salário '+compLabel(c),'salario');
     if(!l)return['Não encontrei folha para você em '+compLabel(c)+'.'];
     const pg=fmtD(fmtISO(dataPgto(c)));
-    return[(isPJ(e)?'💰 *Valor do contrato · '+compLabel(c)+'*\nValor mensal: *'+brl(l.base)+'*'+(l.he?'\nHora extra aprovada: '+brl(l.he):'')+(l.bon?'\nBonificação: '+brl(l.bon):'')+'\nTotal bruto da nota: '+brl(l.total)+'\nRetenções na nota: − '+brl(l.ded1)+'\n*Líquido a receber: '+brl(l.liq)+'*':'💰 *Salário · '+compLabel(c)+'*\nSalário base: '+brl(l.base)+(l.fator<1?' (proporcional)':'')+'\nHora extra aprovada: '+brl(l.he)+'\nBonificação aprovada: '+brl(l.bon)+'\nDesconto de faltas: − '+brl(l.desc)+'\nTotal bruto: '+brl(l.total)+'\nINSS: − '+brl(l.inss)+'\nIRRF: − '+brl(l.irrf)+'\n*Líquido a receber: '+brl(l.liq)+'*')+'\nPagamento previsto: *'+pg+'* (5º dia útil)'+(l.pend?'\n⚠ Há hora extra/bonificação ainda aguardando aprovação do RH, fora deste total.':'')+(isPJ(e)?'':'\n_Cálculo conforme a tabela de impostos do RH. O contracheque oficial vem da folha._')]}
+    return[(isPJ(e)?'💰 *Valor do contrato · '+compLabel(c)+'*\nValor mensal: *'+brl(l.base)+'*'+(l.he?'\nHora extra aprovada: '+brl(l.he):'')+(l.bon?'\nBonificação: '+brl(l.bon):'')+'\nTotal bruto da nota: '+brl(l.total)+'\nRetenções na nota: − '+brl(l.ded1)+'\n*Líquido a receber: '+brl(l.liq)+'*':'💰 *Salário · '+compLabel(c)+'*\nSalário base: '+brl(l.base)+(l.fator<1?' (proporcional)':'')+'\nHora extra aprovada: '+brl(l.he)+'\nBonificação aprovada: '+brl(l.bon)+'\nDesconto de faltas: − '+brl(l.desc)+'\nTotal bruto: '+brl(l.total)+'\nINSS: − '+brl(l.inss)+'\nIRRF: − '+brl(l.irrf)+'\n*Líquido a receber: '+brl(l.liq)+'*')+'\nPagamento previsto: *'+pg+'* (5º dia útil)'+(l.pend?'\n⚠ Há hora extra/bonificação ainda aguardando aprovação do Departamento Pessoal, fora deste total.':'')+(isPJ(e)?'':'\n_Cálculo conforme a tabela de impostos do Departamento Pessoal. O contracheque oficial vem da folha._')]}
   if(op==='2'){wLog(e,'Horas extras','he');if(!B.he)return['Seu contrato não tem hora extra.'];const v=valHE(e);
     return['⏱ *Horas extras · '+e.mesRef+'*\nHoras a 50%: '+e.h50+'h ('+brl(v.t50)+')\nHoras a 100%: '+e.h100+'h ('+brl(v.t100)+')\n*Total: '+brl(v.t50+v.t100)+'*\nSituação: *'+e.heAprov.status+'*'+(e.heAprov.status==='Reprovada'&&e.heAprov.obs?'\nMotivo: '+e.heAprov.obs:'')]}
   if(op==='3'){wLog(e,'Férias','ferias');if(!B.ferias)return['Seu contrato (PJ) não tem férias.'];
-    return['🏖 *Férias*\nPeríodo aquisitivo desde: '+(e.aquisIni?fmtD(e.aquisIni):'—')+'\nFérias programadas: '+(e.feriasIni?fmtD(e.feriasIni)+' ('+e.feriasDias+' dias)':'ainda não programadas')+'\nO RH confirma as datas com você antes.']}
+    return['🏖 *Férias*\nPeríodo aquisitivo desde: '+(e.aquisIni?fmtD(e.aquisIni):'—')+'\nFérias programadas: '+(e.feriasIni?fmtD(e.feriasIni)+' ('+e.feriasDias+' dias)':'ainda não programadas')+'\nO Departamento Pessoal confirma as datas com você antes.']}
   if(op==='4'){wLog(e,'Baixada','baixada');if(!e.dataObra||!e.diasBaixada)return['Sua baixada ainda não foi calculada. Fale com o RH.'];const p=prevBaixada(e),d=diasAte(p);
     return['🚌 *Baixada*\nEntrada na obra: '+fmtD(e.dataObra)+'\nPeríodo: '+e.diasBaixada+' dias\nPrevisão da baixada: *'+fmtD(p)+'*'+(d>=0?' (faltam '+d+' dias)':' (já passou)')]}
   if(op==='5'){wLog(e,'ASO e treinamentos','aso');const a=asoStatus(e),tr=e.docs.filter(d=>d.cat==='Treinamento');
     return['🩺 *ASO:* '+a[0]+(e.asoPrev?'\nPrevisto: '+fmtD(e.asoPrev):'')+(e.asoConf?'\nConfirmado: '+fmtD(e.asoConf):'')+'\n\n📄 *Treinamentos:* '+(tr.length?'\n'+tr.map(d=>'• '+d.nome.split(' · ')[0]+(d.val?' (validade '+fmtD(d.val)+')':'')).join('\n'):'nenhum lançado')]}
   if(op==='6'){wLog(e,'Passagem','mob');const L=e.mob;
     return[L.length?'🎫 *Suas passagens*\n'+L.map(m=>'• '+m.tipo+': '+m.origem+' → '+m.destino+' em '+fmtD(m.data)+' · *'+m.status+'*').join('\n'):'Você não tem passagem solicitada no momento.']}
-  if(op==='7'){WPP.tickets.unshift({t:new Date(),emp:e.id,nome:e.nome,tel:e.tel,ok:false});wLog(e,'Pediu atendimento do RH');return['Certo! Avisei o RH, que vai falar com você por aqui. 🙋']}
+  if(op==='7'){WPP.tickets.unshift({t:new Date(),emp:e.id,nome:e.nome,tel:e.tel,ok:false});wLog(e,'Pediu atendimento do RH');return['Certo! Avisei o Departamento Pessoal, que vai falar com você por aqui. 🙋']}
 }
 function wppEnviar(txt){
   txt=String(txt||'').trim();if(!txt||!WPP.num)return;
@@ -3122,7 +3447,7 @@ function renderWpp(foco){
     <div class="ph-msgs" id="wpp-msgs">${M.length?M.map(m=>`<div class="bb ${m.de}">${wFmt(m.txt)}<i class="h">${m.h}${m.de==='me'?' ✓✓':''}</i></div>`).join(''):'<div class="bb bot">Envie <b>oi</b> para começar.</div>'}</div>
     <div class="ph-q">${S&&S.ok?['1|Salário','2|Horas extras','3|Férias','4|Baixada','5|ASO e treinamentos','6|Passagem','7|Falar com o RH','0|Sair'].map(x=>{const [k,l]=x.split('|');return`<button data-wq="${k}">${l}</button>`}).join(''):'<button data-wq="oi">oi</button>'}</div>
     <div class="ph-in"><input id="wpp-in" placeholder="Mensagem" autocomplete="off"><button id="wpp-send">➤</button></div></div></div>
-   <div>${wppRealHtml()}<div class="alert w" style="margin-top:16px"><div class="t">Simulador</div><div class="d">Esta área simula a conversa para você testar as respostas sem gastar mensagens (usa os dados do cadastro, sem IA).</div></div><div class="card"><h2>Como funciona</h2><div class="ro" style="line-height:1.7">O colaborador chama o número do RH no WhatsApp. O sistema reconhece o telefone pelo cadastro, confirma com os 4 últimos dígitos do CPF e responde com os dados <b>dele mesmo</b>, direto da ficha e da folha: salário do mês, horas extras, férias, baixada, ASO, treinamentos e passagens. Quem não está cadastrado não recebe nada. Três tentativas erradas bloqueiam o acesso. Toda consulta fica registrada na auditoria. A opção 7 abre um atendimento para o RH.</div></div>
+   <div>${wppRealHtml()}<div class="alert w" style="margin-top:16px"><div class="t">Simulador</div><div class="d">Esta área simula a conversa para você testar as respostas sem gastar mensagens (usa os dados do cadastro, sem IA).</div></div><div class="card"><h2>Como funciona</h2><div class="ro" style="line-height:1.7">O colaborador chama o número do Departamento Pessoal no WhatsApp. O sistema reconhece o telefone pelo cadastro, confirma com os 4 últimos dígitos do CPF e responde com os dados <b>dele mesmo</b>, direto da ficha e da folha: salário do mês, horas extras, férias, baixada, ASO, treinamentos e passagens. Quem não está cadastrado não recebe nada. Três tentativas erradas bloqueiam o acesso. Toda consulta fica registrada na auditoria. A opção 7 abre um atendimento para o Departamento Pessoal.</div></div>
    <div class="card" style="margin-top:16px"><h2>Atendimentos pedidos pelo WhatsApp</h2>${WPP.tickets.length?`<table class="matriz"><tr><th>Quando</th><th>Colaborador</th><th>Telefone</th><th></th></tr>${WPP.tickets.map((x,i)=>`<tr><td>${fmtDH(x.t)}</td><td style="text-align:left">${esc(x.nome)}</td><td>${esc(x.tel)}</td><td>${x.ok?'<span class="badge ok">atendido</span>':`<button class="btn" data-wtk="${i}">✔ Atendido</button>`}</td></tr>`).join('')}</table>`:'<div class="empty">Nenhum pedido.</div>'}</div>
    <div class="card" style="margin-top:16px"><h2>Últimas consultas</h2>${logs.length?logs.map(a=>`<div class="item" style="padding:4px 0;border-bottom:1px solid var(--line)">${fmtDH(a.t)} · <b>${esc(a.alvo)}</b> · ${esc(a.campo)}</div>`).join(''):'<div class="empty">Nenhuma consulta ainda.</div>'}</div></div></div>`;
   const box=$('wpp-msgs');if(box)box.scrollTop=box.scrollHeight;
@@ -3131,7 +3456,7 @@ function renderWpp(foco){
 
 
 /* =====================================================================
-   IMPOSTOS E ENCARGOS (parâmetros editáveis pelo RH, vindos da contabilidade)
+   IMPOSTOS E ENCARGOS (parâmetros editáveis pelo Departamento Pessoal, vindos da contabilidade)
    ===================================================================== */
 const IMP={
  atualizado:'',fonte:'Valores iniciais de referência. Substitua pelos que a contabilidade enviar.',
@@ -3175,7 +3500,7 @@ function renderImp(){
   const emp=Object.keys(IMP.emp);
   const L=linhasFolha(FOLHA.comp);const soma=(a,k)=>a.reduce((s,x)=>s+x[k],0);
   $('v-imp').innerHTML=`<div class="card"><h2>Impostos e encargos</h2>
-   <div class="alert w" style="margin-bottom:10px"><div class="t">Confirme com a contabilidade</div><div class="d">Os valores abaixo são parâmetros iniciais de referência. ${ed?'Preencha com o que a contabilidade enviar: cada mudança vale para a folha, o WhatsApp e a ficha na hora e fica na auditoria.':'Somente leitura para o Financeiro. Quem altera é o RH.'}</div></div>
+   <div class="alert w" style="margin-bottom:10px"><div class="t">Confirme com a contabilidade</div><div class="d">Os valores abaixo são parâmetros iniciais de referência. ${ed?'Preencha com o que a contabilidade enviar: cada mudança vale para a folha, o WhatsApp e a ficha na hora e fica na auditoria.':'Somente leitura para o Financeiro. Quem altera é o Departamento Pessoal.'}</div></div>
    <div class="tools"><label>Fonte / observação <input data-imp="fonte" data-impl="Fonte" ${dis} value="${esc(IMP.fonte)}" style="width:380px"></label><label>Atualizado em <input data-imp="atualizado" data-impl="Atualizado em" ${dis} value="${esc(IMP.atualizado)}" placeholder="ex.: 01/11/2026" style="width:120px"></label></div></div>
    <div class="dashgrid" style="margin-top:16px">
    <div class="card"><h2>INSS do empregado (tabela progressiva · todas as empresas)</h2><table class="matriz"><tr><th>Faixa até (R$)</th><th>Alíquota (%)</th></tr>${IMP.inss.faixas.map((f,i)=>`<tr><td>${n('inss.faixas.'+i+'.0','INSS faixa '+(i+1)+' limite',f[0],110)}</td><td>${n('inss.faixas.'+i+'.1','INSS faixa '+(i+1)+' alíquota',f[1],70)}</td></tr>`).join('')}</table><div style="margin-top:6px">Teto do salário de contribuição (R$) ${n('inss.teto','INSS teto',IMP.inss.teto,110)}</div></div>
@@ -3239,8 +3564,8 @@ document.addEventListener('click',async ev=>{
   if(t.dataset.mobok!==undefined){const m=e.mob[Number(t.dataset.mobok)];m.status='Comprada';auditar({acao:'Passagem comprada',alvo:e.nome,alvoId:e.id,sec:'mob',campo:m.origem+' → '+m.destino,antes:'Pendente',depois:'Comprada'});render()}
   if(t.dataset.delfalta!==undefined){const f=e.faltas[Number(t.dataset.delfalta)];auditar({acao:'Removeu falta/atestado',alvo:e.nome,alvoId:e.id,sec:'faltas',campo:f.tipo+' '+fmtD(f.data),antes:f.dias+' dia(s)',depois:'(removido)'});e.faltas.splice(Number(t.dataset.delfalta),1);render()}
   if(t.id==='nf-add'){const dt=$('nf-data').value;if(!dt){alert('Informe a data.');return}const f=$('nf-file').files[0];let ax=null;if(f){ax=await anexar(f,'emp'+e.id);if(!ax)return}e.faltas.push({data:dt,dias:Number($('nf-dias').value)||1,tipo:$('nf-tipo').value,anexo:ax?ax.nome:'',anexoPath:ax?ax.path:'',obs:$('nf-obs').value.trim()});auditar({acao:'Registrou falta/atestado',alvo:e.nome,alvoId:e.id,sec:'faltas',campo:$('nf-tipo').value+' '+fmtD(dt),depois:(Number($('nf-dias').value)||1)+' dia(s)'+(f?' · anexo '+f.name:'')});render()}
-  if(t.dataset.bonaprov){const obs=($('bon-obs')||{value:''}).value.trim();if(t.dataset.bonaprov==='Reprovada'&&!obs){alert('Informe o motivo da reprovação.');return}const ant=e.bonAprov.status;e.bonAprov={status:t.dataset.bonaprov,por:usuario?usuario.nome:'Gestor do RH',em:fmtISO(HOJE),obs};auditar({acao:t.dataset.bonaprov==='Aprovada'?'Aprovou bonificação':'Reprovou bonificação',alvo:e.nome,alvoId:e.id,sec:'bonus',campo:'Bonificação '+e.bonMes,antes:ant,depois:t.dataset.bonaprov+(obs?' · '+obs:'')});render()}
-  if(t.dataset.heaprov){const obs=($('he-obs')||{value:''}).value.trim();if(t.dataset.heaprov==='Reprovada'&&!obs){alert('Informe o motivo da reprovação.');return}const ant=e.heAprov.status;e.heAprov={status:t.dataset.heaprov,por:usuario?usuario.nome:'Gestor do RH',em:fmtISO(HOJE),obs};auditar({acao:t.dataset.heaprov==='Aprovada'?'Aprovou hora extra':'Reprovou hora extra',alvo:e.nome,alvoId:e.id,sec:'he',campo:'Hora extra',antes:ant,depois:t.dataset.heaprov+(obs?' · '+obs:'')});render()}
+  if(t.dataset.bonaprov){const obs=($('bon-obs')||{value:''}).value.trim();if(t.dataset.bonaprov==='Reprovada'&&!obs){alert('Informe o motivo da reprovação.');return}const ant=e.bonAprov.status;e.bonAprov={status:t.dataset.bonaprov,por:usuario?usuario.nome:'Gestor do Departamento Pessoal',em:fmtISO(HOJE),obs};auditar({acao:t.dataset.bonaprov==='Aprovada'?'Aprovou bonificação':'Reprovou bonificação',alvo:e.nome,alvoId:e.id,sec:'bonus',campo:'Bonificação '+e.bonMes,antes:ant,depois:t.dataset.bonaprov+(obs?' · '+obs:'')});render()}
+  if(t.dataset.heaprov){const obs=($('he-obs')||{value:''}).value.trim();if(t.dataset.heaprov==='Reprovada'&&!obs){alert('Informe o motivo da reprovação.');return}const ant=e.heAprov.status;e.heAprov={status:t.dataset.heaprov,por:usuario?usuario.nome:'Gestor do Departamento Pessoal',em:fmtISO(HOJE),obs};auditar({acao:t.dataset.heaprov==='Aprovada'?'Aprovou hora extra':'Reprovou hora extra',alvo:e.nome,alvoId:e.id,sec:'he',campo:'Hora extra',antes:ant,depois:t.dataset.heaprov+(obs?' · '+obs:'')});render()}
   if(t.id==='nd-add'){const f=$('nd-file').files[0];if(!f){alert('Escolha um arquivo.');return}const cc=$('nd-cat').value==='Contracheque',comp=$('nd-comp')?$('nd-comp').value:'';if(cc&&!comp){alert('Informe o mês de referência do contracheque.');return}const ax=await anexar(f,'emp'+e.id);if(!ax)return;e.docs.push({cat:$('nd-cat').value,nome:f.name,val:cc?'':$('nd-val').value,path:ax.path,comp:cc?comp:''});auditar({acao:'Anexou documento',alvo:e.nome,alvoId:e.id,sec:'docs',campo:$('nd-cat').value,depois:f.name+($('nd-val').value?' · validade '+fmtD($('nd-val').value):'')});render()}
   if(t.id==='nm-add'){const de=$('nm-de').value,dt=$('nm-dt').value;if(!de||!dt){alert('Selecione o destino e a data.');return}if(de===$('nm-or').value){alert('Origem e destino não podem ser iguais.');return}e.mob.push({tipo:$('nm-tipo').value,origem:$('nm-or').value,destino:de,data:dt,status:'Pendente'});auditar({acao:'Registrou mobilização/transferência',alvo:e.nome,alvoId:e.id,sec:'mob',campo:$('nm-tipo').value,depois:$('nm-or').value+' → '+de+' em '+fmtD(dt)});render()}
 });
@@ -3249,7 +3574,7 @@ document.addEventListener('change',async ev=>{
   if(t.id==='mob-sel'){mobSel=Number(t.value);renderMob();return}
   if(t.dataset.usrperfil&&usuario&&usuario.mestre){alterarPerfilUsuario(t.dataset.usrperfil,t.value);return}
   if(t.id==='usrp-sem'){$('usrp-lista').style.display=t.checked?'none':'';return}
-  if(t.id==='wpp-numero'&&perfil==='grh'){const v=dig(t.value);if(v!==dig(WPP.numero)){auditar({acao:'Alterou número do WhatsApp do RH',alvo:'WhatsApp',sec:'proj',campo:'Número',antes:fmtFone(WPP.numero),depois:fmtFone(v)});WPP.numero=v}render();return}
+  if(t.id==='wpp-numero'&&perfil==='grh'){const v=dig(t.value);if(v!==dig(WPP.numero)){auditar({acao:'Alterou número do WhatsApp do Departamento Pessoal',alvo:'WhatsApp',sec:'proj',campo:'Número',antes:fmtFone(WPP.numero),depois:fmtFone(v)});WPP.numero=v}render();return}
   if(t.id==='fat-cli'){FATQ.cli=t.value;renderFatLista();return}
   if(t.id==='fat-st'){FATQ.st=t.value;renderFatLista();return}
   if(t.id==='pgr-file'&&t.files[0]&&podeEditPgr()){anexarPgr(t.files[0]);return}

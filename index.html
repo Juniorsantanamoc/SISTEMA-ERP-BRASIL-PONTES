@@ -7795,7 +7795,7 @@ async function loadAndRenderUsuarios(){
   }).join('') : `<tr class="empty-row"><td colspan="6">Nenhum usuário encontrado.</td></tr>`;
   renderPedidosAcesso();
 }
-const RH_PERFIS = [['grh','Gestor do RH (mestre do RH)'],['rh','RH'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['plan','Planejamento'],['dir','Diretoria'],['nenhum','Bloquear acesso ao RH']];
+const RH_PERFIS = [['grh','Gestor do Departamento Pessoal (mestre)'],['rh','Departamento Pessoal'],['fin','Financeiro'],['sst','Saúde e Segurança'],['cmp','Compras'],['pmo','PMO'],['plan','Planejamento'],['dir','Diretoria'],['nenhum','Bloquear acesso ao RH']];
 /* páginas do sistema do RH que cada usuário pode ver (só o Mestre configura; null = sem restrição) */
 const RH_CATALOGO = [
   {grupo:'RH', key:'rh:painel', label:'Painel'}, {grupo:'RH', key:'rh:colab', label:'Colaboradores'}, {grupo:'RH', key:'rh:mob', label:'Mobilização de contratos'}, {grupo:'RH', key:'rh:imp', label:'Impostos e encargos'},
