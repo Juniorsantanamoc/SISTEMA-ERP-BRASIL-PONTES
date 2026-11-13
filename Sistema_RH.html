@@ -2057,7 +2057,10 @@ function wppRealHtml(){
    ===================================================================== */
 const PASS={lista:[],ref:[{key:'cafeM',nome:'Café da Manhã',hora:'06:30',valor:20},{key:'almoco',nome:'Almoço',hora:'12:00',valor:35},{key:'cafeT',nome:'Café da Tarde',hora:'15:30',valor:20},{key:'janta',nome:'Janta',hora:'20:00',valor:35}],obras:[],carregado:false,carregando:false,filtro:'andamento',conf:'pend',q:'',cd:'',sel:new Set()};
 const PASS_CRIA=['rh','grh','cmp'],PASS_COMPRA=['cmp','grh'],PASS_FIN=['fin','grh'],PASS_CONF=['cmp','grh'];
-const PASS_TIPOS=['Aérea/Ida','Aérea/Volta','Ônibus/Ida','Ônibus/Volta'];
+const PASS_TIPOS=['Aérea/Ida','Aérea/Volta','Aérea/Ida e volta','Ônibus/Ida','Ônibus/Volta','Ônibus/Ida e volta'];
+const passIV=r=>/ida e volta/i.test((r&&r.tipo)||'');
+const passVoltaDT=r=>passIV(r)&&r.data_saida_volta?`<div class="ro">Volta: ${fmtD(r.data_saida_volta)} ${passHM(r.hora_saida_volta)}</div>`:'';
+const passVoltaCh=r=>passIV(r)&&r.data_chegada_volta?`<div class="ro">Volta: ${fmtD(r.data_chegada_volta)} ${passHM(r.hora_chegada_volta)}</div>`:'';
 const PASS_QKEY={cafeM:'qtd_cafe_m',almoco:'qtd_almoco',cafeT:'qtd_cafe_t',janta:'qtd_janta'};
 const passPode=l=>l.includes(perfil);
 const passVeValor=()=>perfil!=='rh';
@@ -2168,13 +2171,13 @@ function passLista(t){
   const ver=passVeValor(),obs=r=>r.obs?`<div class="ro" style="max-width:240px;white-space:normal" title="${esc(r.obs)}">📝 ${esc(String(r.obs).length>60?String(r.obs).slice(0,58)+'…':r.obs)}</div>`:'';
   let h='';
   if(t==='psol'){
-    h=`<table>${passTh(['Nº','Colaborador','CD','Rota','Saída','Chegada','Refeições','Uber/Táxi','Total colab.','Passagem','Status','Ações'])}<tbody>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b><div class="ro">por ${passQuem(r)}</div>${obs(r)}${(r.anexos_documento||[]).length?`<div>${passChips(r.anexos_documento)}</div>`:''}</td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}</td><td>${passDT(r.data_chegada,r.hora_chegada)}</td><td style="white-space:nowrap">${passRefs(r)}</td><td>${brl(r.uber)}</td><td>${brl(r.total_colaborador)}</td><td>${passChips(r.anexos_passagem)}${ver&&r.valor_passagem!=null&&r.status!=='pendente'?`<div class="ro">${brl(r.valor_passagem)}</div>`:''}</td><td>${passBadge(r.status)}</td><td>${passAcoes(r,t)}</td></tr>`).join('')}</tbody></table>`;
+    h=`<table>${passTh(['Nº','Colaborador','CD','Rota','Saída','Chegada','Refeições','Uber/Táxi','Total colab.','Passagem','Status','Ações'])}<tbody>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b><div class="ro">por ${passQuem(r)}</div>${obs(r)}${(r.anexos_documento||[]).length?`<div>${passChips(r.anexos_documento)}</div>`:''}</td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}${passVoltaDT(r)}</td><td>${passDT(r.data_chegada,r.hora_chegada)}${passVoltaCh(r)}</td><td style="white-space:nowrap">${passRefs(r)}</td><td>${brl(r.uber)}</td><td>${brl(r.total_colaborador)}</td><td>${passChips(r.anexos_passagem)}${ver&&r.valor_passagem!=null&&r.status!=='pendente'?`<div class="ro">${brl(r.valor_passagem)}</div>`:''}</td><td>${passBadge(r.status)}</td><td>${passAcoes(r,t)}</td></tr>`).join('')}</tbody></table>`;
   }else if(t==='pfin'){
-    h=`<table>${passTh(['Nº','Colaborador','CD','Rota','Saída','Chegada','Refeições + Uber','Passagem','Total geral','Docs / passagem / comprovante','Ações'])}<tbody>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b><div class="ro">por ${passQuem(r)}</div>${obs(r)}</td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}</td><td>${passDT(r.data_chegada,r.hora_chegada)}</td><td>${brl(r.total_colaborador)}</td><td>${brl(r.valor_passagem)}</td><td><b>${brl(passTotal(r))}</b></td><td>${passChips(r.anexos_documento)}<br>${passChips(r.anexos_passagem)}<br>${passChips(r.anexos_comprovante)}</td><td>${passAcoes(r,t)}</td></tr>`).join('')}</tbody></table>`;
+    h=`<table>${passTh(['Nº','Colaborador','CD','Rota','Saída','Chegada','Refeições + Uber','Passagem','Total geral','Docs / passagem / comprovante','Ações'])}<tbody>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b><div class="ro">por ${passQuem(r)}</div>${obs(r)}</td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}${passVoltaDT(r)}</td><td>${passDT(r.data_chegada,r.hora_chegada)}${passVoltaCh(r)}</td><td>${brl(r.total_colaborador)}</td><td>${brl(r.valor_passagem)}</td><td><b>${brl(passTotal(r))}</b></td><td>${passChips(r.anexos_documento)}<br>${passChips(r.anexos_passagem)}<br>${passChips(r.anexos_comprovante)}</td><td>${passAcoes(r,t)}</td></tr>`).join('')}</tbody></table>`;
   }else if(t==='phist'){
-    h=`<table>${passTh(['Nº','Colaborador','CD','Rota','Saída','Chegada','Refeições + Uber','Passagem','Total geral','Anexos','Pago em','Conferido','Ações'])}<tbody>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b><div class="ro">por ${passQuem(r)}</div>${obs(r)}</td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}</td><td>${passDT(r.data_chegada,r.hora_chegada)}</td><td>${brl(r.total_colaborador)}</td><td>${ver?brl(r.valor_passagem):'—'}</td><td>${ver?`<b>${brl(passTotal(r))}</b>`:brl(r.total_colaborador)}</td><td>${passChips(r.anexos_passagem)}${passChips(r.anexos_comprovante)}</td><td>${r.data_pagamento?fmtDH(r.data_pagamento).slice(0,16):'—'}</td><td>${r.conferido?'<span class="badge g">sim</span>':'<span class="badge w">não</span>'}</td><td><button class="btn sec" data-pass="recibo:${r.id}">🧾 Recibo</button></td></tr>`).join('')}</tbody></table>`;
+    h=`<table>${passTh(['Nº','Colaborador','CD','Rota','Saída','Chegada','Refeições + Uber','Passagem','Total geral','Anexos','Pago em','Conferido','Ações'])}<tbody>${L.map(r=>`<tr><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b><div class="ro">por ${passQuem(r)}</div>${obs(r)}</td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}${passVoltaDT(r)}</td><td>${passDT(r.data_chegada,r.hora_chegada)}${passVoltaCh(r)}</td><td>${brl(r.total_colaborador)}</td><td>${ver?brl(r.valor_passagem):'—'}</td><td>${ver?`<b>${brl(passTotal(r))}</b>`:brl(r.total_colaborador)}</td><td>${passChips(r.anexos_passagem)}${passChips(r.anexos_comprovante)}</td><td>${r.data_pagamento?fmtDH(r.data_pagamento).slice(0,16):'—'}</td><td>${r.conferido?'<span class="badge g">sim</span>':'<span class="badge w">não</span>'}</td><td><button class="btn sec" data-pass="recibo:${r.id}">🧾 Recibo</button></td></tr>`).join('')}</tbody></table>`;
   }else{
-    h=`<table>${passTh(['<input type="checkbox" data-pass-selall="1" title="Marcar todos">','Nº','Colaborador','CD','Rota','Saída','Refeições + Uber','Passagem','Total geral','Pago em','Conferido'])}<tbody>${L.map(r=>`<tr><td><input type="checkbox" data-pass-sel="${r.id}" ${PASS.sel.has(r.id)?'checked':''}></td><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b></td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}</td><td>${brl(r.total_colaborador)}</td><td>${brl(r.valor_passagem)}</td><td><b>${brl(passTotal(r))}</b></td><td>${r.data_pagamento?fmtDH(r.data_pagamento).slice(0,16):'—'}</td><td>${r.conferido?`<span class="badge g" title="${esc((r.conferido_por||'')+' em '+(r.conferido_em?fmtDH(r.conferido_em).slice(0,16):''))}">conferido</span>`:'<span class="badge w">a conferir</span>'}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="8">Total (${L.length})</td><td colspan="3">${brl(L.reduce((s,r)=>s+passTotal(r),0))}</td></tr></tfoot></table>`;
+    h=`<table>${passTh(['<input type="checkbox" data-pass-selall="1" title="Marcar todos">','Nº','Colaborador','CD','Rota','Saída','Refeições + Uber','Passagem','Total geral','Pago em','Conferido'])}<tbody>${L.map(r=>`<tr><td><input type="checkbox" data-pass-sel="${r.id}" ${PASS.sel.has(r.id)?'checked':''}></td><td>${esc(r.numero)}</td><td><b>${esc(r.nome)}</b></td><td>${esc(r.cd)}</td><td>${passRota(r)}</td><td>${passDT(r.data_saida,r.hora_saida)}${passVoltaDT(r)}</td><td>${brl(r.total_colaborador)}</td><td>${brl(r.valor_passagem)}</td><td><b>${brl(passTotal(r))}</b></td><td>${r.data_pagamento?fmtDH(r.data_pagamento).slice(0,16):'—'}</td><td>${r.conferido?`<span class="badge g" title="${esc((r.conferido_por||'')+' em '+(r.conferido_em?fmtDH(r.conferido_em).slice(0,16):''))}">conferido</span>`:'<span class="badge w">a conferir</span>'}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="8">Total (${L.length})</td><td colspan="3">${brl(L.reduce((s,r)=>s+passTotal(r),0))}</td></tr></tfoot></table>`;
   }
   return `<div style="overflow:auto">${h}</div>`;
 }
@@ -2228,18 +2231,26 @@ function passFormHtml(p,r){
   <div class="f" style="grid-template-columns:1fr 1fr"><div><label>Origem *</label><input id="${p}-origem" value="${v('origem')}"></div><div><label>Destino *</label><input id="${p}-destino" value="${v('destino')}"></div></div>
   <div class="f" style="grid-template-columns:1fr"><div><label>Tipo *</label><select id="${p}-tipo">${PASS_TIPOS.map(t=>`<option ${r&&r.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
   <div class="f" style="grid-template-columns:repeat(4,1fr)"><div><label>Data saída *</label><input type="date" id="${p}-ds" value="${esc(r?r.data_saida:passHoje())}"></div><div><label>Hora saída *</label><input type="time" id="${p}-hs" value="${esc(r?passHM(r.hora_saida):'08:00')}"></div><div><label>Data chegada *</label><input type="date" id="${p}-dc" value="${esc(r?r.data_chegada:passHoje())}"></div><div><label>Hora chegada *</label><input type="time" id="${p}-hc" value="${esc(r?passHM(r.hora_chegada):'18:00')}"></div></div>
+  <div id="${p}-volta" style="display:${passIV(r)?'block':'none'}"><div class="ro" style="margin:4px 0"><b>Viagem de volta</b></div><div class="f" style="grid-template-columns:repeat(4,1fr)"><div><label>Data saída (volta) *</label><input type="date" id="${p}-dsv" value="${esc(r&&r.data_saida_volta||'')}"></div><div><label>Hora saída (volta) *</label><input type="time" id="${p}-hsv" value="${esc(r&&r.hora_saida_volta?passHM(r.hora_saida_volta):'08:00')}"></div><div><label>Data chegada (volta) *</label><input type="date" id="${p}-dcv" value="${esc(r&&r.data_chegada_volta||'')}"></div><div><label>Hora chegada (volta) *</label><input type="time" id="${p}-hcv" value="${esc(r&&r.hora_chegada_volta?passHM(r.hora_chegada_volta):'18:00')}"></div></div></div>
   <div class="f" style="grid-template-columns:1fr"><div><label>Uber / Táxi (R$)</label><input type="number" id="${p}-uber" min="0" step="0.01" value="${esc(r?r.uber:0)}"></div></div>
   ${edit?'':`<div class="f" style="grid-template-columns:1fr"><div><label>Documento do colaborador (RG/CPF) — foto ou PDF</label><input type="file" id="${p}-doc" accept="image/*,.pdf" multiple></div></div>`}
   <div class="f" style="grid-template-columns:1fr"><div><label>Observação (aparece no recibo)</label><textarea id="${p}-obs" rows="3" placeholder="Se houver rota alternativa feita por outro meio de locomoção, descreva aqui e informe o valor em Uber / Táxi.">${esc(r&&r.obs||'')}</textarea></div></div>
   <div class="ro" id="${p}-prev" style="margin:8px 0"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn sec" data-pass="fechar">Cancelar</button><button class="btn" data-pass="${edit?'salvar-edit:'+r.id:'salvar-nova'}">${edit?'Salvar alterações':'Criar solicitação'}</button></div></div>`;
 }
+const passSomaQ=(a,b)=>{const o={};PASS.ref.forEach(r=>{o[r.key]=(a[r.key]||0)+(b[r.key]||0)});return o};
 function passPreview(p){
   const el=$(p+'-prev');if(!el)return;
   const g=k=>($(p+'-'+k)||{}).value||'';
+  const iv=passIV({tipo:g('tipo')});
   if(!g('ds')||!g('dc')){el.textContent='';return}
   if(!passOrdemOk(g('ds'),g('hs'),g('dc'),g('hc'))){el.innerHTML='<b style="color:#d32f2f">Verifique as datas: a chegada não pode ser antes da saída.</b>';return}
-  const q=passCalc(g('ds'),g('hs'),g('dc'),g('hc'));
+  let q=passCalc(g('ds'),g('hs'),g('dc'),g('hc'));
+  if(iv){
+    if(!g('dsv')||!g('dcv')){el.innerHTML='<span class="ro">Preencha também as datas da volta para calcular as refeições.</span>';return}
+    if(!passOrdemOk(g('dsv'),g('hsv'),g('dcv'),g('hcv'))||!passOrdemOk(g('dc'),g('hc'),g('dsv'),g('hsv'))){el.innerHTML='<b style="color:#d32f2f">Verifique as datas da volta: ela não pode começar antes da chegada da ida, nem terminar antes de começar.</b>';return}
+    q=passSomaQ(q,passCalc(g('dsv'),g('hsv'),g('dcv'),g('hcv')));
+  }
   el.innerHTML='Refeições: '+PASS.ref.map(r=>esc(r.nome)+': <b>'+(q[r.key]||0)+'</b>').join(' · ')+' · Total refeições: <b>'+brl(passValorRef(q))+'</b>';
 }
 function passLer(p){
@@ -2249,7 +2260,16 @@ function passLer(p){
   if(falta.length)return{erro:'Preencha: '+falta.join(', ')+'.'};
   if(!passOrdemOk(d.data_saida,d.hora_saida,d.data_chegada,d.hora_chegada))return{erro:'A data/hora de chegada não pode ser antes da saída.'};
   if(d.uber<0)return{erro:'Uber / Táxi não pode ser negativo.'};
-  const q=passCalc(d.data_saida,d.hora_saida,d.data_chegada,d.hora_chegada),vr=passValorRef(q);
+  let q=passCalc(d.data_saida,d.hora_saida,d.data_chegada,d.hora_chegada);
+  if(passIV(d)){
+    const v={dsv:g('dsv'),hsv:g('hsv'),dcv:g('dcv'),hcv:g('hcv')};
+    if(!v.dsv||!v.hsv||!v.dcv||!v.hcv)return{erro:'Preencha as datas e horas da viagem de volta.'};
+    if(!passOrdemOk(v.dsv,v.hsv,v.dcv,v.hcv))return{erro:'Na volta, a chegada não pode ser antes da saída.'};
+    if(!passOrdemOk(d.data_chegada,d.hora_chegada,v.dsv,v.hsv))return{erro:'A volta não pode começar antes da chegada da ida.'};
+    Object.assign(d,{data_saida_volta:v.dsv,hora_saida_volta:v.hsv,data_chegada_volta:v.dcv,hora_chegada_volta:v.hcv});
+    q=passSomaQ(q,passCalc(v.dsv,v.hsv,v.dcv,v.hcv));
+  }else Object.assign(d,{data_saida_volta:null,hora_saida_volta:null,data_chegada_volta:null,hora_chegada_volta:null});
+  const vr=passValorRef(q);
   Object.assign(d,{qtd_cafe_m:q.cafeM||0,qtd_almoco:q.almoco||0,qtd_cafe_t:q.cafeT||0,qtd_janta:q.janta||0,valor_refeicoes:vr,total_colaborador:vr+d.uber});
   return{d};
 }
@@ -2398,7 +2418,7 @@ async function passConferir(){
 }
 const passSelecionadas=()=>passLinhas('pconf').filter(r=>PASS.sel.has(r.id));
 const passCab=['Nº','Colaborador','CD','Origem','Destino','Tipo','Saída','Chegada','Refeições + Uber (R$)','Passagem (R$)','Total (R$)','Pago em','Conferido por'];
-const passLin=r=>[r.numero,r.nome,r.cd,r.origem,r.destino,r.tipo,fmtD(r.data_saida)+' '+passHM(r.hora_saida),fmtD(r.data_chegada)+' '+passHM(r.hora_chegada),Number(r.total_colaborador)||0,Number(r.valor_passagem)||0,passTotal(r),r.data_pagamento?fmtDH(r.data_pagamento).slice(0,16):'',r.conferido?(r.conferido_por||'sim'):''];
+const passLin=r=>[r.numero,r.nome,r.cd,r.origem,r.destino,r.tipo,fmtD(r.data_saida)+' '+passHM(r.hora_saida)+(passIV(r)&&r.data_saida_volta?' / volta '+fmtD(r.data_saida_volta)+' '+passHM(r.hora_saida_volta):''),fmtD(r.data_chegada)+' '+passHM(r.hora_chegada)+(passIV(r)&&r.data_chegada_volta?' / volta '+fmtD(r.data_chegada_volta)+' '+passHM(r.hora_chegada_volta):''),Number(r.total_colaborador)||0,Number(r.valor_passagem)||0,passTotal(r),r.data_pagamento?fmtDH(r.data_pagamento).slice(0,16):'',r.conferido?(r.conferido_por||'sim'):''];
 async function passExportar(){
   const L=passSelecionadas();if(!L.length){toast('Marque as passagens que quer exportar.');return}
   const nome='passagens_'+passHoje();
@@ -2425,12 +2445,12 @@ function passReciboHtml(r,logo){
   const ver=passVeValor();
   return `<div class="pass-rec">${logo?`<div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #1d3b6e;padding-bottom:8px;margin-bottom:8px"><img src="data:image/png;base64,${LOGO_BP_B64}" style="height:36px"><b style="font-size:15px">RECIBO DE REFEIÇÕES — VIAGEM</b></div>`:''}
   <h3 style="margin:4px 0">${esc(r.nome)}</h3><div class="ro">${esc(r.cd)} · Solicitação Nº ${esc(r.numero)}</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;font-size:13px;margin:8px 0"><div><b>CPF:</b> ${esc(r.cpf||'—')}</div><div><b>RG:</b> ${esc(r.rg||'—')}</div><div><b>Nascimento:</b> ${r.data_nascimento?fmtD(r.data_nascimento):'—'}</div><div><b>Tipo:</b> ${esc(r.tipo)}</div><div style="grid-column:1/3"><b>Rota:</b> ${esc(r.origem)} → ${esc(r.destino)}</div><div><b>Saída:</b> ${fmtD(r.data_saida)} ${passHM(r.hora_saida)}</div><div><b>Chegada:</b> ${fmtD(r.data_chegada)} ${passHM(r.hora_chegada)}</div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;font-size:13px;margin:8px 0"><div><b>CPF:</b> ${esc(r.cpf||'—')}</div><div><b>RG:</b> ${esc(r.rg||'—')}</div><div><b>Nascimento:</b> ${r.data_nascimento?fmtD(r.data_nascimento):'—'}</div><div><b>Tipo:</b> ${esc(r.tipo)}</div><div style="grid-column:1/3"><b>Rota:</b> ${esc(r.origem)} → ${esc(r.destino)}</div><div><b>Saída:</b> ${fmtD(r.data_saida)} ${passHM(r.hora_saida)}</div><div><b>Chegada:</b> ${fmtD(r.data_chegada)} ${passHM(r.hora_chegada)}</div>${passIV(r)&&r.data_saida_volta?`<div><b>Saída (volta):</b> ${fmtD(r.data_saida_volta)} ${passHM(r.hora_saida_volta)}</div><div><b>Chegada (volta):</b> ${fmtD(r.data_chegada_volta)} ${passHM(r.hora_chegada_volta)}</div>`:''}</div>
   <table><tr><th>Refeição</th><th>Qtde</th><th>Vlr unit.</th><th>Subtotal</th></tr>${PASS.ref.map(x=>{const q=r[PASS_QKEY[x.key]]||0;return `<tr><td>${esc(x.nome)}</td><td>${q}</td><td>${brl(x.valor)}</td><td>${brl(q*(Number(x.valor)||0))}</td></tr>`}).join('')}<tr><td colspan="3">Uber / Táxi</td><td>${brl(r.uber)}</td></tr><tr class="tot"><td colspan="3">Valor que o colaborador pode gastar na viagem (refeições + Uber/Táxi)</td><td>${brl(r.total_colaborador)}</td></tr>${ver?`<tr><td colspan="3">Passagem (transporte)</td><td>${r.valor_passagem!=null?brl(r.valor_passagem):'—'}</td></tr><tr class="tot"><td colspan="3">TOTAL GERAL</td><td>${brl(passTotal(r))}</td></tr>`:''}</table>
   ${r.obs?`<div style="margin-top:8px;font-size:13px"><b>Observação:</b> ${esc(r.obs)}</div>`:''}</div>`;
 }
 function passTextoRecibo(r){
-  const L=['*Brasil Pontes Engenharia — Recibo de refeições (viagem)*','',r.nome,'Rota: '+r.origem+' → '+r.destino+' ('+r.tipo+')','Saída: '+fmtD(r.data_saida)+' '+passHM(r.hora_saida),'Chegada: '+fmtD(r.data_chegada)+' '+passHM(r.hora_chegada),''];
+  const L=['*Brasil Pontes Engenharia — Recibo de refeições (viagem)*','',r.nome,'Rota: '+r.origem+' → '+r.destino+' ('+r.tipo+')','Saída: '+fmtD(r.data_saida)+' '+passHM(r.hora_saida),'Chegada: '+fmtD(r.data_chegada)+' '+passHM(r.hora_chegada)].concat(passIV(r)&&r.data_saida_volta?['Saída (volta): '+fmtD(r.data_saida_volta)+' '+passHM(r.hora_saida_volta),'Chegada (volta): '+fmtD(r.data_chegada_volta)+' '+passHM(r.hora_chegada_volta)]:[],['']);
   PASS.ref.forEach(x=>{const q=r[PASS_QKEY[x.key]]||0;if(q)L.push(q+'× '+x.nome+' ('+brl(x.valor)+') = '+brl(q*(Number(x.valor)||0)))});
   if(Number(r.uber))L.push('Uber/Táxi: '+brl(r.uber));
   L.push('','*Valor disponível para a viagem: '+brl(r.total_colaborador)+'*');
@@ -2493,12 +2513,18 @@ document.addEventListener('click',ev=>{
 document.addEventListener('input',ev=>{
   const t=ev.target;if(!t)return;
   if(t.id==='pass-q'){PASS.q=t.value;passAtualiza()}
-  else if(/^(np|ep)-(ds|hs|dc|hc)$/.test(t.id||''))passPreview(t.id.slice(0,2));
+  else if(/^(np|ep)-(ds|hs|dc|hc|dsv|hsv|dcv|hcv)$/.test(t.id||''))passPreview(t.id.slice(0,2));
 });
 document.addEventListener('change',ev=>{
   const t=ev.target;if(!t||!usuario)return;
   if(t.id==='pass-cd'){PASS.cd=t.value;passAtualiza();return}
-  if(/^(np|ep)-(ds|hs|dc|hc)$/.test(t.id||'')){passPreview(t.id.slice(0,2));return}
+  if(/^(np|ep)-(ds|hs|dc|hc|dsv|hsv|dcv|hcv)$/.test(t.id||'')){passPreview(t.id.slice(0,2));return}
+  if(/^(np|ep)-tipo$/.test(t.id||'')){
+    const p=t.id.slice(0,2),vb=$(p+'-volta');
+    if(vb){const iv=passIV({tipo:t.value});vb.style.display=iv?'block':'none';
+      if(iv&&!($(p+'-dsv').value)){$(p+'-dsv').value=$(p+'-dc').value;$(p+'-dcv').value=$(p+'-dc').value}}
+    passPreview(p);return;
+  }
   if(/^(np|ep)-nome$/.test(t.id||'')){
     const p=t.id.slice(0,2),e=passEmpPorNome(t.value);if(!e)return;
     const set=(k,v)=>{const el=$(p+'-'+k);if(el&&v)el.value=v};
