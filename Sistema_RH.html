@@ -167,7 +167,7 @@ body:not(.out) main{padding-left:108px}body:not(.out) .aviso{padding-left:108px}
     <div class="card" style="margin-top:16px"><h2>🔄 Atividade de outros módulos <span class="ro">· atualiza na hora, sem sair do seu módulo</span></h2><div id="feed"></div></div></section>
   <section id="v-colab" hidden>
     <div class="card"><h2>Colaboradores</h2>
-      <div class="tools"><input id="busca" placeholder="Buscar por nome, matrícula ou função..."><select id="fobra"></select><select id="fempresa"></select><button class="btn" id="btn-export">⬇ Exportar para Excel</button><button class="btn sec" id="btn-novo" hidden>➕ Novo colaborador</button><button class="btn sec" id="btn-imp-erp" hidden>⬇ Importar do cadastro do Compras</button><button class="btn" id="btn-imp-xls" hidden>📥 Importar planilha (IA)</button></div>
+      <div class="tools"><input id="busca" placeholder="Buscar por nome, matrícula ou função..."><select id="fobra"></select><select id="fempresa"></select><select id="fsit" title="Situação"><option value="">Em atividade</option><option value="Pausado">Pausados</option><option value="Desligado">Desligados</option><option value="todos">Todos</option></select><button class="btn" id="btn-export">⬇ Exportar para Excel</button><button class="btn sec" id="btn-novo" hidden>➕ Novo colaborador</button><button class="btn sec" id="btn-imp-erp" hidden>⬇ Importar do cadastro do Compras</button><button class="btn" id="btn-imp-xls" hidden>📥 Importar planilha (IA)</button></div>
       <div style="overflow:auto"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></div></section>
   <section id="v-mob" hidden></section>
   <section id="v-pgr" hidden></section>
@@ -231,13 +231,14 @@ const CDS=['CD 48 DOM PEDRO','CD 51 PEDRO LEOPOLDO','CD 53 ITABIRITO','CD 54 RIB
 const CHECK_CLT=[['aso','Exame admissional (ASO) apto'],['ctps','CTPS / registro no eSocial'],['rgcpf','RG e CPF'],['resid','Comprovante de residência'],['foto','Foto 3x4'],['titulo','Título de eleitor'],['certid','Certidão de casamento / nascimento dos filhos'],['banco','Dados bancários'],['contrato','Contrato de trabalho assinado'],['os','Ordem de serviço de segurança assinada'],['integr','Treinamento de integração (NR-18)'],['epi','Ficha de EPI e uniforme entregues'],['vt','Opção de vale-transporte']];
 const CHECK_PJ=[['aso','Exame admissional (ASO) apto'],['rgcpf','RG e CPF'],['resid','Comprovante de residência'],['foto','Foto 3x4'],['cnpj','Cartão CNPJ e contrato social / MEI'],['banco','Dados bancários da empresa (PJ)'],['contrato','Contrato de prestação de serviços assinado'],['os','Ordem de serviço de segurança assinada'],['integr','Treinamento de integração (NR-18)'],['epi','Ficha de EPI e uniforme entregues'],['nf','Orientação sobre emissão de nota fiscal']];
 const CONTRATOS=['CLT (efetivo)','CLT em experiência','Temporário','PJ','PJ com férias e 13º'];
+const EXP_TIPOS=['Selecione…','30 dias','45 dias','60 dias','90 dias','30 + 30 dias','30 + 60 dias','45 + 45 dias','60 + 30 dias','Outro (informar dias)'];
 /* Regras por modalidade: PJ comum não tem férias/13º/1/3/HE; PJ com férias e 13º tem férias, 13º e 1/3, mas não HE */
 const BENEF=e=>({ferias:e.contrato!=='PJ',treze:e.contrato!=='PJ',terco:e.contrato!=='PJ',he:e.contrato==='PJ com férias e 13º'?e.temHE==='Sim':!String(e.contrato).startsWith('PJ')});
 const isPJ=e=>String(e.contrato).startsWith('PJ');
 const checkItens=e=>isPJ(e)?CHECK_PJ:CHECK_CLT;
 const SECOES=[
  {id:'ident',titulo:'Identificação e contrato',ver:['rh','fin','sst','pmo'],edit:['rh'],campos:[
-   ['nome','Nome completo','text',1],['empresa','Empresa (CNPJ)','select',EMPRESAS],['matricula','Matrícula','text'],['funcao','Função','select',FUNCOES],['obra','Obra atual (CD)','select',CDS],['admissao','Admissão','date'],['contrato','Modalidade de contrato','select',CONTRATOS],['expTipo','Período de experiência','select',['45 + 45 dias','30 + 60 dias','90 dias']],['dataFimContrato','Fim / vigência do contrato','date'],['temHE','Este colaborador tem hora extra?','select',['Não','Sim']],['decisaoRenov','Decisão sobre renovação','select',['Em análise','Renovar','Não renovar']],['status','Situação','select',['Ativo','Afastado','Férias','Desligado']]],calc:'ident'},
+   ['nome','Nome completo','text',1],['empresa','Empresa (CNPJ)','select',EMPRESAS],['matricula','Matrícula','text'],['funcao','Função','select',FUNCOES],['obra','Obra atual (CD)','select',CDS],['admissao','Admissão','date'],['contrato','Modalidade de contrato','select',CONTRATOS],['expTipo','Período de experiência','select',EXP_TIPOS],['expDias1','1º período (dias)','number'],['expDias2','2º período (dias; 0 se não houver)','number'],['prazoContrato','Prazo do contrato (dias)','number'],['dataFimContrato','Data final do contrato','date'],['temHE','Este colaborador tem hora extra?','select',['Não','Sim']],['decisaoRenov','Decisão sobre renovação','select',['Em análise','Renovar','Não renovar']],['status','Situação','select',['Ativo','Afastado','Férias','Pausado','Desligado']]],calc:'ident'},
  {id:'cnh',titulo:'Motorista e CNH',ver:['rh','sst'],edit:['rh','sst'],campos:[
    ['motorista','Além da função, é motorista?','select',['Não','Sim']],['cnhNum','Nº da CNH','text'],['cnhCat','Categoria','select',['A','B','C','D','E','AB','AC','AD','AE']],['cnhVal','Vencimento da CNH','date']],calc:'cnh'},
  {id:'admissao',titulo:'Checklist de admissão',ver:['rh','sst'],edit:['rh','sst'],especial:'check'},
@@ -285,7 +286,8 @@ const EMP=[];
 const valorHora=e=>Number(e.salario||0)/DIVISOR;
 const valHE=e=>({v50:valorHora(e)*1.5,v100:valorHora(e)*2,t50:Number(e.h50||0)*valorHora(e)*1.5,t100:Number(e.h100||0)*valorHora(e)*2});
 const prevBaixada=e=>addDays(e.dataObra,e.diasBaixada);
-const expEnds=e=>{if(!e.admissao||e.contrato!=='CLT em experiência')return[];const n={'45 + 45 dias':[44,89],'30 + 60 dias':[29,89],'90 dias':[89]}[e.expTipo]||[];return n.map(d=>addDays(e.admissao,d))};
+function expDiasList(e){const t=String(e.expTipo||'');const m=/^(\d+)(?:\s*\+\s*(\d+))? dias$/.exec(t);let a,b;if(m){a=+m[1];b=+(m[2]||0)}else if(t.startsWith('Outro')){a=Number(e.expDias1)||0;b=Number(e.expDias2)||0}else return[];const o=[];if(a>0)o.push(a-1);if(a>0&&b>0)o.push(a+b-1);return o}
+const expEnds=e=>{if(!e.admissao||e.contrato!=='CLT em experiência')return[];return expDiasList(e).map(d=>addDays(e.admissao,d))};
 const nextAnniv=s=>{const d=parse(s);if(!d)return null;const y=HOJE.getFullYear();let c=new Date(y,d.getMonth(),d.getDate());if(c<HOJE)c=new Date(y+1,d.getMonth(),d.getDate());return{iso:fmtISO(c),anos:c.getFullYear()-d.getFullYear()}};
 const tempoCasa=e=>{const d=parse(e.admissao);if(!d)return '—';let m=(HOJE.getFullYear()-d.getFullYear())*12+HOJE.getMonth()-d.getMonth();if(HOJE.getDate()<d.getDate())m--;return Math.floor(m/12)+' ano(s) e '+(m%12)+' mês(es)'};
 const cnhStatus=e=>{if(e.motorista!=='Sim')return['Não é motorista','g'];const d=diasAte(e.cnhVal);if(d===null)return['CNH sem validade','w'];return d<0?['CNH vencida há '+(-d)+'d','r']:d<=60?['CNH vence em '+d+'d','w']:['CNH em dia','ok']};
@@ -311,7 +313,7 @@ function asoStatus(e){
 function gerarAlertas(){
   const A=[];
   EMP.forEach(e=>{
-    const B=BENEF(e);const renov=()=>({'Em análise':'decisão pendente: vai renovar?','Renovar':'decisão: renovar (preparar aditivo)','Não renovar':'decisão: não renovar (preparar encerramento)'}[e.decisaoRenov]);
+    if(!ctrAtivo(e))return;const B=BENEF(e);const renov=()=>({'Em análise':'decisão pendente: vai renovar?','Renovar':'decisão: renovar (preparar aditivo)','Não renovar':'decisão: não renovar (preparar encerramento)'}[e.decisaoRenov]);
     const pb=prevBaixada(e);
     if(e.dataObra&&pb){const d=diasAte(pb);
       if(d<=21)A.push({k:'bx'+e.id+pb,e,nivel:d<=7?'r':'w',roles:['cmp'],tipo:'🚌 Comprar passagem · baixada',txt:`${e.nome} (${e.obra}) · baixada prevista ${fmtD(pb)} (${d<0?'atrasada '+(-d):'em '+d} dias)`,cta:'Passagem comprada'})}
@@ -323,8 +325,7 @@ function gerarAlertas(){
       if(lc<=120)A.push({k:'fv'+e.id,e,nivel:lc<=60?'r':'w',roles:['rh'],tipo:'⚠️ Férias a vencer',txt:`${e.nome} · limite para conceder férias em ${fmtD(limiteConc(e))} (${lc} dias)`,cta:'Programada'});
       else if(aq!==null&&aq<=30)A.push({k:'fa'+e.id,e,nivel:'i',roles:['rh'],tipo:'🏖 Direito a férias adquirido',txt:`${e.nome} · período aquisitivo ${aq<0?'completo desde '+fmtD(addDays(e.aquisIni,365)):'completa em '+fmtD(addDays(e.aquisIni,365))}; programar férias até ${fmtD(limiteConc(e))}`,cta:'Programada'})}
     if(e.motorista==='Sim'){const d=diasAte(e.cnhVal);if(d!==null&&d<=60)A.push({k:'cnh'+e.id+e.cnhVal,e,nivel:d<=15?'r':'w',roles:['sst','rh'],tipo:'🚚 CNH do motorista',txt:`${e.nome} · CNH cat. ${e.cnhCat} ${d<0?'vencida há '+(-d):'vence em '+d} dias (${fmtD(e.cnhVal)})`,cta:'CNH renovada'})}
-    expEnds(e).forEach((dt,i,arr)=>{const d=diasAte(dt);if(d!==null&&d>=0&&d<=15){const fim=i===arr.length-1;A.push({k:'exp'+e.id+dt,e,nivel:d<=5?'r':'w',roles:['rh'],tipo:'📝 Experiência vencendo',txt:`${e.nome} · ${fim?'fim do contrato de experiência':'fim do 1º período'} em ${fmtD(dt)} (${d} dias) · ${fim?renov().replace('renovar','efetivar'):renov()}`,cta:'Decisão registrada'})}});
-    if(['Temporário','PJ','PJ com férias e 13º'].includes(e.contrato)&&e.dataFimContrato){const d=diasAte(e.dataFimContrato);if(d!==null&&d<=30)A.push({k:'tmp'+e.id+e.dataFimContrato,e,nivel:d<=10?'r':'w',roles:['rh'],tipo:'📝 Contrato '+(e.contrato==='Temporário'?'temporário':'PJ')+' vencendo',txt:`${e.nome} · vence em ${fmtD(e.dataFimContrato)} (${d<0?'venceu há '+(-d):d} dias) · ${renov()}`,cta:'Decisão registrada'})}
+    ctrAlertas(e,A);
     const an=nextAnniv(e.admissao);if(an&&an.anos>=1){const d=diasAte(an.iso);if(d<=30)A.push({k:'ac'+e.id+an.iso,e,nivel:'i',roles:['rh'],tipo:'🏅 Aniversário de contrato',txt:`${e.nome} completa ${an.anos} ano(s) de casa em ${fmtD(an.iso)} (${d===0?'hoje':'em '+d+' dias'}) ${B.ferias?' · inicia novo período aquisitivo de férias':''}`,cta:'Ciente'})}
     const nb=nextAnniv(e.nasc);if(nb){const d=diasAte(nb.iso);if(d<=15)A.push({k:'bd'+e.id+nb.iso,e,nivel:'i',roles:['rh'],tipo:'🎂 Aniversário do colaborador',txt:`${e.nome} faz ${nb.anos} anos em ${fmtD(nb.iso)} (${d===0?'hoje':'em '+d+' dias'})`,cta:'Parabenizado'})}
     const [cf,ct]=checkProg(e);if(cf<ct&&!e.legado){const ad=diasAte(e.admissao);const falt=checkItens(e).filter(c=>!e.check[c[0]]).map(c=>c[1]);A.push({k:'ck'+e.id+cf,e,nivel:ad!==null&&ad>=-45?'r':'w',roles:['rh','sst'],tipo:'✅ Checklist de admissão incompleto',txt:`${e.nome} · ${cf}/${ct} itens. Faltam: ${falt.join('; ')}`,cta:'Ciente'})}
@@ -405,7 +406,7 @@ function renderKpis(){
 }
 
 function colunas(){
-  const base=[['Colaborador',e=>`<b>${esc(e.nome)}</b><div class="ro">Mat. ${esc(e.matricula)}</div>`],['Função',e=>esc(e.funcao)+(e.motorista==='Sim'?' <span class="badge">Motorista</span>':'')],['Obra',e=>esc(e.obra)]].concat((isRH()||perfil==='fin')?[['Empresa',e=>esc(e.empresa)],['Contrato',e=>`<span class="badge ${isPJ(e)?'g':''}">${esc(e.contrato)}</span>`]]:[]);
+  const base=[['Colaborador',e=>`<b>${esc(e.nome)}</b>${e.status==='Desligado'||e.status==='Pausado'?' <span class="badge '+(e.status==='Desligado'?'r':'w')+'">'+e.status+'</span>':''}<div class="ro">Mat. ${esc(e.matricula)}</div>`],['Função',e=>esc(e.funcao)+(e.motorista==='Sim'?' <span class="badge">Motorista</span>':'')],['Obra',e=>esc(e.obra)]].concat((isRH()||perfil==='fin')?[['Empresa',e=>esc(e.empresa)],['Contrato',e=>`<span class="badge ${isPJ(e)?'g':''}">${esc(e.contrato)}</span>`]]:[]);
   const ext={
    rh:[['Baixada prevista',e=>{const p=prevBaixada(e);const d=diasAte(p);return p?fmtD(p)+` <span class="badge ${d<=7?'r':d<=21?'w':'g'}">${d<0?'atrasada':d+' d'}</span>`:'—'}],['ASO',e=>{const s=asoStatus(e);return`<span class="badge ${s[1]}">${s[0]}</span>`}],['Admissão',e=>{const p=checkProg(e);return`<span class="badge ${p[0]<p[1]?'w':'ok'}">${p[0]}/${p[1]}</span>`}],['Hora extra',heBadge],['Última alteração',e=>ultimaAlt(e.id)]],
    fin:[['Salário',e=>brl(e.salario)],['Valor da hora',e=>brl(valorHora(e))],['HE do mês',e=>brl(heTot(e))+' '+heBadge(e)],['Bonificação',e=>bonTot(e)?brl(bonTot(e))+' '+bonBadge(e):'—']],
@@ -445,7 +446,7 @@ function campoHtml(e,s,c,edit){
   return `<div class="${(full||fullSel).trim()}"><label>${label}</label>${inp}</div>`;
 }
 function calcHtml(e,tipo){
-  if(tipo==='ident'){const ends=expEnds(e);return `<div class="calc">${tempoCasa(e)}<small>tempo de casa</small></div>`+(ends.length?`<div class="calc">${ends.map(d=>fmtD(d)).join(' e ')}<small>fim do(s) período(s) de experiência</small></div>`:'')}
+  if(tipo==='ident'){return `<div class="calc">${tempoCasa(e)}<small>tempo de casa</small></div>`+ctrCalcHtml(e)}
   if(tipo==='cnh'){const s=cnhStatus(e);return `<div class="calc">${s[0]}<small>situação da CNH${e.motorista==='Sim'?'':' (preencha só se for motorista)'}</small></div>`}
   if(tipo==='salario'){if(isPJ(e))return `<div class="calc" style="grid-column:1/-1">Pagamento mensal contra nota fiscal<small>${BENEF(e).ferias?'PJ com férias e 13º: previsões na seção própria; hora extra só se marcada na identificação.':'PJ: sem férias, 13º, 1/3 ou hora extra.'}</small></div>`;
     const h=valHE(e);return `<div class="calc">${brl(valorHora(e))}<small>valor da hora normal (salário ÷ ${DIVISOR})</small></div><div class="calc">${brl(h.v50)} · ${brl(h.v100)}<small>hora extra 50% · 100%</small></div>`}
@@ -476,8 +477,8 @@ function calcHtml(e,tipo){
 }
 function camposDe(e,s){
   if(s.id==='cnh'&&e.motorista!=='Sim')return s.campos.slice(0,1);
-  if(s.id==='ident'){const venc=['Temporário','PJ','PJ com férias e 13º'].includes(e.contrato);
-    return s.campos.filter(c=>c[0]==='expTipo'?e.contrato==='CLT em experiência':c[0]==='dataFimContrato'?venc:c[0]==='decisaoRenov'?(venc||e.contrato==='CLT em experiência'):c[0]==='temHE'?e.contrato==='PJ com férias e 13º':true)}
+  if(s.id==='ident'){const venc=ctrComPrazo(e),exp=e.contrato==='CLT em experiência',outro=String(e.expTipo||'').startsWith('Outro');
+    return s.campos.filter(c=>c[0]==='expTipo'?exp:(c[0]==='expDias1'||c[0]==='expDias2')?(exp&&outro):c[0]==='prazoContrato'?venc:c[0]==='dataFimContrato'?(venc||(exp&&!!e.dataFimContrato)):c[0]==='decisaoRenov'?(venc||exp):c[0]==='temHE'?e.contrato==='PJ com férias e 13º':true)}
   if(s.id==='salario'&&isPJ(e))return [['salario','Valor mensal do contrato PJ (R$)','number']];
   return s.campos}
 function secaoHtml(e,s){
@@ -518,9 +519,9 @@ function secaoHtml(e,s){
      <div class="ro" style="margin-bottom:6px">Cada transferência pendente gera alerta de compra de passagem para Compras/PMO. Baixada e férias geram o alerta automaticamente.</div>
      ${e.mob.map((m,i)=>`<div class="item" style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)"><span class="badge">${m.tipo}</span><span style="flex:1">${esc(m.origem)} → ${esc(m.destino)} · ${fmtD(m.data)}</span><span class="badge ${m.status==='Pendente'?'w':'ok'}">Passagem ${m.status==='Pendente'?'pendente':'comprada'}</span>${edit&&m.status==='Pendente'?`<button class="btn sec" data-mobok="${i}">marcar comprada</button>`:''}</div>`).join('')||'<div class="empty">Nenhuma mobilização/transferência registrada.</div>'}
      ${edit?`<div class="f" style="margin-top:10px;grid-template-columns:130px 1fr 1fr 150px auto;align-items:end">
-      <div><label>Tipo</label><select id="nm-tipo"><option>Mobilização</option><option>Transferência</option></select></div>
-      <div><label>Origem</label><select id="nm-or">${CDS.map(c=>`<option ${c===e.obra?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
-      <div><label>Destino</label><select id="nm-de"><option value="">Selecione o CD...</option>${CDS.filter(c=>c!==e.obra).map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
+      <div><label>Tipo</label><select id="nm-tipo"><option>Mobilização</option><option>Transferência</option><option>Baixada</option><option>Férias</option><option>Desligamento</option></select></div>
+      <div><label>Origem</label><input id="nm-or" list="nm-cds" value="${esc(e.obra)}" placeholder="CD ou cidade de origem" autocomplete="off"><datalist id="nm-cds">${CDS.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+      <div><label>Destino</label><input id="nm-de" list="nm-cds" placeholder="CD ou cidade de destino" autocomplete="off"></div>
       <div><label>Data da viagem</label><input type="date" id="nm-dt"></div>
       <button class="btn" id="nm-add">Registrar e avisar Compras</button></div>`:''}</div>`;
   }
@@ -533,7 +534,7 @@ function asoAnexoHtml(e,edit){
 function renderModal(){
   const e=EMP.find(x=>x.id===abertoId); if(!e)return;
   const sc=$('ov').scrollTop;
-  $('modal').innerHTML=`<div class="mh"><div><h2>${esc(e.nome)}</h2><div class="ro">${esc(e.funcao)} · ${esc(e.obra)} · Mat. ${esc(e.matricula)} · visão: <b>${PERFIS[perfil]}</b>${(()=>{const a=AUDIT.find(x=>x.alvoId===e.id&&x.acao!=='Exportou planilha');return roleOk(['rh'])&&a?'<br>Última alteração: <b>'+esc(a.quem)+'</b> em '+fmtDH(a.t):''})()}</div></div>${perfil==='grh'?'<button class="btn sec" data-delcolab="1" style="margin-left:auto">🗑 Excluir cadastro</button><button class="x" data-close="1" style="margin-left:8px">×</button>':'<button class="x" data-close="1">×</button>'}</div><div class="secs">${SECOES.map(s=>secaoHtml(e,s)).join('')}${roleOk(['rh'])?histHtml(e.id,'Histórico de alterações deste cadastro'):''}</div>`;
+  $('modal').innerHTML=`<div class="mh"><div><h2>${esc(e.nome)}</h2><div class="ro">${esc(e.funcao)} · ${esc(e.obra)} · Mat. ${esc(e.matricula)} · visão: <b>${PERFIS[perfil]}</b>${(()=>{const a=AUDIT.find(x=>x.alvoId===e.id&&x.acao!=='Exportou planilha');return roleOk(['rh'])&&a?'<br>Última alteração: <b>'+esc(a.quem)+'</b> em '+fmtDH(a.t):''})()}</div></div>${acoesColabHtml(e)}<button class="x" data-close="1" style="margin-left:8px">×</button></div><div class="secs">${SECOES.map(s=>secaoHtml(e,s)).join('')}${perfil==='grh'?histIaHtml(e):''}</div>`;
   $('ov').classList.add('on'); $('ov').scrollTop=sc;
 }
 
@@ -608,7 +609,8 @@ function renderTabs(){
 /* ---------- Lista e exportação ---------- */
 function filtrados(){
   const q=$('busca').value.trim().toLowerCase(),ob=$('fobra').value,em=$('fempresa').value;
-  return EMP.filter(e=>(!ob||e.obra===ob)&&(!em||e.empresa===em)&&(!q||[e.nome,e.matricula,e.funcao].some(v=>String(v).toLowerCase().includes(q))));
+  const sit=($('fsit')||{}).value||'';
+  return EMP.filter(e=>(sit==='todos'||(sit?e.status===sit:e.status!=='Desligado'))&&(!ob||e.obra===ob)&&(!em||e.empresa===em)&&(!q||[e.nome,e.matricula,e.funcao].some(v=>String(v).toLowerCase().includes(q))));
 }
 const fmtCampo=(e,c)=>{const v=e[c[0]];if(c[2]==='date')return v?fmtD(v):'';return v==null?'':v};
 const EXTRAS={
@@ -1732,7 +1734,7 @@ const iaHtml=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\*(.+?)\*/
 async function perguntarIA(pergunta,fallback){
   try{
     const hist=CHAT.msgs.filter(m=>m.txt&&!/Pensando/.test(m.txt)).slice(-9,-1).map(m=>({de:m.de,txt:String(m.txt).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}));
-    const r=await sb.functions.invoke('assistente-ia',{body:{sistema:'rh',pergunta,historico:hist,perfil:PERFIS[perfil]||perfil,aba:(MODNOME_[mod]||mod)+' › '+tab}});
+    const r=await sb.functions.invoke('assistente-ia',{body:{sistema:'rh',pergunta,historico:hist,perfil:PERFIS[perfil]||perfil,aba:(MODNOME_[mod]||mod)+' › '+tab,auditoria:perfil==='grh'}});
     let d=r.data;
     if(r.error&&r.error.context&&r.error.context.json){try{d=await r.error.context.json()}catch(e){}}
     if(d&&d.resposta)return iaHtml(d.resposta);
@@ -3265,6 +3267,183 @@ document.addEventListener('change',e=>{
   else if(t.id==='impx-sobre'){IMPX.sobre=t.checked;const emp=$('impx-emp').value;impxPrevia();$('impx-emp').value=emp}
 },true);
 
+/* =====================================================================
+   CONTRATOS: prazos (experiência, temporário, PJ), alerta diário, renovação
+   com novo prazo obrigatório, e baixa / pausa / exclusão do colaborador.
+   ===================================================================== */
+const CTR_DEC={'Em análise':'decisão pendente: vai renovar?','Renovar':'decisão: renovar (informe o novo prazo)','Não renovar':'decisão: não renovar (encerrar e dar baixa)'};
+const CTR_MOTIVOS_BAIXA=['Pedido de demissão','Dispensa sem justa causa','Dispensa por justa causa','Término de contrato','Término de experiência','Acordo entre as partes','Aposentadoria','Falecimento','Outro'];
+const ctrComPrazo=e=>['Temporário','PJ','PJ com férias e 13º'].includes(e.contrato);
+const ctrLimite=e=>isPJ(e)?30:15;
+const ctrAtivo=e=>e.status!=='Desligado'&&e.status!=='Pausado';
+function ctrQuando(d){return d===0?'vence hoje':d>0?'faltam '+d+' dia'+(d>1?'s':''):'venceu há '+(-d)+' dia'+(d<-1?'s':'')}
+
+/* Datas-limite do contrato atual: experiência (1 ou 2 períodos), temporário ou PJ.
+   Depois de uma renovação, vale a nova data final guardada em dataFimContrato. */
+function contratoMarcos(e){
+  if(e.contrato==='CLT em experiência'){
+    const ends=expEnds(e),ov=e.dataFimContrato;
+    if(ov&&(!ends.length||ov>ends[ends.length-1]))return[{dt:ov,final:true,rot:'fim do contrato prorrogado'}];
+    return ends.map((dt,i)=>({dt,final:i===ends.length-1,rot:i===ends.length-1?'fim do contrato de experiência':'fim do 1º período de experiência'}));
+  }
+  if(ctrComPrazo(e)&&e.dataFimContrato)return[{dt:e.dataFimContrato,final:true,rot:'fim do contrato'}];
+  return[];
+}
+function contratoFinal(e){const f=contratoMarcos(e).find(x=>x.final);return f?f.dt:''}
+
+/* Alerta DIÁRIO: a partir de 15 dias (CLT/temporário) ou 30 dias (PJ) antes do fim, e depois de vencido,
+   o aviso aparece todo dia (sem botão de dispensar) até o prazo ser renovado com nova data ou a baixa ser dada. */
+function ctrAlertas(e,A){
+  contratoMarcos(e).forEach(mk=>{
+    const d=diasAte(mk.dt);if(d===null)return;
+    if(d<0&&!mk.final)return;
+    if(d>ctrLimite(e))return;
+    const exp=e.contrato==='CLT em experiência';
+    const tipo=exp?(d<0?'📝 Experiência vencida':'📝 Experiência vencendo'):'📝 Contrato '+(e.contrato==='Temporário'?'temporário':'PJ')+(d<0?' vencido':' vencendo');
+    let dec=CTR_DEC[e.decisaoRenov]||CTR_DEC['Em análise'];
+    if(exp&&mk.final&&e.decisaoRenov==='Renovar')dec='decisão: efetivar ou prorrogar (informe o novo prazo)';
+    A.push({k:'ctr'+e.id+mk.dt,e,nivel:d<=5?'r':'w',roles:['rh'],tipo,txt:`${e.nome} · ${mk.rot} em ${fmtD(mk.dt)} (${ctrQuando(d)}) · ${dec}`,cta:null})});
+}
+
+/* Cartões da seção Identificação: data final calculada, dias restantes e períodos anteriores */
+function ctrCalcHtml(e){
+  const m=contratoMarcos(e);let h='';
+  if(m.length){
+    const fin=m.find(x=>x.final)||m[m.length-1],d=diasAte(fin.dt);
+    const cor=d<0?'background:#fdecea':d<=ctrLimite(e)?'background:var(--wbg)':'';
+    h+=`<div class="calc" style="${cor}">${fmtD(fin.dt)}<small>data final do contrato · ${ctrQuando(d)}</small></div>`;
+    if(m.length>1)h+=`<div class="calc">${fmtD(m[0].dt)}<small>${m[0].rot}</small></div>`;
+  }else if(e.contrato==='CLT em experiência')h+='<div class="calc">—<small>informe a admissão e o período de experiência para calcular a data final</small></div>';
+  else if(ctrComPrazo(e))h+='<div class="calc">—<small>informe o prazo (dias) ou a data final do contrato</small></div>';
+  const H=e.contratoHist||[];
+  if(H.length)h+=`<div class="ro" style="grid-column:1/-1">Períodos anteriores: ${H.map(x=>(x.tipo==='Efetivado'?'efetivado em ':'até '+fmtD(x.fim)+' · renovado em ')+fmtD(x.em)+(x.por?' por '+esc(x.por):'')).join(' | ')}</div>`;
+  if(e.status==='Desligado'&&e.baixa)h+=`<div class="calc" style="grid-column:1/-1;background:#fdecea">Baixa em ${fmtD(e.baixa.data)} · ${esc(e.baixa.motivo||'')}<small>${esc(e.baixa.obs||'')}${e.baixa.por?' · registrado por '+esc(e.baixa.por):''}</small></div>`;
+  if(e.status==='Pausado'&&e.pausa)h+=`<div class="calc" style="grid-column:1/-1;background:var(--wbg)">Pausado desde ${fmtD(e.pausa.ini)} · ${esc(e.pausa.motivo||'')}<small>${e.pausa.prev?'retorno previsto em '+fmtD(e.pausa.prev):'sem previsão de retorno'}${e.pausa.por?' · registrado por '+esc(e.pausa.por):''}</small></div>`;
+  return h;
+}
+
+/* chamado antes de gravar uma alteração de campo na ficha; devolve true se tratou (e não deve gravar) */
+function ctrAntes(e,f,nv){
+  if(f==='decisaoRenov'&&nv==='Renovar'&&(ctrComPrazo(e)||e.contrato==='CLT em experiência')){ctrRenovar(e);return true}
+  if((f==='prazoContrato'||f==='admissao')&&ctrComPrazo(e)){
+    const prazo=Number(f==='prazoContrato'?nv:e.prazoContrato),adm=f==='admissao'?nv:e.admissao;
+    if(adm&&prazo>0){const fim=addDays(adm,prazo-1);if(fim!==e.dataFimContrato){auditar({acao:'Editou',alvo:e.nome,alvoId:e.id,sec:'ident',campo:'Data final do contrato (calculada pelo prazo)',antes:fmtV(e.dataFimContrato),depois:fmtV(fim)});e.dataFimContrato=fim}}
+  }
+  return false;
+}
+
+/* ---------- renovação com novo prazo obrigatório ---------- */
+const ctrReabrir=id=>{window.__semFora=false;abertoId=id;render()};
+function ctrRenovar(e){
+  const fin=contratoFinal(e),exp=e.contrato==='CLT em experiência';
+  abrirCustom(`<div class="hd"><h2 style="margin:0">Renovar contrato · ${esc(e.nome)}</h2></div><div class="secs" style="padding:12px 16px">
+  <div class="ro" style="margin-bottom:10px">Prazo atual termina em <b>${fin?fmtD(fin):'(sem data)'}</b>. Para renovar, informe já o prazo do próximo período: assim o alerta diário continua valendo e o controle não se perde.</div>
+  ${exp?`<label style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input type="radio" name="rn-modo" value="prorrogar" checked> Prorrogar com novo prazo</label><label style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><input type="radio" name="rn-modo" value="efetivar"> Efetivar como CLT (sem data final)</label>`:''}
+  <div class="f" id="rn-campos" style="grid-template-columns:1fr 1fr"><div><label>Novo prazo (dias a partir do fim atual)</label><input type="number" id="rn-dias" min="1"></div><div><label>Nova data final *</label><input type="date" id="rn-data"></div></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn sec" data-ctr="rn-cancel:${e.id}">Cancelar</button><button class="btn" data-ctr="rn-ok:${e.id}">Confirmar renovação</button></div></div>`);
+  window.__semFora=true;window.__rnBase=fin||fmtISO(HOJE);
+}
+function ctrRenovarOk(e){
+  const modo=(document.querySelector('input[name="rn-modo"]:checked')||{value:'prorrogar'}).value,fin=contratoFinal(e),por=usuario?usuario.nome:'';
+  e.contratoHist=(e.contratoHist||[]).slice();
+  if(modo==='efetivar'){
+    e.contratoHist.push({tipo:'Efetivado',fim:fin||'',em:fmtISO(HOJE),por});
+    const antes=e.contrato;e.contrato='CLT (efetivo)';e.expTipo='Não se aplica';e.dataFimContrato='';e.decisaoRenov='Em análise';
+    auditar({acao:'Efetivou colaborador',alvo:e.nome,alvoId:e.id,sec:'ident',campo:'Modalidade de contrato',antes,depois:'CLT (efetivo)'});
+    toast('Colaborador efetivado como CLT.');ctrReabrir(e.id);return;
+  }
+  const nd=($('rn-data')||{}).value||'';
+  if(!nd){alert('Informe a nova data final do contrato. Sem o novo prazo não dá para renovar.');return}
+  if(fin&&nd<=fin){alert('A nova data final precisa ser depois do fim atual ('+fmtD(fin)+').');return}
+  e.contratoHist.push({fim:fin||'',em:fmtISO(HOJE),por});
+  e.dataFimContrato=nd;e.prazoContrato='';e.decisaoRenov='Em análise';
+  auditar({acao:'Renovou contrato',alvo:e.nome,alvoId:e.id,sec:'ident',campo:'Data final do contrato',antes:fmtV(fin),depois:fmtV(nd)});
+  toast('Contrato renovado até '+fmtD(nd)+'. O alerta volta a valer perto do novo prazo.');ctrReabrir(e.id);
+}
+
+/* ---------- baixa, pausa, reativação ---------- */
+function acoesColabHtml(e){
+  const rh=perfil==='rh'||perfil==='grh';let h='';
+  if(rh){
+    if(e.status==='Pausado')h+=`<button class="btn sec" data-ctr="reativar:${e.id}">▶ Reativar</button>`;
+    else if(e.status==='Desligado'){if(perfil==='grh')h+=`<button class="btn sec" data-ctr="reativar:${e.id}">↩ Reativar cadastro</button>`}
+    else h+=`<button class="btn sec" data-ctr="pausar:${e.id}">⏸ Pausar</button><button class="btn sec" data-ctr="baixa:${e.id}">📤 Dar baixa</button>`;
+  }
+  if(perfil==='grh')h+=`<button class="btn sec" data-delcolab="1" title="Apaga o cadastro para sempre">🗑 Excluir definitivamente</button>`;
+  return h?`<div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">${h}</div>`:'<span style="margin-left:auto"></span>';
+}
+function ctrPausarModal(e){
+  abrirCustom(`<div class="hd"><h2 style="margin:0">Pausar · ${esc(e.nome)}</h2></div><div class="secs" style="padding:12px 16px">
+  <div class="ro" style="margin-bottom:8px">Enquanto estiver pausado, o colaborador não gera alertas. O cadastro continua guardado e pode ser reativado.</div>
+  <div class="f" style="grid-template-columns:1fr 1fr"><div><label>Início da pausa</label><input type="date" id="ps-ini" value="${fmtISO(HOJE)}"></div><div><label>Retorno previsto (opcional)</label><input type="date" id="ps-prev"></div><div class="full" style="grid-column:1/-1"><label>Motivo *</label><input id="ps-mot" placeholder="Ex.: licença, afastamento, obra paralisada"></div></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn sec" data-ctr="cancel:${e.id}">Cancelar</button><button class="btn" data-ctr="ps-ok:${e.id}">Pausar colaborador</button></div></div>`);
+  window.__semFora=true;
+}
+function ctrBaixaModal(e){
+  abrirCustom(`<div class="hd"><h2 style="margin:0">Dar baixa · ${esc(e.nome)}</h2></div><div class="secs" style="padding:12px 16px">
+  <div class="ro" style="margin-bottom:8px">O colaborador passa para "Desligado", sai da lista de ativos e deixa de gerar alertas. O cadastro fica guardado e pode ser reativado pelo Gestor.</div>
+  <div class="f" style="grid-template-columns:1fr 1fr"><div><label>Data da baixa *</label><input type="date" id="bx-data" value="${fmtISO(HOJE)}"></div><div><label>Motivo *</label><select id="bx-mot">${CTR_MOTIVOS_BAIXA.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div><div class="full" style="grid-column:1/-1"><label>Observação</label><input id="bx-obs"></div></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn sec" data-ctr="cancel:${e.id}">Cancelar</button><button class="btn" data-ctr="bx-ok:${e.id}">Confirmar baixa</button></div></div>`);
+  window.__semFora=true;
+}
+function ctrPausarOk(e){
+  const mot=($('ps-mot').value||'').trim(),ini=$('ps-ini').value||fmtISO(HOJE);
+  if(!mot){alert('Informe o motivo da pausa.');return}
+  const ant=e.status;e.status='Pausado';e.pausa={ini,prev:$('ps-prev').value||'',motivo:mot,por:usuario?usuario.nome:''};
+  auditar({acao:'Pausou colaborador',alvo:e.nome,alvoId:e.id,sec:'ident',campo:'Situação',antes:ant,depois:'Pausado · '+mot});
+  toast('Colaborador pausado.');ctrReabrir(e.id);
+}
+function ctrBaixaOk(e){
+  const dt=$('bx-data').value;if(!dt){alert('Informe a data da baixa.');return}
+  const ant=e.status,mot=$('bx-mot').value;
+  e.status='Desligado';e.baixa={data:dt,motivo:mot,obs:($('bx-obs').value||'').trim(),por:usuario?usuario.nome:''};e.pausa=null;
+  auditar({acao:'Deu baixa no colaborador',alvo:e.nome,alvoId:e.id,sec:'ident',campo:'Situação',antes:ant,depois:'Desligado · '+mot+' em '+fmtD(dt)});
+  toast('Baixa registrada.');ctrReabrir(e.id);
+}
+function ctrReativar(e){
+  const ant=e.status;
+  if(!confirm('Reativar '+e.nome+'? Ele volta para a lista de ativos e os alertas voltam a valer.'))return;
+  e.status='Ativo';e.pausa=null;e.baixa=null;
+  auditar({acao:'Reativou colaborador',alvo:e.nome,alvoId:e.id,sec:'ident',campo:'Situação',antes:ant,depois:'Ativo'});
+  toast('Colaborador reativado.');renderModal();render();
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target&&ev.target.closest?ev.target.closest('[data-ctr]'):null;
+  if(!b||!usuario)return;
+  const [a,x]=String(b.dataset.ctr).split(':'),id=Number(x),e=EMP.find(z=>z.id===id);if(!e)return;
+  const rh=perfil==='rh'||perfil==='grh';
+  switch(a){
+    case 'rn-cancel':case 'cancel':ctrReabrir(id);break;
+    case 'rn-ok':if(rh)ctrRenovarOk(e);break;
+    case 'pausar':if(rh)ctrPausarModal(e);break;
+    case 'baixa':if(rh)ctrBaixaModal(e);break;
+    case 'ps-ok':if(rh)ctrPausarOk(e);break;
+    case 'bx-ok':if(rh)ctrBaixaOk(e);break;
+    case 'reativar':if(rh&&(e.status==='Pausado'||perfil==='grh'))ctrReativar(e);break;
+    case 'hist-ia':if(perfil==='grh')ctrHistoricoIA(e);break;
+  }
+});
+document.addEventListener('input',ev=>{
+  const t=ev.target;if(!t||t.id!=='rn-dias')return;
+  const dias=Number(t.value),el=document.getElementById('rn-data'),base=window.__rnBase;
+  if(el&&dias>0&&base)el.value=addDays(base,dias);
+});
+document.addEventListener('change',ev=>{
+  const t=ev.target;if(t&&t.id==='fsit'&&typeof renderTabela==='function')renderTabela();
+});
+
+/* ---------- histórico de alterações: só o Gestor, e perguntando à IA ---------- */
+function histIaHtml(e){
+  return `<div class="sec" style="grid-column:1/-1"><h3>🕘 Histórico de alterações</h3><div class="ro" style="margin-bottom:8px">O histórico não fica mais exposto na ficha. Para consultar quem alterou o quê e quando neste cadastro, pergunte à IA do sistema.</div><button class="btn sec" data-ctr="hist-ia:${e.id}">💬 Perguntar à IA sobre este cadastro</button></div>`;
+}
+function ctrHistoricoIA(e){
+  abertoId=null;$('ov').classList.remove('on');
+  CHAT.abrir=true;
+  if(!CHAT.msgs.length)CHAT.msgs.push({de:'ia',txt:'Olá! Sou o assistente do Departamento Pessoal. Pergunte, por exemplo: <i>quem alterou o salário de fulano?</i>'});
+  renderChat();
+  enviarChat('Quais foram as últimas alterações no cadastro de '+e.nome+'? Mostre data, quem alterou e o que mudou.');
+}
+
 const diffDias=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)+1;
 const mesesTxt=n=>{const m=Math.floor(n/30.4375);return m>=1?` (~${m} ${m===1?'mês':'meses'})`:''};
 function refreshCDS(){const v=$('fobra').value;$('fobra').innerHTML='<option value="">Todas as obras</option>'+CDS.map(o=>`<option>${esc(o)}</option>`).join('');$('fobra').value=v}
@@ -3632,7 +3811,7 @@ document.addEventListener('click',async ev=>{
   if(t.dataset.bonaprov){const obs=($('bon-obs')||{value:''}).value.trim();if(t.dataset.bonaprov==='Reprovada'&&!obs){alert('Informe o motivo da reprovação.');return}const ant=e.bonAprov.status;e.bonAprov={status:t.dataset.bonaprov,por:usuario?usuario.nome:'Gestor do Departamento Pessoal',em:fmtISO(HOJE),obs};auditar({acao:t.dataset.bonaprov==='Aprovada'?'Aprovou bonificação':'Reprovou bonificação',alvo:e.nome,alvoId:e.id,sec:'bonus',campo:'Bonificação '+e.bonMes,antes:ant,depois:t.dataset.bonaprov+(obs?' · '+obs:'')});render()}
   if(t.dataset.heaprov){const obs=($('he-obs')||{value:''}).value.trim();if(t.dataset.heaprov==='Reprovada'&&!obs){alert('Informe o motivo da reprovação.');return}const ant=e.heAprov.status;e.heAprov={status:t.dataset.heaprov,por:usuario?usuario.nome:'Gestor do Departamento Pessoal',em:fmtISO(HOJE),obs};auditar({acao:t.dataset.heaprov==='Aprovada'?'Aprovou hora extra':'Reprovou hora extra',alvo:e.nome,alvoId:e.id,sec:'he',campo:'Hora extra',antes:ant,depois:t.dataset.heaprov+(obs?' · '+obs:'')});render()}
   if(t.id==='nd-add'){const f=$('nd-file').files[0];if(!f){alert('Escolha um arquivo.');return}const cc=$('nd-cat').value==='Contracheque',comp=$('nd-comp')?$('nd-comp').value:'';if(cc&&!comp){alert('Informe o mês de referência do contracheque.');return}const ax=await anexar(f,'emp'+e.id);if(!ax)return;e.docs.push({cat:$('nd-cat').value,nome:f.name,val:cc?'':$('nd-val').value,path:ax.path,comp:cc?comp:''});auditar({acao:'Anexou documento',alvo:e.nome,alvoId:e.id,sec:'docs',campo:$('nd-cat').value,depois:f.name+($('nd-val').value?' · validade '+fmtD($('nd-val').value):'')});render()}
-  if(t.id==='nm-add'){const de=$('nm-de').value,dt=$('nm-dt').value;if(!de||!dt){alert('Selecione o destino e a data.');return}if(de===$('nm-or').value){alert('Origem e destino não podem ser iguais.');return}e.mob.push({tipo:$('nm-tipo').value,origem:$('nm-or').value,destino:de,data:dt,status:'Pendente'});auditar({acao:'Registrou mobilização/transferência',alvo:e.nome,alvoId:e.id,sec:'mob',campo:$('nm-tipo').value,depois:$('nm-or').value+' → '+de+' em '+fmtD(dt)});render()}
+  if(t.id==='nm-add'){const de=$('nm-de').value,dt=$('nm-dt').value;if(!de.trim()||!dt||!$('nm-or').value.trim()){alert('Informe a origem, o destino e a data.');return}if(de.trim()===$('nm-or').value.trim()){alert('Origem e destino não podem ser iguais.');return}e.mob.push({tipo:$('nm-tipo').value,origem:$('nm-or').value,destino:de,data:dt,status:'Pendente'});auditar({acao:'Registrou mobilização/transferência',alvo:e.nome,alvoId:e.id,sec:'mob',campo:$('nm-tipo').value,depois:$('nm-or').value+' → '+de+' em '+fmtD(dt)});render()}
 });
 document.addEventListener('change',async ev=>{
   const t=ev.target;
@@ -3662,7 +3841,7 @@ document.addEventListener('change',async ev=>{
   if(!t.dataset.f)return;
   const e=EMP.find(x=>x.id===abertoId); if(!e)return;
   const f=t.dataset.f,old=e[f],nv=t.type==='number'?(t.value===''?'':Number(t.value)):t.value,ci=campoInfo(f);
-  if(String(old)===String(nv))return;
+  if(String(old)===String(nv))return;if(ctrAntes(e,f,nv))return;
   if(['h50','h100','mesRef'].includes(f)){if(e.heAprov.status!=='Pendente')auditar({acao:'Hora extra voltou para Pendente (horas alteradas)',alvo:e.nome,alvoId:e.id,sec:'he',campo:'Aprovação',antes:e.heAprov.status,depois:'Pendente'});e.heAprov={status:'Pendente',por:'',em:'',obs:''}}
   if(['bonValor','bonMes','bonMotivo'].includes(f)){if(e.bonAprov.status!=='Pendente')auditar({acao:'Bonificação voltou para Pendente (valores alterados)',alvo:e.nome,alvoId:e.id,sec:'bonus',campo:'Aprovação',antes:e.bonAprov.status,depois:'Pendente'});e.bonAprov={status:'Pendente',por:'',em:'',obs:''}}
   e[f]=nv;
