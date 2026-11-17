@@ -2152,6 +2152,7 @@ function passAcoes(r,t){
   const b=[`<button class="btn sec" data-pass="recibo:${r.id}">🧾 Recibo</button>`];
   if(r.status==='pendente'&&passPode(PASS_CRIA))b.push(`<button class="btn sec" data-pass="edit:${r.id}">✏️ Editar</button>`);
   if(r.status==='pendente'&&passPode(PASS_COMPRA))b.push(`<button class="btn" data-pass="compra:${r.id}">✅ Registrar compra</button>`);
+  if(passAnexosOk(r))b.push(`<button class="btn sec" data-pass="anexos:${r.id}">📎 Editar anexos</button>`);
   if(r.status==='comprado'&&passPode(PASS_FIN)){
     b.push(`<button class="btn sec" data-pass="comprov:${r.id}">📎 Comprovante</button>`,`<button class="btn sec" data-pass="edit:${r.id}">⏰ Editar horário</button>`,`<button class="btn" data-pass="pago:${r.id}">💰 Marcar como pago</button>`);
   }
@@ -2346,6 +2347,41 @@ async function passSalvarCompra(id,btn){
   }catch(e){btn.disabled=false;btn.textContent='✅ Comprado — enviar ao Financeiro';toast('Erro ao registrar compra: '+(e.message||e))}
 }
 
+/* ---------- corrigir anexo/valor da passagem já comprada ---------- */
+function passAnexosOk(r){return !!r&&((r.status==='comprado'&&passPode(PASS_COMPRA))||(r.status==='pago'&&perfil==='grh'))}
+function passAnexosModal(id){
+  const r=PASS.lista.find(x=>x.id===id);if(!passAnexosOk(r))return;
+  passAbrir(`<div class="hd"><h2 style="margin:0">Editar anexos da passagem</h2></div><div class="secs" style="padding:12px 16px"><div class="ro" style="margin-bottom:8px">Nº ${esc(r.numero)} — ${esc(r.nome)} — ${esc(r.origem)} → ${esc(r.destino)}</div>
+  <div style="margin-bottom:8px"><label>Passagens anexadas</label>${(r.anexos_passagem||[]).length?(r.anexos_passagem||[]).map((a,i)=>`<div>${passChips([a])} <button class="btn sec" data-pass="rmanexo:${id}:${i}">Remover</button></div>`).join(''):'<div class="ro">Nenhuma passagem anexada.</div>'}</div>
+  <div class="f" style="grid-template-columns:1fr"><div><label>Valor da passagem (R$) *</label><input type="number" id="pa-valor" min="0" step="0.01" value="${esc(r.valor_passagem!=null?r.valor_passagem:'')}"></div><div><label>Adicionar passagem(ns) — PDF ou imagem</label><input type="file" id="pa-anexos" accept="image/*,.pdf" multiple></div></div>
+  <div class="ro" style="margin:8px 0">Remova o arquivo errado e anexe o correto. Se mudar o valor, ele também é atualizado.</div>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn sec" data-pass="fechar">Fechar</button><button class="btn" data-pass="salvar-anexos:${id}">Salvar</button></div></div>`);
+}
+async function passRmAnexo(id,i){
+  const r=PASS.lista.find(x=>x.id===id);if(!passAnexosOk(r))return;
+  const a=(r.anexos_passagem||[])[i];if(!a)return;
+  if(!confirm('Remover o arquivo "'+a.nome+'" desta passagem?'))return;
+  const l=(r.anexos_passagem||[]).slice();l.splice(i,1);
+  const u=await sb.from('passagens').update({anexos_passagem:l,updated_at:new Date().toISOString()}).eq('id',id).select('id');
+  if(u.error||!(u.data||[]).length){toast('Não consegui remover.');return}
+  try{await sb.storage.from('anexos-passagens').remove([a.path])}catch(e){}
+  auditar({acao:'Removeu anexo de passagem',alvo:r.nome,alvoId:r.numero,sec:'proj',campo:'Passagem',antes:a.nome});
+  await passRecarrega();passAnexosModal(id);
+}
+async function passSalvarAnexos(id,btn){
+  const r=PASS.lista.find(x=>x.id===id);if(!passAnexosOk(r))return;
+  const v=$('pa-valor').value,files=$('pa-anexos').files;
+  if(v===''||isNaN(Number(v))||Number(v)<0){toast('Informe o valor da passagem.');return}
+  btn.disabled=true;btn.textContent='Salvando…';
+  try{
+    const novos=files&&files.length?await passUpload(files,'passagem-'+r.numero):[];
+    const u=await sb.from('passagens').update({valor_passagem:Number(v),anexos_passagem:[...(r.anexos_passagem||[]),...novos],updated_at:new Date().toISOString()}).eq('id',id).select('id');
+    if(u.error||!(u.data||[]).length)throw new Error(u.error?u.error.message:'sem permissão');
+    auditar({acao:'Editou anexos de passagem',alvo:r.nome,alvoId:r.numero,sec:'proj',campo:'Passagem',depois:brl(Number(v))});
+    passFechar();toast('Passagem atualizada.');await passRecarrega();
+  }catch(e){btn.disabled=false;btn.textContent='Salvar';toast('Erro ao salvar: '+(e.message||e))}
+}
+
 /* ---------- financeiro ---------- */
 function passComprovModal(id){
   const r=PASS.lista.find(x=>x.id===id);if(!r||!passPode(PASS_FIN))return;
@@ -2492,6 +2528,9 @@ document.addEventListener('click',ev=>{
     case 'salvar-edit':passSalvarEdit(id,b);break;
     case 'compra':passCompraModal(id);break;
     case 'salvar-compra':passSalvarCompra(id,b);break;
+    case 'anexos':passAnexosModal(id);break;
+    case 'rmanexo':passRmAnexo(id,Number(y));break;
+    case 'salvar-anexos':passSalvarAnexos(id,b);break;
     case 'comprov':passComprovModal(id);break;
     case 'salvar-comprov':passSalvarComprov(id);break;
     case 'rmcomprov':passRmComprov(id,Number(y));break;
