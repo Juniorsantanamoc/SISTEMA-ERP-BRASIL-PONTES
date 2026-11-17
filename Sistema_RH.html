@@ -3369,7 +3369,7 @@ function acoesColabHtml(e){
     else if(e.status==='Desligado'){if(perfil==='grh')h+=`<button class="btn sec" data-ctr="reativar:${e.id}">↩ Reativar cadastro</button>`}
     else h+=`<button class="btn sec" data-ctr="pausar:${e.id}">⏸ Pausar</button><button class="btn sec" data-ctr="baixa:${e.id}">📤 Dar baixa</button>`;
   }
-  if(perfil==='grh')h+=`<button class="btn sec" data-delcolab="1" title="Apaga o cadastro para sempre">🗑 Excluir definitivamente</button>`;
+  /* sem botão de excluir: o cadastro fica no banco; saída de pessoas é por "Dar baixa" */
   return h?`<div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">${h}</div>`:'<span style="margin-left:auto"></span>';
 }
 function ctrPausarModal(e){
