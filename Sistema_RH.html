@@ -3444,6 +3444,317 @@ function ctrHistoricoIA(e){
   enviarChat('Quais foram as últimas alterações no cadastro de '+e.nome+'? Mostre data, quem alterou e o que mudou.');
 }
 
+/* =====================================================================
+   DEPARTAMENTO PESSOAL (18/11/2026)
+   - Ficha do colaborador fica com o cadastro: saem hora extra, previsão de
+     13º/férias/1/3, bonificação, férias, baixada e faltas/atestados.
+   - Aba "Salário, impostos e encargos" (antiga "Impostos e encargos"):
+     lista por colaborador por competência + resumo por empresa + parâmetros.
+   - Aba nova "Férias, baixadas e afastamentos": lista e calendário por obra,
+     lançamento unificado com a Mobilização (viagem → Compras compra a passagem).
+   - Checklist de admissão CLT = lista de documentos do Departamento Pessoal + ASO.
+     ASO apto gera alerta para Saúde e Segurança iniciar a mobilização.
+   Os dados continuam nos mesmos campos do colaborador (nada muda no banco);
+   as telas novas só reorganizam onde cada coisa é vista e lançada.
+   ===================================================================== */
+let FICHA_MODO='ficha',DP_PEND=null,DP_ULT=null;
+const DP_SAL=['salario','he','prov','bonus'];
+const DP_AUS=['ferias','baixada','faltas','mob'];
+const DP_FORA=['he','prov','bonus','ferias','baixada','faltas'];
+const dpTem=id=>FICHA_MODO==='sal'?DP_SAL.includes(id):FICHA_MODO==='aus'?DP_AUS.includes(id):!DP_FORA.includes(id);
+
+/* ---------- checklist de admissão (CLT) ---------- */
+CHECK_CLT.splice(0,CHECK_CLT.length,
+ ['aso','Exame admissional (ASO) apto'],
+ ['ctps','Foto da Carteira de Trabalho (3 primeiras páginas) ou o arquivo digital'],
+ ['foto','1 (uma) foto 3x4 recente'],
+ ['pis','Cartão do PIS'],
+ ['rg','Foto da Identidade'],
+ ['cpftit','Foto do CPF e do Título Eleitoral'],
+ ['reserv','Foto do Certificado de Reservista'],
+ ['cnh','Foto da Carteira de Habilitação (se tiver)'],
+ ['certid','Foto da Certidão de Nascimento ou Casamento'],
+ ['resid','Foto do Comprovante de Residência'],
+ ['escolar','Foto do histórico ou declaração escolar'],
+ ['antec','Foto da certidão de antecedentes criminais'],
+ ['certfilhos','Foto da Certidão de Nascimento do(s) filho(s) menor(es) de 14 anos'],
+ ['vacina','Foto do Cartão de Vacinas atualizado da(s) criança(s) menor(es) de 14 anos']);
+
+/* ---------- abas: renomear e criar ---------- */
+(function(){
+  const R=MODS.find(m=>m.id==='rh'),Fm=MODS.find(m=>m.id==='fin');
+  [R,Fm].forEach(M=>{const a=M&&M.abas.find(x=>x[0]==='imp');if(a)a[1]='Salário, impostos e encargos'});
+  if(R&&!R.abas.some(a=>a[0]==='aus')){const i=R.abas.findIndex(a=>a[0]==='imp');R.abas.splice(i+1,0,['aus','Férias, baixadas e afastamentos',['rh','grh']])}
+  if(!ABAS.some(a=>a[0]==='aus'))ABAS.push(['aus']);
+  const vi=document.getElementById('v-imp');
+  if(vi&&!document.getElementById('v-aus')){const s=document.createElement('section');s.id='v-aus';s.hidden=true;vi.parentNode.insertBefore(s,vi.nextSibling)}
+  const st=document.createElement('style');
+  st.textContent='.dp-modos{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}.dp-modos button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer}.dp-modos button.on{background:var(--b,#2f6fed);color:#fff;border-color:transparent}'+
+   '.dp-vis{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.dp-vis button{border:0;background:#fff;padding:6px 12px;cursor:pointer;font-size:13px}.dp-vis button.on{background:var(--b,#2f6fed);color:#fff}'+
+   '.dp-cal{border-collapse:collapse;font-size:11px}.dp-cal th,.dp-cal td{border:1px solid var(--line);padding:2px;text-align:center;min-width:20px}.dp-cal td.nm{text-align:left;white-space:nowrap;padding:2px 6px;min-width:160px}.dp-cal td.fds{background:#f4f5f7}.dp-cal th.fds{background:#e5e7eb;color:#1f2937}.dp-cal tr.ob td{background:var(--lb,#eef3ff);font-weight:700;text-align:left}'+
+   '.dp-c{display:inline-block;width:100%;border-radius:3px;font-weight:700;color:#fff}.dp-F{background:#2e9e5b}.dp-B{background:#2f6fed}.dp-A{background:#e08a1e}.dp-X{background:#d64545}.dp-J{background:#9a8f2e}.dp-L{background:#7b4fbf}.dp-V{background:#6b7280}'+
+   '.dp-leg span{display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:12px}.dp-leg i{width:14px;height:14px;border-radius:3px;display:inline-block}';
+  document.head.appendChild(st);
+})();
+
+/* ---------- ficha: cada modo mostra só as suas seções ---------- */
+const _dpSecao=secaoHtml;
+secaoHtml=function(e,s){if(!dpTem(s.id))return '';if(FICHA_MODO!=='ficha'&&!podeVer(s))return '';return _dpSecao(e,s)};
+const _dpPodeEditar=podeEditar;
+podeEditar=function(s){if(FICHA_MODO==='sal'&&perfil==='fin')return false;return _dpPodeEditar(s)};
+const _dpHistIa=histIaHtml;
+histIaHtml=function(e){return FICHA_MODO==='ficha'?_dpHistIa(e):''};
+function dpModos(){
+  const vis=ids=>SECOES.some(s=>ids.includes(s.id)&&podeVer(s));
+  const r=[['ficha','📋 Ficha do colaborador']];
+  if(vis(['he','prov','bonus']))r.push(['sal','💰 Salário, hora extra e bonificação']);
+  if(vis(['ferias','baixada','faltas']))r.push(['aus','🏖 Férias, baixadas e afastamentos']);
+  return r;
+}
+const _dpRenderModal=renderModal;
+renderModal=function(){
+  if(abertoId!==DP_ULT){FICHA_MODO=DP_PEND||'ficha';DP_PEND=null;DP_ULT=abertoId}
+  const ms=dpModos();if(!ms.some(m=>m[0]===FICHA_MODO))FICHA_MODO='ficha';
+  if(!EMP.some(x=>x.id===abertoId))return _dpRenderModal();
+  _dpRenderModal();
+  const secs=$('modal').querySelector('.secs');
+  if(secs&&ms.length>1)secs.insertAdjacentHTML('beforebegin',`<div class="dp-modos">${ms.map(m=>`<button class="${m[0]===FICHA_MODO?'on':''}" data-fmodo="${m[0]}">${m[1]}</button>`).join('')}</div>`);
+};
+function dpAbrir(id,modo){DP_PEND=modo;DP_ULT=null;abertoId=Number(id);renderModal()}
+
+/* ---------- histórico mensal de hora extra e bonificação ---------- */
+if(!REM_KEYS.includes('remHist'))REM_KEYS.push('remHist');
+const dpK=s=>String(s||'').trim().toLowerCase();
+function dpHist(e,lab){const h=e.remHist||{};const k=Object.keys(h).find(x=>dpK(x)===dpK(lab));return k?h[k]:null}
+function dpSnap(){
+  if(!isRH())return;
+  EMP.forEach(e=>{
+    const h=Object.assign({},e.remHist||{});let mud=false;
+    const put=(lab,campo,v)=>{if(!lab)return;const k=Object.keys(h).find(x=>dpK(x)===dpK(lab))||String(lab).trim();const cur=Object.assign({},h[k]||{});if(JSON.stringify(cur[campo])===JSON.stringify(v))return;cur[campo]=v;h[k]=cur;mud=true};
+    if(Number(e.h50)||Number(e.h100))put(e.mesRef,'he',{h50:Number(e.h50)||0,h100:Number(e.h100)||0,heAprov:Object.assign({},e.heAprov)});
+    if(Number(e.bonValor))put(e.bonMes,'bon',{bonValor:Number(e.bonValor)||0,bonMotivo:e.bonMotivo||'',bonAprov:Object.assign({},e.bonAprov)});
+    if(mud)e.remHist=h;
+  });
+}
+
+/* ---------- aba "Salário, impostos e encargos" ---------- */
+const IMPV={v:'colab'},SALQ={comp:null,emp:'',q:''};
+const dpCompAtual=()=>HOJE.getFullYear()+'-'+pad(HOJE.getMonth()+1);
+function dpComps(){
+  const set=new Set();let y=HOJE.getFullYear(),m=HOJE.getMonth();
+  for(let i=0;i<6;i++){set.add(y+'-'+pad(m+1));m--;if(m<0){m=11;y--}}
+  const lab2c=l=>{const mm=/^([A-Za-zç]{3})\/(\d{4})$/.exec(String(l||'').trim());if(!mm)return null;const i=MESES.findIndex(x=>x.toLowerCase()===mm[1].toLowerCase());return i<0?null:mm[2]+'-'+pad(i+1)};
+  EMP.forEach(e=>{Object.keys(e.remHist||{}).concat([e.mesRef,e.bonMes]).forEach(l=>{const c=lab2c(l);if(c)set.add(c)})});
+  return [...set].sort().reverse();
+}
+function dpSalLinhas(comp){
+  const lab=compLabel(comp);
+  return EMP.filter(e=>e.status!=='Desligado').map(e=>{
+    const x=Object.assign({},e),hi=dpHist(e,lab);
+    if(dpK(e.mesRef)!==dpK(lab)){if(hi&&hi.he){x.h50=hi.he.h50;x.h100=hi.he.h100;x.heAprov=hi.he.heAprov;x.mesRef=lab}else{x.h50=0;x.h100=0;x.heAprov={status:'Pendente',por:'',em:'',obs:''}}}
+    if(dpK(e.bonMes)!==dpK(lab)){if(hi&&hi.bon){x.bonValor=hi.bon.bonValor;x.bonMotivo=hi.bon.bonMotivo;x.bonAprov=hi.bon.bonAprov;x.bonMes=lab}else{x.bonValor=0;x.bonAprov={status:'Pendente',por:'',em:'',obs:''}}}
+    let l=null;try{l=linhaFolha(x,comp)}catch(err){l=null}
+    const B=BENEF(x),dias=Number(x.feriasDias)||30,vf=B.ferias?base13(x)*dias/30*(B.terco?4/3:1):0;
+    return {e,x,l,p13:prev13(x),pf:vf};
+  });
+}
+function dpSalLista(){
+  const el=$('sal-lista');if(!el)return;
+  const q=dpK(SALQ.q);
+  const L=dpSalLinhas(SALQ.comp).filter(r=>(!SALQ.emp||r.e.empresa===SALQ.emp)&&(!q||dpK(r.e.nome+' '+r.e.matricula+' '+r.e.funcao).includes(q)));
+  const s=k=>L.reduce((a,r)=>a+(k(r)||0),0);
+  const heTxt=r=>{const t=heTot(r.x);if(!BENEF(r.x).he)return '<span class="ro">não tem</span>';if(!t&&!Number(r.x.h50)&&!Number(r.x.h100))return '—';return `${Number(r.x.h50)||0}h 50% · ${Number(r.x.h100)||0}h 100%<br>${brl(t)} ${heBadge(r.x)}`};
+  const bonTxt=r=>bonTot(r.x)?brl(bonTot(r.x))+' '+bonBadge(r.x):'—';
+  el.innerHTML=`<div style="overflow:auto"><table><thead><tr><th>Colaborador</th><th>Empresa</th><th>Contrato</th><th>Salário base</th><th>Hora extra</th><th>Bonificação</th><th>Previsão 13º</th><th>Férias + 1/3</th><th>Bruto do mês</th><th>Descontos</th><th>Líquido</th><th>Custo da empresa</th></tr></thead>
+   <tbody>${L.map(r=>`<tr data-salid="${r.e.id}" style="cursor:pointer"><td><b>${esc(r.e.nome)}</b><div class="ro">Mat. ${esc(r.e.matricula)} · ${esc(r.e.funcao)}</div></td><td>${esc(r.e.empresa)}</td><td>${esc(r.e.contrato)}</td><td>${r.e.salario!==''&&r.e.salario!=null?brl(r.e.salario):'<span class="badge w">sem salário</span>'}</td><td>${heTxt(r)}</td><td>${bonTxt(r)}</td><td>${r.p13?brl(r.p13):'—'}</td><td>${r.pf?brl(r.pf):'—'}</td><td>${r.l?brl(r.l.total):'—'}</td><td>${r.l&&(r.l.ded1||r.l.ded2)?'− '+brl(r.l.ded1+r.l.ded2):'—'}</td><td>${r.l?'<b>'+brl(r.l.liq)+'</b>':'—'}</td><td>${r.l?brl(r.l.custo):'—'}</td></tr>`).join('')||`<tr><td colspan="12" class="empty">Nenhum colaborador nesta seleção.</td></tr>`}</tbody>
+   ${L.length?`<tfoot><tr><td colspan="3" style="text-align:right">Total (${L.length})</td><td>${brl(s(r=>Number(r.e.salario)||0))}</td><td>${brl(s(r=>heTot(r.x)))}</td><td>${brl(s(r=>bonTot(r.x)))}</td><td>${brl(s(r=>r.p13))}</td><td>${brl(s(r=>r.pf))}</td><td>${brl(s(r=>r.l&&r.l.total))}</td><td>${brl(s(r=>r.l&&(r.l.ded1+r.l.ded2)))}</td><td>${brl(s(r=>r.l&&r.l.liq))}</td><td>${brl(s(r=>r.l&&r.l.custo))}</td></tr></tfoot>`:''}</table></div>`;
+}
+const _dpRenderImp=renderImp;
+renderImp=function(){
+  _dpRenderImp();
+  const v=$('v-imp');if(!v)return;
+  const orig=[...v.children];if(!orig.length)return;
+  const resumo=orig[orig.length-1],params=orig.slice(0,-1);
+  const h2=params[0]&&params[0].querySelector('h2');if(h2)h2.textContent='Parâmetros de impostos e encargos';
+  if(!SALQ.comp)SALQ.comp=dpCompAtual();
+  const so=perfil==='fin'||!isRH();
+  const topo=document.createElement('div');topo.className='card';
+  topo.innerHTML=`<h2>Salário, impostos e encargos</h2><div class="tools" style="align-items:center"><div class="dp-vis">${[['colab','👥 Por colaborador'],['emp','🏢 Resumo por empresa'],['par','⚙️ Parâmetros de impostos']].map(x=>`<button data-impv="${x[0]}" class="${IMPV.v===x[0]?'on':''}">${x[1]}</button>`).join('')}</div>${so?'<span class="badge g">somente leitura</span>':''}</div>`;
+  const bx=document.createElement('div');bx.id='imp-colab';bx.style.marginTop='16px';bx.hidden=IMPV.v!=='colab';
+  if(IMPV.v==='colab'){
+    bx.innerHTML=`<div class="card"><div class="tools"><label>Competência <select id="sal-comp">${dpComps().map(c=>`<option value="${c}" ${c===SALQ.comp?'selected':''}>${compLabel(c)}</option>`).join('')}</select></label>
+     <label>Empresa <select id="sal-emp"><option value="">Todas</option>${EMPRESAS.map(x=>`<option ${x===SALQ.emp?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+     <label>Buscar <input id="sal-q" value="${esc(SALQ.q)}" placeholder="nome, matrícula ou função"></label></div>
+     <div class="ro" style="margin:6px 0 10px">${so?'Visualização do Financeiro: valores do mês com a situação de aprovação.':'Clique no colaborador para lançar hora extra e bonificação (o Gestor do Departamento Pessoal aprova). O salário base vem da ficha.'} Hora extra e bonificação só entram no bruto quando aprovadas. Meses anteriores ficam guardados para consulta.</div>
+     <div id="sal-lista"></div></div>`;
+  }
+  resumo.hidden=IMPV.v!=='emp';if(IMPV.v==='emp')resumo.style.marginTop='16px';
+  params.forEach(p=>{p.hidden=IMPV.v!=='par'});if(params[0])params[0].style.marginTop='16px';
+  v.insertBefore(topo,v.firstChild);v.insertBefore(bx,topo.nextSibling);
+  if(IMPV.v==='colab')dpSalLista();
+};
+
+/* ---------- aba "Férias, baixadas e afastamentos" ---------- */
+const AUSQ={vis:'lista',grupo:'',obra:'',q:'',mes:null};
+const AUS_TIPOS=['Férias','Baixada','Atestado médico','Falta injustificada','Falta justificada (outros)','Afastamento (INSS)','Licença maternidade/paternidade'];
+const dpGrupo=t=>/^Férias/.test(t)?'Férias':/^Baixada/.test(t)?'Baixada':/^Viagem/.test(t)?'Viagens':/Afastamento|Licença/.test(t)?'Afastamentos e licenças':'Atestados e faltas';
+const dpLetra=t=>/^Férias/.test(t)?'F':/^Baixada/.test(t)?'B':/^Atestado/.test(t)?'A':/injustificada/.test(t)?'X':/justificada/.test(t)?'J':/Afastamento|Licença/.test(t)?'L':'V';
+function dpEventos(){
+  const ev=[];
+  EMP.forEach(e=>{
+    if(e.status==='Desligado')return;
+    if(e.feriasIni)ev.push({e,tipo:'Férias',ini:e.feriasIni,fim:feriasFim(e),dias:Number(e.feriasDias)||30,obs:'Programadas'});
+    (e.feriasHist||[]).forEach(f=>ev.push({e,tipo:'Férias',ini:f.ini,fim:addDays(f.ini,(Number(f.dias)||30)-1),dias:Number(f.dias)||30,obs:'Anteriores'}));
+    const pb=prevBaixada(e);if(e.dataObra&&pb)ev.push({e,tipo:'Baixada',ini:pb,fim:pb,dias:'',obs:'Prevista pelo ciclo de '+(e.diasBaixada||'?')+' dias em campo',prev:true});
+    (e.baixadas||[]).forEach(b=>ev.push({e,tipo:'Baixada',ini:b.ini,fim:addDays(b.ini,(Number(b.dias)||1)-1),dias:Number(b.dias)||1,obs:b.obs||''}));
+    (e.faltas||[]).forEach(f=>ev.push({e,tipo:f.tipo,ini:f.data,fim:addDays(f.data,(Number(f.dias)||1)-1),dias:Number(f.dias)||1,obs:f.obs||'',anexo:f.anexo,semAnexo:f.tipo==='Atestado médico'&&!f.anexo}));
+    (e.mob||[]).forEach(m=>{if(['Baixada','Férias','Desligamento'].includes(m.tipo))ev.push({e,tipo:'Viagem · '+m.tipo,ini:m.data,fim:m.data,dias:'',obs:(m.origem||'')+' → '+(m.destino||'')+' · passagem '+(m.status==='Pendente'?'pendente':'comprada')})});
+  });
+  return ev.filter(x=>x.ini).sort((a,b)=>String(b.ini).localeCompare(String(a.ini)));
+}
+const dpSitu=x=>{const h=fmtISO(HOJE);return x.ini>h?['Prevista','w']:(x.fim||x.ini)>=h?['Em curso','ok']:['Concluída','g']};
+function dpAusFiltro(L){const q=dpK(AUSQ.q);return L.filter(x=>(!AUSQ.grupo||dpGrupo(x.tipo)===AUSQ.grupo)&&(!AUSQ.obra||x.e.obra===AUSQ.obra)&&(!q||dpK(x.e.nome+' '+x.e.matricula).includes(q)))}
+function dpAusLista(){
+  const el=$('aus-lista');if(!el)return;
+  if(AUSQ.vis==='cal'){el.innerHTML=dpCalHtml();return}
+  const L=dpAusFiltro(dpEventos());
+  el.innerHTML=`<div style="overflow:auto"><table><thead><tr><th>Colaborador</th><th>Obra</th><th>Tipo</th><th>Início</th><th>Fim</th><th>Dias</th><th>Situação</th><th>Observação</th></tr></thead><tbody>${L.map(x=>{const s=dpSitu(x);return `<tr data-ausid="${x.e.id}" style="cursor:pointer"><td><b>${esc(x.e.nome)}</b><div class="ro">Mat. ${esc(x.e.matricula)}</div></td><td>${esc(x.e.obra)}</td><td><span class="dp-c dp-${dpLetra(x.tipo)}" style="width:auto;padding:1px 8px">${esc(x.tipo)}</span></td><td>${fmtD(x.ini)}</td><td>${x.fim&&x.fim!==x.ini?fmtD(x.fim):'—'}</td><td>${x.dias||'—'}</td><td><span class="badge ${s[1]}">${x.prev?'Prevista':s[0]}</span></td><td>${esc(x.obs)}${x.anexo?' <span class="badge ok">📎 anexo</span>':''}${x.semAnexo?' <span class="badge r">sem atestado</span>':''}</td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Nenhum registro nesta seleção.</td></tr>'}</tbody></table></div>`;
+}
+function dpCalHtml(){
+  const [y,m]=AUSQ.mes.split('-').map(Number),dm=new Date(y,m,0).getDate(),ini=AUSQ.mes+'-01',fim=AUSQ.mes+'-'+pad(dm);
+  const L=dpAusFiltro(dpEventos()).filter(x=>x.ini<=fim&&(x.fim||x.ini)>=ini);
+  const por=new Map();L.forEach(x=>{if(!por.has(x.e.id))por.set(x.e.id,{e:x.e,ev:[]});por.get(x.e.id).ev.push(x)});
+  const linhas=[...por.values()].sort((a,b)=>String(a.e.obra).localeCompare(String(b.e.obra))||String(a.e.nome).localeCompare(String(b.e.nome)));
+  const dias=[...Array(dm)].map((_,i)=>i+1),fds=d=>{const w=new Date(y,m-1,d).getDay();return w===0||w===6};
+  let ob=null,html='';
+  linhas.forEach(r=>{
+    if(r.e.obra!==ob){ob=r.e.obra;html+=`<tr class="ob"><td colspan="${dm+1}">${esc(ob||'Sem obra')}</td></tr>`}
+    html+=`<tr data-ausid="${r.e.id}" style="cursor:pointer"><td class="nm">${esc(r.e.nome)}</td>${dias.map(d=>{const iso=AUSQ.mes+'-'+pad(d);const x=r.ev.find(v=>v.ini<=iso&&(v.fim||v.ini)>=iso);return `<td class="${fds(d)?'fds':''}">${x?`<span class="dp-c dp-${dpLetra(x.tipo)}" title="${esc(x.tipo+' · '+fmtD(x.ini)+(x.fim&&x.fim!==x.ini?' a '+fmtD(x.fim):''))}">${dpLetra(x.tipo)}</span>`:''}</td>`}).join('')}</tr>`;
+  });
+  const leg=[['F','Férias'],['B','Baixada'],['A','Atestado'],['X','Falta injustificada'],['J','Falta justificada'],['L','Afastamento / licença'],['V','Viagem (mobilização)']];
+  return `<div class="tools" style="align-items:center"><button class="btn sec" data-ausmes="-1">◀</button><b style="min-width:110px;text-align:center">${MESES[m-1]}/${y}</b><button class="btn sec" data-ausmes="1">▶</button><div class="dp-leg">${leg.map(l=>`<span><i class="dp-${l[0]}"></i>${l[1]}</span>`).join('')}</div></div>
+   <div style="overflow:auto;margin-top:8px"><table class="dp-cal no-ordenar"><thead><tr><th>Colaborador</th>${dias.map(d=>`<th class="${fds(d)?'fds':''}">${d}</th>`).join('')}</tr></thead><tbody>${html||`<tr><td colspan="${dm+1}" class="empty">Ninguém fora da obra neste mês.</td></tr>`}</tbody></table></div>`;
+}
+function renderAus(){
+  const v=$('v-aus');if(!v||v.hidden)return;
+  if(!AUSQ.mes)AUSQ.mes=dpCompAtual();
+  const obras=[...new Set(EMP.map(e=>e.obra).filter(Boolean))].sort();
+  const ev=dpEventos(),h=fmtISO(HOJE),em30=addDays(h,30);
+  const k=[['Fora da obra hoje',new Set(ev.filter(x=>!x.prev&&x.ini<=h&&(x.fim||x.ini)>=h&&!/^Viagem/.test(x.tipo)).map(x=>x.e.id)).size,''],
+   ['Férias nos próximos 30 dias',ev.filter(x=>x.tipo==='Férias'&&x.ini>=h&&x.ini<=em30).length,'w'],
+   ['Baixadas nos próximos 30 dias',ev.filter(x=>x.tipo==='Baixada'&&x.ini>=h&&x.ini<=em30).length,'w'],
+   ['Atestados sem anexo',ev.filter(x=>x.semAnexo).length,'w']];
+  v.innerHTML=`<div class="kpis">${k.map(x=>`<div class="kpi ${x[2]}"><b>${x[1]}</b><span>${x[0]}</span></div>`).join('')}</div>
+   <div class="card" style="margin-top:12px"><h2>Férias, baixadas e afastamentos</h2>
+   <div class="tools" style="align-items:center"><div class="dp-vis"><button data-ausvis="lista" class="${AUSQ.vis==='lista'?'on':''}">📋 Lista</button><button data-ausvis="cal" class="${AUSQ.vis==='cal'?'on':''}">📅 Calendário por obra</button></div>
+    <label>Tipo <select id="aus-grupo"><option value="">Todos</option>${['Férias','Baixada','Atestados e faltas','Afastamentos e licenças','Viagens'].map(g=>`<option ${g===AUSQ.grupo?'selected':''}>${g}</option>`).join('')}</select></label>
+    <label>Obra <select id="aus-obra"><option value="">Todas</option>${obras.map(o=>`<option ${o===AUSQ.obra?'selected':''}>${esc(o)}</option>`).join('')}</select></label>
+    <label>Buscar <input id="aus-q" value="${esc(AUSQ.q)}" placeholder="nome ou matrícula"></label>
+    ${isRH()?'<button class="btn" id="aus-novo">＋ Lançar</button>':''}</div>
+   <div class="ro" style="margin:6px 0 10px">Clique numa linha para abrir férias, baixada, faltas e mobilização do colaborador. Ao lançar férias ou baixada, dá para registrar a viagem na Mobilização: Compras recebe o alerta para comprar a passagem.</div>
+   <div id="aus-lista"></div></div>`;
+  dpAusLista();
+}
+function dpLancarHtml(){
+  const L=EMP.filter(e=>e.status!=='Desligado').sort((a,b)=>String(a.nome).localeCompare(String(b.nome)));
+  return `<div class="mh"><div><h2>Lançar férias, baixada ou afastamento</h2><div class="ro">O lançamento aparece na lista, no calendário e na ficha do colaborador.</div></div><button class="x" data-close="1">×</button></div>
+   <div class="sec"><div class="f">
+    <div class="full"><label>Colaborador</label><select id="la-emp"><option value="">— escolha —</option>${L.map(e=>`<option value="${e.id}">${esc(e.nome)} · ${esc(e.obra)}</option>`).join('')}</select></div>
+    <div><label>Tipo</label><select id="la-tipo">${AUS_TIPOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
+    <div><label>Início</label><input type="date" id="la-ini"></div>
+    <div><label>Dias</label><input type="number" id="la-dias" value="30" min="1"></div>
+    <div class="full"><label>Observação</label><input id="la-obs"></div>
+    <div class="full" id="la-anx" hidden><label>Atestado / documento (PDF ou foto)</label><input type="file" id="la-file"></div>
+    <div class="full" id="la-mob"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="la-viagem" checked> Registrar a viagem na Mobilização e avisar Compras para comprar a passagem</label>
+     <div class="f" style="margin-top:6px"><div><label>Origem</label><input id="la-or" list="la-cds" autocomplete="off"></div><div><label>Destino</label><input id="la-de" list="la-cds" autocomplete="off"></div><datalist id="la-cds">${CDS.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div></div>
+    <div class="full ro" id="la-info"></div>
+   </div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn" id="la-salvar">Salvar lançamento</button><button class="btn sec" data-close="1">Cancelar</button></div></div>`;
+}
+function dpLaSync(){
+  const t=($('la-tipo')||{}).value||'',e=EMP.find(x=>x.id===Number(($('la-emp')||{}).value));
+  const viag=t==='Férias'||t==='Baixada';
+  if($('la-mob'))$('la-mob').hidden=!viag;
+  if($('la-anx'))$('la-anx').hidden=viag;
+  if($('la-dias')&&!$('la-dias').dataset.mexeu)$('la-dias').value=t==='Férias'?30:t==='Baixada'?10:1;
+  if(e&&$('la-or')&&!$('la-or').dataset.mexeu)$('la-or').value=t==='Baixada'||t==='Férias'?(e.obra||''):'';
+  if(e&&$('la-de')&&!$('la-de').dataset.mexeu)$('la-de').value=e.cidade?(e.cidade+(e.uf?'/'+e.uf:'')):'';
+  if($('la-info'))$('la-info').textContent=t==='Baixada'?'A data de volta à obra (início + dias) passa a ser a nova data de ida para a obra, e a próxima baixada é recalculada pelo ciclo do colaborador.':t==='Férias'?'Substitui as férias programadas do colaborador (as anteriores ficam no histórico).':t==='Falta injustificada'?'Falta injustificada gera desconto na folha.':'';
+}
+async function dpLaSalvar(){
+  const e=EMP.find(x=>x.id===Number($('la-emp').value)),t=$('la-tipo').value,ini=$('la-ini').value,dias=Number($('la-dias').value)||0,obs=$('la-obs').value.trim();
+  if(!e){alert('Escolha o colaborador.');return}
+  if(!ini){alert('Informe a data de início.');return}
+  if(dias<1){alert('Informe a quantidade de dias.');return}
+  const viag=(t==='Férias'||t==='Baixada')&&$('la-viagem').checked,or=($('la-or').value||'').trim(),de=($('la-de').value||'').trim();
+  if(viag&&(!or||!de)){alert('Informe a origem e o destino da viagem, ou desmarque a opção de registrar a viagem.');return}
+  if(viag&&or===de){alert('Origem e destino não podem ser iguais.');return}
+  if(t==='Férias'){
+    if(e.feriasIni&&e.feriasIni!==ini){e.feriasHist=(e.feriasHist||[]).concat({ini:e.feriasIni,dias:Number(e.feriasDias)||30})}
+    const ant=e.feriasIni;e.feriasIni=ini;e.feriasDias=String(dias);
+    auditar({acao:'Lançou férias',alvo:e.nome,alvoId:e.id,sec:'ferias',campo:'Férias',antes:ant?fmtD(ant):'—',depois:fmtD(ini)+' · '+dias+' dias'+(obs?' · '+obs:'')});
+  }else if(t==='Baixada'){
+    const volta=addDays(ini,dias),ant=e.dataObra;
+    e.baixadas=(e.baixadas||[]).concat({ini,dias,obs,por:usuario?usuario.nome:'',em:fmtISO(HOJE)});e.dataObra=volta;
+    auditar({acao:'Lançou baixada',alvo:e.nome,alvoId:e.id,sec:'baixada',campo:'Baixada',depois:fmtD(ini)+' · '+dias+' dias · volta à obra '+fmtD(volta)+(obs?' · '+obs:'')});
+    auditar({acao:'Editou',alvo:e.nome,alvoId:e.id,sec:'baixada',campo:'Data em que foi para a obra',antes:fmtD(ant),depois:fmtD(volta)});
+  }else{
+    const f=$('la-file').files[0];let ax=null;if(f){ax=await anexar(f,'emp'+e.id);if(!ax)return}
+    e.faltas.push({data:ini,dias,tipo:t,anexo:ax?ax.nome:'',anexoPath:ax?ax.path:'',obs});
+    auditar({acao:'Registrou falta/atestado',alvo:e.nome,alvoId:e.id,sec:'faltas',campo:t+' '+fmtD(ini),depois:dias+' dia(s)'+(f?' · anexo '+f.name:'')});
+  }
+  if(viag){e.mob.push({tipo:t,origem:or,destino:de,data:ini,status:'Pendente'});auditar({acao:'Registrou mobilização/transferência',alvo:e.nome,alvoId:e.id,sec:'mob',campo:t,depois:or+' → '+de+' em '+fmtD(ini)})}
+  fecharModal();render();toast('Lançamento salvo'+(viag?' e viagem enviada para Compras.':'.'));
+}
+
+/* ---------- alertas: ASO apto avisa Saúde e Segurança; sem alerta de passagem em dobro ---------- */
+const _dpAlertasGlobais=alertasGlobais;
+alertasGlobais=function(A){
+  const perto=(a,b)=>{const x=parse(a),y=parse(b);return x&&y&&Math.abs(x-y)<=10*864e5};
+  for(let i=A.length-1;i>=0;i--){const a=A[i],e=a.e;if(!e||!Array.isArray(e.mob)||typeof a.k!=='string')continue;
+    if(/^bx/.test(a.k)&&e.mob.some(m=>m.tipo==='Baixada'&&perto(m.data,prevBaixada(e))))A.splice(i,1);
+    else if(/^fe/.test(a.k)&&e.mob.some(m=>m.tipo==='Férias'&&perto(m.data,e.feriasIni)))A.splice(i,1)}
+  EMP.forEach(e=>{
+    if(e.status==='Desligado'||e.legado||!e.check||!e.check.aso)return;
+    const ad=diasAte(e.admissao);if(ad!==null&&ad<-90)return;
+    A.push({k:'asoapto'+e.id,e,nivel:'w',roles:['sst'],tipo:'🩺 ASO admissional apto · iniciar mobilização',txt:`${e.nome} (${e.funcao||'sem função'} · ${e.obra||'sem obra'}) está com o ASO admissional apto. Saúde e Segurança pode iniciar a mobilização (treinamentos e EPI).`,cta:'Mobilização iniciada'});
+  });
+  return _dpAlertasGlobais(A);
+};
+
+/* ---------- render e eventos ---------- */
+const _dpRender=render;
+render=function(){dpSnap();_dpRender();renderAus()};
+document.addEventListener('click',ev=>{
+  const t=ev.target;if(!t||!t.closest)return;
+  const sw=t.closest('[data-fmodo]');if(sw){FICHA_MODO=sw.dataset.fmodo;renderModal();ev.stopImmediatePropagation();return}
+  if(t.dataset&&t.dataset.close!==undefined||t===$('ov')){DP_ULT=null}
+  const iv=t.closest('[data-impv]');if(iv){IMPV.v=iv.dataset.impv;renderImp();return}
+  const av=t.closest('[data-ausvis]');if(av){AUSQ.vis=av.dataset.ausvis;renderAus();return}
+  const am=t.closest('[data-ausmes]');if(am){let [y,m]=AUSQ.mes.split('-').map(Number);m+=Number(am.dataset.ausmes);if(m<1){m=12;y--}if(m>12){m=1;y++}AUSQ.mes=y+'-'+pad(m);dpAusLista();return}
+  if(t.id==='aus-novo'){abrirCustom(dpLancarHtml());dpLaSync();return}
+  if(t.id==='la-salvar'){dpLaSalvar();return}
+  const sr=t.closest('tr[data-salid]');if(sr){dpAbrir(sr.dataset.salid,'sal');return}
+  const ar=t.closest('tr[data-ausid]');if(ar){dpAbrir(ar.dataset.ausid,'aus');return}
+  const row=t.closest('tr.row');if(row){DP_PEND=mod==='fin'?'sal':(mod==='pmo'||mod==='compras')?'aus':'ficha';DP_ULT=null;return}
+  if(t.dataset&&t.dataset.id&&t.closest('.alert')){const tp=((t.closest('.alert').querySelector('.t')||{}).textContent)||'';DP_PEND=/hora extra|bonifica/i.test(tp)?'sal':/férias|baixada|atestado|falta/i.test(tp)?'aus':'ficha';DP_ULT=null}
+});
+document.addEventListener('change',ev=>{
+  const t=ev.target;if(!t)return;
+  if(t.id==='sal-comp'){SALQ.comp=t.value;dpSalLista();return}
+  if(t.id==='sal-emp'){SALQ.emp=t.value;dpSalLista();return}
+  if(t.id==='aus-grupo'){AUSQ.grupo=t.value;dpAusLista();return}
+  if(t.id==='aus-obra'){AUSQ.obra=t.value;dpAusLista();return}
+  if(t.id==='la-emp'||t.id==='la-tipo'){dpLaSync();return}
+  if(t.id==='la-or'||t.id==='la-de'||t.id==='la-dias')t.dataset.mexeu='1';
+});
+document.addEventListener('input',ev=>{
+  const t=ev.target;if(!t)return;
+  if(t.id==='sal-q'){SALQ.q=t.value;dpSalLista()}
+  if(t.id==='aus-q'){AUSQ.q=t.value;dpAusLista()}
+  if(t.id==='la-or'||t.id==='la-de'||t.id==='la-dias')t.dataset.mexeu='1';
+});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape')DP_ULT=null});
+
 /* ===== Ordenar listas clicando no título da coluna (vale para todas as tabelas) =====
    Clique no título: ordena (A→Z, data mais antiga primeiro, menor valor primeiro).
    Clique de novo: inverte. Uma setinha ▲/▼ mostra a coluna e o sentido.
