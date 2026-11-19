@@ -1491,6 +1491,8 @@ function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.get
 function isNum(v){ return v!==null && v!==undefined && v!=="" && !isNaN(Number(v)); }
 function esc(s){ return (s===null||s===undefined) ? "" : String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function escAttr(s){ return esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+/* valor JS seguro dentro de atributo HTML (onclick='...'): JSON + escape de aspas */
+function jsAttr(v){ return escAttr(JSON.stringify(v===undefined?null:v)); }
 function obsIcon(txt){ return txt ? ` <span class="obs-icon" title="${escAttr(txt)}">📝</span>` : ''; }
 /* Balão clicável de observação — abre um chat da observação (texto original +
    respostas em thread). Fica bem no início da célula, antes do texto truncado,
@@ -7774,7 +7776,7 @@ async function loadAndRenderUsuarios(){
     }else if(ehGestor && !IS_MESTRE){
       permCell = '<span class="muted">Só o Gestor Mestre configura</span>';
     }else{
-      permCell = `<button class="btn btn-sm" onclick='abrirPermissoesModal(${JSON.stringify(u.id)}, ${JSON.stringify(u.nome||u.id)}, ${JSON.stringify(Array.isArray(u.paginas_permitidas)?u.paginas_permitidas:null)}, ${JSON.stringify(u.papel)})'>🔒 Permissões${Array.isArray(u.paginas_permitidas)?` <span class="badge b-amber">${u.paginas_permitidas.length}</span>`:''}</button>`;
+      permCell = `<button class="btn btn-sm" onclick='abrirPermissoesModal(${jsAttr(u.id)}, ${jsAttr(u.nome||u.id)}, ${jsAttr(Array.isArray(u.paginas_permitidas)?u.paginas_permitidas:null)}, ${jsAttr(u.papel)})'>🔒 Permissões${Array.isArray(u.paginas_permitidas)?` <span class="badge b-amber">${u.paginas_permitidas.length}</span>`:''}</button>`;
     }
     return `<tr>
     <td>${esc(u.nome)||'<span class="muted">—</span>'}${u.id===CURRENT_USER.id?' <span class="badge b-blue">Você</span>':''}</td>
@@ -7790,7 +7792,7 @@ async function loadAndRenderUsuarios(){
     <td><select class="status-select" onchange="alterarRhPerfil('${u.id}', this.value)" ${(u.rh_perfil==='grh' && !IS_MESTRE) ? 'disabled title="Só o Gestor Mestre altera o Gestor do RH"' : ''}>
       <option value="">Padrão (consulta; Mestre = Gestor do RH)</option>
       ${RH_PERFIS.map(([v,l])=>`<option value="${v}" ${u.rh_perfil===v?'selected':''} ${(v==='grh' && !IS_MESTRE)?'disabled':''}>${l}</option>`).join('')}
-    </select>${ehMestre ? '<div class="muted" style="font-size:12px;margin-top:4px;">Mestre vê todo o RH</div>' : (IS_MESTRE ? `<div style="margin-top:6px;"><button class="btn btn-sm" onclick='abrirRhPaginasModal(${JSON.stringify(u.id)}, ${JSON.stringify(u.nome||u.id)}, ${JSON.stringify(Array.isArray(u.rh_paginas)?u.rh_paginas:null)})'>🔒 Páginas do RH${Array.isArray(u.rh_paginas)?` <span class="badge b-amber">${u.rh_paginas.length}</span>`:''}</button></div>` : '')}</td>
+    </select>${ehMestre ? '<div class="muted" style="font-size:12px;margin-top:4px;">Mestre vê todo o RH</div>' : (IS_MESTRE ? `<div style="margin-top:6px;"><button class="btn btn-sm" onclick='abrirRhPaginasModal(${jsAttr(u.id)}, ${jsAttr(u.nome||u.id)}, ${jsAttr(Array.isArray(u.rh_paginas)?u.rh_paginas:null)})'>🔒 Páginas do RH${Array.isArray(u.rh_paginas)?` <span class="badge b-amber">${u.rh_paginas.length}</span>`:''}</button></div>` : '')}</td>
   </tr>`;
   }).join('') : `<tr class="empty-row"><td colspan="6">Nenhum usuário encontrado.</td></tr>`;
   renderPedidosAcesso();
